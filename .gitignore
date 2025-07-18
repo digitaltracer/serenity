@@ -1,0 +1,208 @@
+# Dependencies
+node_modules/
+*/node_modules/
+.pnp
+.pnp.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Production builds
+dist/
+build/
+out/
+release/
+.next/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output/
+
+# Cache directories
+.cache/
+.parcel-cache/
+.serverless/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# TypeScript
+*.tsbuildinfo
+
+# Turbo
+.turbo/
+
+# Electron
+apps/desktop/dist/
+apps/desktop/release/
+dist_electron/
+
+# Electron-builder artifacts
+*.dmg
+*.pkg
+*.rpm
+*.deb
+*.tar.xz
+*.zip
+*.exe
+*.msi
+*.nupkg
+*.snap
+*.AppImage
+
+# React Native
+apps/mobile/ios/Pods/
+apps/mobile/android/app/build/
+apps/mobile/ios/build/
+apps/mobile/android/build/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# User data and app data
+user-data/
+app-data/
+
+# Temporary files
+tmp/
+temp/
+
+# Test results
+test-results/
+junit.xml
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+# Storybook
+storybook-static/
+
+# Build artifacts
+*.tgz
+*.tar.gz
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Generated files
+generated/
+auto-generated/
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.cert
+certificates/
+
+# MacOS specific
+.AppleDouble
+.LSOverride
+
+# Windows specific
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux specific
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Build tools cache
+.webpack/
+.rollup.cache/
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# App signing
+*.p12
+*.mobileprovision
+*.provisionprofile
+
+# Local development
+.local/
+.vscode/settings.json
+
+# Dependency directories
+jspm_packages/
+
+# Application logs
+app.log
+error.log
+access.log
+
+# Misc
+.npmrc
+.yarnrc
+.pnpmrc

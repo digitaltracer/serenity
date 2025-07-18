@@ -206,5 +206,3 @@ access.log
 .npmrc
 .yarnrc
 .pnpmrc
-.claude/*
-screenshots/*

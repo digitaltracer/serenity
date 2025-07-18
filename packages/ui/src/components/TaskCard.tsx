@@ -1,0 +1,192 @@
+import React from 'react';
+import { Task } from '@serenity/core';
+import { cn } from '../utils/cn';
+import { CheckCircle2, Circle, Calendar, Flag, RefreshCw, ListTodo } from 'lucide-react';
+
+export interface TaskCardProps {
+  task: Task;
+  onToggle?: (taskId: string) => void;
+  onToggleSubtask?: (taskId: string, subtaskId: string) => void;
+  onClick?: (task: Task) => void;
+  className?: string;
+}
+
+const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onToggleSubtask, onClick, className }) => {
+  const priorityColors = {
+    high: 'text-red-500 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20',
+    medium: 'text-yellow-500 border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20',
+    low: 'text-green-500 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20',
+  };
+
+  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && !task.completed;
+  const isDueToday = task.dueDate && new Date(task.dueDate).toDateString() === new Date().toDateString();
+
+  return (
+    <div
+      className={cn(
+        'group relative border rounded-lg p-4 transition-all hover:shadow-md cursor-pointer',
+        'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700',
+        {
+          'opacity-60': task.completed,
+          'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-900/10': isOverdue,
+          'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/10': isDueToday && !isOverdue,
+        },
+        className
+      )}
+      onClick={() => onClick?.(task)}
+    >
+      <div className="flex items-start gap-3">
+        {/* Checkbox */}
+        <button
+          className="flex-shrink-0 mt-0.5 transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle?.(task.id);
+          }}
+        >
+          {task.completed ? (
+            <CheckCircle2 className="w-5 h-5 text-green-500" />
+          ) : (
+            <Circle className="w-5 h-5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300" />
+          )}
+        </button>
+
+        {/* Task Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between">
+            <h3
+              className={cn(
+                'font-medium text-gray-900 dark:text-gray-100',
+                {
+                  'line-through text-gray-500 dark:text-gray-400': task.completed,
+                }
+              )}
+            >
+              {task.title}
+            </h3>
+
+            {/* Priority Badge */}
+            <div
+              className={cn(
+                'flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border',
+                priorityColors[task.priority]
+              )}
+            >
+              <Flag className="w-3 h-3" />
+              {task.priority}
+            </div>
+          </div>
+
+          {/* Description */}
+          {task.description && (
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+              {task.description}
+            </p>
+          )}
+
+          {/* Subtasks */}
+          {task.subtasks && task.subtasks.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {task.subtasks.slice(0, 3).map((subtask) => (
+                <div key={subtask.id} className="flex items-center gap-2 text-sm">
+                  <button
+                    className="flex-shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleSubtask?.(task.id, subtask.id);
+                    }}
+                  >
+                    {subtask.completed ? (
+                      <CheckCircle2 className="w-3 h-3 text-green-500" />
+                    ) : (
+                      <Circle className="w-3 h-3 text-gray-400" />
+                    )}
+                  </button>
+                  <span
+                    className={cn(
+                      'text-gray-600 dark:text-gray-400',
+                      { 'line-through text-gray-400 dark:text-gray-500': subtask.completed }
+                    )}
+                  >
+                    {subtask.title}
+                  </span>
+                </div>
+              ))}
+              {task.subtasks.length > 3 && (
+                <div className="text-xs text-gray-500 dark:text-gray-400 ml-5">
+                  +{task.subtasks.length - 3} more subtasks
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="flex items-center justify-between mt-3">
+            <div className="flex items-center gap-2">
+              {/* Due Date */}
+              {task.dueDate && (
+                <div
+                  className={cn(
+                    'flex items-center gap-1 text-xs',
+                    {
+                      'text-red-600 dark:text-red-400': isOverdue,
+                      'text-blue-600 dark:text-blue-400': isDueToday && !isOverdue,
+                      'text-gray-500 dark:text-gray-400': !isOverdue && !isDueToday,
+                    }
+                  )}
+                >
+                  <Calendar className="w-3 h-3" />
+                  {new Date(task.dueDate).toLocaleDateString()}
+                </div>
+              )}
+
+              {/* Subtask Progress */}
+              {task.subtasks && task.subtasks.length > 0 && (
+                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                  <ListTodo className="w-3 h-3" />
+                  {task.subtasks.filter(st => st.completed).length}/{task.subtasks.length}
+                </div>
+              )}
+
+              {/* Recurring */}
+              {task.recurring && (
+                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                  <RefreshCw className="w-3 h-3" />
+                  {task.recurring.type}
+                </div>
+              )}
+
+              {/* Project */}
+              {task.projectId && (
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  📁 Project
+                </div>
+              )}
+            </div>
+
+            {/* Tags */}
+            {task.tags.length > 0 && (
+              <div className="flex gap-1">
+                {task.tags.slice(0, 2).map((tag, index) => (
+                  <span
+                    key={index}
+                    className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                  >
+                    {tag}
+                  </span>
+                ))}
+                {task.tags.length > 2 && (
+                  <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                    +{task.tags.length - 2}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export { TaskCard };

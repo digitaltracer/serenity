@@ -129,7 +129,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         
         <SidebarHeader>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 justify-center w-full">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">S</span>
               </div>
@@ -163,6 +163,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           
           {sidebarCollapsed && (
             <div className="space-y-2">
+              {/* Toggle button when collapsed */}
+              <SidebarItem
+                icon={<PanelLeft className="w-5 h-5" />}
+                onClick={toggleSidebar}
+              />
               {navigationItems.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -229,19 +234,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </Sidebar>
 
-      {/* Floating expand button when sidebar is collapsed */}
-      {sidebarCollapsed && (
-        <div className="fixed top-16 left-4 z-50">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleSidebar}
-            className="bg-white dark:bg-gray-800 shadow-md hover:shadow-lg border border-gray-200 dark:border-gray-700 w-8 h-8 p-0"
-          >
-            <PanelLeft className="w-4 h-4" />
-          </Button>
-        </div>
-      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">

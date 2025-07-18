@@ -24,7 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children, className, collapsed }) => 
         'transition-all duration-300',
         {
           'w-56': !collapsed,
-          'w-16': collapsed,
+          'w-20': collapsed,
         },
         className
       )}

@@ -4,6 +4,63 @@ import { selectAllTasks, selectAllEntries } from '@serenity/core';
 import { Card, CardHeader, CardTitle, CardContent, ProgressBar } from '@serenity/ui';
 import { BarChart3, TrendingUp, Calendar, Target, Zap, Clock, BookOpen } from 'lucide-react';
 
+const calculateStreak = (completedTasks: any[]) => {
+  if (completedTasks.length === 0) return 0;
+  
+  const today = new Date();
+  let streak = 0;
+  let currentDate = new Date(today);
+  
+  while (streak < 30) { // Limit to prevent infinite loop
+    const dayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+    
+    const hasTasksThisDay = completedTasks.some(task => {
+      const taskDate = task.updatedAt ? new Date(task.updatedAt) : new Date();
+      return taskDate >= dayStart && taskDate < dayEnd;
+    });
+    
+    if (hasTasksThisDay) {
+      streak++;
+      currentDate.setDate(currentDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  
+  return streak;
+};
+
+const getImprovementSuggestion = (allTasks: any[], completedTasks: any[]) => {
+  const pendingTasks = allTasks.filter(task => !task.completed);
+  const overdueTasks = pendingTasks.filter(task => {
+    if (!task.dueDate) return false;
+    const dueDate = new Date(task.dueDate);
+    return dueDate < new Date();
+  });
+  
+  if (overdueTasks.length > 0) {
+    return `You have ${overdueTasks.length} overdue tasks - consider prioritizing them`;
+  }
+  
+  const largeTasksWithoutSubtasks = allTasks.filter(task => 
+    !task.completed && 
+    task.description && 
+    task.description.length > 100 && 
+    (!task.subtasks || task.subtasks.length === 0)
+  );
+  
+  if (largeTasksWithoutSubtasks.length > 0) {
+    return `Consider breaking down ${largeTasksWithoutSubtasks.length} large tasks into subtasks`;
+  }
+  
+  if (completedTasks.length > 0) {
+    return 'Great job! Keep up the momentum';
+  }
+  
+  return 'Start by creating your first task';
+};
+
 export const AnalyticsPage: React.FC = () => {
   const tasks = useSelector(selectAllTasks);
   const journalEntries = useSelector(selectAllEntries);
@@ -15,18 +72,20 @@ export const AnalyticsPage: React.FC = () => {
 
     // Task analytics
     const completedTasks = tasks.filter(task => task.completed);
-    const tasksCompletedToday = completedTasks.filter(task => 
-      new Date(task.updatedAt) >= today
-    ).length;
+    const tasksCompletedToday = completedTasks.filter(task => {
+      const taskDate = task.updatedAt ? new Date(task.updatedAt) : new Date();
+      return taskDate >= today;
+    }).length;
     const completionRate = tasks.length > 0 ? Math.round((completedTasks.length / tasks.length) * 100) : 0;
 
     // Calculate streak (simplified - consecutive days with at least one completed task)
     const activeStreak = calculateStreak(completedTasks);
 
     // Journal analytics
-    const journalEntriesThisMonth = journalEntries.filter(entry => 
-      new Date(entry.date) >= thisMonth
-    ).length;
+    const journalEntriesThisMonth = journalEntries.filter(entry => {
+      const entryDate = entry.date ? new Date(entry.date) : new Date();
+      return entryDate >= thisMonth;
+    }).length;
     const avgWordsPerEntry = journalEntries.length > 0 
       ? Math.round(journalEntries.reduce((sum, entry) => sum + entry.content.split(' ').length, 0) / journalEntries.length)
       : 0;
@@ -34,7 +93,8 @@ export const AnalyticsPage: React.FC = () => {
     // Weekly insights
     const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const tasksByDay = completedTasks.reduce((acc, task) => {
-      const day = dayOfWeek[new Date(task.updatedAt).getDay()];
+      const taskDate = task.updatedAt ? new Date(task.updatedAt) : new Date();
+      const day = dayOfWeek[taskDate.getDay()];
       acc[day] = (acc[day] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -62,61 +122,6 @@ export const AnalyticsPage: React.FC = () => {
       improvementArea
     };
   }, [tasks, journalEntries]);
-
-  const calculateStreak = (completedTasks: typeof tasks) => {
-    if (completedTasks.length === 0) return 0;
-    
-    const today = new Date();
-    let streak = 0;
-    let currentDate = new Date(today);
-    
-    while (streak < 30) { // Limit to prevent infinite loop
-      const dayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-      
-      const hasTasksThisDay = completedTasks.some(task => {
-        const taskDate = new Date(task.updatedAt);
-        return taskDate >= dayStart && taskDate < dayEnd;
-      });
-      
-      if (hasTasksThisDay) {
-        streak++;
-        currentDate.setDate(currentDate.getDate() - 1);
-      } else {
-        break;
-      }
-    }
-    
-    return streak;
-  };
-
-  const getImprovementSuggestion = (allTasks: typeof tasks, completedTasks: typeof tasks) => {
-    const pendingTasks = allTasks.filter(task => !task.completed);
-    const overdueTasks = pendingTasks.filter(task => 
-      task.dueDate && new Date(task.dueDate) < new Date()
-    );
-    
-    if (overdueTasks.length > 0) {
-      return `You have ${overdueTasks.length} overdue tasks - consider prioritizing them`;
-    }
-    
-    const largeTasksWithoutSubtasks = allTasks.filter(task => 
-      !task.completed && 
-      task.description && 
-      task.description.length > 100 && 
-      (!task.subtasks || task.subtasks.length === 0)
-    );
-    
-    if (largeTasksWithoutSubtasks.length > 0) {
-      return `Consider breaking down ${largeTasksWithoutSubtasks.length} large tasks into subtasks`;
-    }
-    
-    if (completedTasks.length > 0) {
-      return 'Great job! Keep up the momentum';
-    }
-    
-    return 'Start by creating your first task';
-  };
 
   return (
     <div className="max-w-6xl mx-auto">

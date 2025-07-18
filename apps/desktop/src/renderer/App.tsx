@@ -22,7 +22,7 @@ function AppContent() {
   return (
     <ThemeProvider>
       <Router>
-        <div className="h-screen bg-gray-50 dark:bg-gray-950">
+        <div className="h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
           <Layout>
             <Routes>
               <Route path="/" element={<HomePage />} />

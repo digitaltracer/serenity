@@ -11,20 +11,26 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const root = window.document.documentElement;
+    const body = window.document.body;
     
     // Remove existing theme classes
     root.classList.remove('light', 'dark');
+    body.classList.remove('light', 'dark');
     
     if (theme === 'system') {
       // Use system preference
       const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       root.classList.add(systemTheme);
+      body.classList.add(systemTheme);
       
       // Listen for system theme changes
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
       const handleChange = (e: MediaQueryListEvent) => {
         root.classList.remove('light', 'dark');
-        root.classList.add(e.matches ? 'dark' : 'light');
+        body.classList.remove('light', 'dark');
+        const newTheme = e.matches ? 'dark' : 'light';
+        root.classList.add(newTheme);
+        body.classList.add(newTheme);
       };
       
       mediaQuery.addEventListener('change', handleChange);
@@ -32,6 +38,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     } else {
       // Use explicit theme
       root.classList.add(theme);
+      body.classList.add(theme);
     }
   }, [theme]);
 

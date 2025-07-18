@@ -14,3 +14,4 @@ export * from './JournalEntryModal';
 export * from './ThemeToggle';
 export * from './SubtaskModal';
 export * from './TagInput';
+export * from './DatePicker';

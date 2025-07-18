@@ -8,7 +8,7 @@ export interface SidebarProps {
 }
 
 export interface SidebarItemProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   icon?: React.ReactNode;
   active?: boolean;
   onClick?: () => void;
@@ -23,7 +23,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children, className, collapsed }) => 
         'dark:bg-gray-900 dark:border-gray-800',
         'transition-all duration-300',
         {
-          'w-64': !collapsed,
+          'w-56': !collapsed,
           'w-16': collapsed,
         },
         className
@@ -71,6 +71,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
         {
           'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300': active,
           'text-gray-700 dark:text-gray-200': !active,
+          'justify-center': !children, // Center icon when no text
         },
         className
       )}
@@ -81,7 +82,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
           {icon}
         </div>
       )}
-      <span className="font-medium truncate">{children}</span>
+      {children && <span className="font-medium truncate">{children}</span>}
     </div>
   );
 };

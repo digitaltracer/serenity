@@ -6,6 +6,7 @@ import { Input } from './Input';
 import { Textarea } from './Textarea';
 import { Select } from './Select';
 import { TagInput } from './TagInput';
+import { DatePicker } from './DatePicker';
 import { Calendar, Flag, Folder } from 'lucide-react';
 
 export interface TaskModalProps {
@@ -27,7 +28,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
     title: '',
     description: '',
     priority: 'medium' as Task['priority'],
-    dueDate: '',
+    dueDate: null as Date | null,
     projectId: '',
     tags: [] as string[],
     recurring: undefined as Task['recurring'],
@@ -40,7 +41,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         title: task.title,
         description: task.description || '',
         priority: task.priority,
-        dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
+        dueDate: task.dueDate ? new Date(task.dueDate) : null,
         projectId: task.projectId || '',
         tags: task.tags,
         recurring: task.recurring,
@@ -50,7 +51,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         title: '',
         description: '',
         priority: 'medium',
-        dueDate: '',
+        dueDate: null,
         projectId: '',
         tags: [],
         recurring: undefined,
@@ -65,7 +66,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
     const taskData: Partial<Task> = {
       ...formData,
-      dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
+      dueDate: formData.dueDate || undefined,
       projectId: formData.projectId || undefined,
     };
 
@@ -140,11 +141,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
             options={priorityOptions}
           />
           
-          <Input
+          <DatePicker
             label="Due Date"
-            type="date"
             value={formData.dueDate}
-            onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
+            onChange={(date) => setFormData(prev => ({ ...prev, dueDate: date }))}
+            placeholder="Select due date"
           />
         </div>
 

@@ -54,7 +54,7 @@ const ThemeToggle: React.FC<ThemeToggleProps> = ({
         size={size}
         onClick={handleCycleTheme}
         title={getTooltip()}
-        className="transition-all hover:bg-gray-100 dark:hover:bg-gray-800"
+        className="transition-all hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200"
       >
         {getIcon()}
       </Button>

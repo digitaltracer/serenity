@@ -6,6 +6,7 @@ import { Input } from './Input';
 import { Select } from './Select';
 import { RichTextEditor } from './RichTextEditor';
 import { TagInput } from './TagInput';
+import { DatePicker } from './DatePicker';
 import { Pin, Calendar } from 'lucide-react';
 
 export interface JournalEntryModalProps {
@@ -24,7 +25,7 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
   const [formData, setFormData] = useState({
     title: '',
     content: '',
-    date: '',
+    date: new Date() as Date,
     tags: [] as string[],
     pinned: false,
     mood: '' as JournalEntry['mood'] | '',
@@ -36,7 +37,7 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
       setFormData({
         title: entry.title || '',
         content: entry.content,
-        date: new Date(entry.date).toISOString().split('T')[0],
+        date: new Date(entry.date),
         tags: entry.tags,
         pinned: entry.pinned,
         mood: entry.mood || '',
@@ -45,7 +46,7 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
       setFormData({
         title: '',
         content: '',
-        date: new Date().toISOString().split('T')[0],
+        date: new Date(),
         tags: [],
         pinned: false,
         mood: '',
@@ -61,7 +62,7 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
     const entryData: Partial<JournalEntry> = {
       ...formData,
       title: formData.title || undefined,
-      date: new Date(formData.date),
+      date: formData.date,
       mood: formData.mood || undefined,
     };
 
@@ -106,11 +107,10 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
             onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
           />
           
-          <Input
+          <DatePicker
             label="Date"
-            type="date"
             value={formData.date}
-            onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+            onChange={(date) => setFormData(prev => ({ ...prev, date: date || new Date() }))}
             required
           />
         </div>

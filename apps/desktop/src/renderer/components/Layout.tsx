@@ -35,7 +35,10 @@ import {
   Settings, 
   Plus,
   Menu,
-  ListChecks
+  ListChecks,
+  PanelLeft,
+  PanelLeftClose,
+  Square
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -102,6 +105,28 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="flex h-full">
       {/* Sidebar */}
       <Sidebar collapsed={sidebarCollapsed}>
+        {/* Draggable top section - reserve space for window controls */}
+        <div 
+          className="h-12 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-end px-4"
+          style={{ WebkitAppRegion: 'drag' } as any}
+        >
+          {!sidebarCollapsed && (
+            <div 
+              className="flex items-center justify-center"
+              style={{ WebkitAppRegion: 'no-drag' } as any}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleSidebar}
+                className="opacity-70 hover:opacity-100 w-6 h-6 p-0"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+        
         <SidebarHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -114,53 +139,83 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </h1>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleSidebar}
-            >
-              <Menu className="w-4 h-4" />
-            </Button>
           </div>
         </SidebarHeader>
 
         <SidebarContent>
-          <SidebarSection title="Navigation">
-            {navigationItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <SidebarItem
-                  key={item.path}
-                  icon={<Icon className="w-5 h-5" />}
-                  active={isActive(item.path)}
-                  onClick={() => navigate(item.path)}
-                >
-                  {!sidebarCollapsed && item.label}
-                </SidebarItem>
-              );
-            })}
-          </SidebarSection>
+          {!sidebarCollapsed && (
+            <SidebarSection title="Navigation">
+              {navigationItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <SidebarItem
+                    key={item.path}
+                    icon={<Icon className="w-5 h-5" />}
+                    active={isActive(item.path)}
+                    onClick={() => navigate(item.path)}
+                  >
+                    {item.label}
+                  </SidebarItem>
+                );
+              })}
+            </SidebarSection>
+          )}
+          
+          {sidebarCollapsed && (
+            <div className="space-y-2">
+              {navigationItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <SidebarItem
+                    key={item.path}
+                    icon={<Icon className="w-5 h-5" />}
+                    active={isActive(item.path)}
+                    onClick={() => navigate(item.path)}
+                  />
+                );
+              })}
+            </div>
+          )}
 
-          <SidebarSection title="Quick Actions">
-            <SidebarItem
-              icon={<Plus className="w-5 h-5" />}
-              onClick={() => setIsTaskModalOpen(true)}
-            >
-              {!sidebarCollapsed && 'New Task'}
-            </SidebarItem>
-            <SidebarItem
-              icon={<BookOpen className="w-5 h-5" />}
-              onClick={() => setIsJournalModalOpen(true)}
-            >
-              {!sidebarCollapsed && 'New Entry'}
-            </SidebarItem>
-            <SidebarItem
-              icon={<ListChecks className="w-5 h-5" />}
-              onClick={() => setIsSubtaskModalOpen(true)}
-            >
-              {!sidebarCollapsed && 'Add Subtask'}
-            </SidebarItem>
-          </SidebarSection>
+          {!sidebarCollapsed && (
+            <SidebarSection title="Quick Actions">
+              <SidebarItem
+                icon={<Plus className="w-5 h-5" />}
+                onClick={() => setIsTaskModalOpen(true)}
+              >
+                New Task
+              </SidebarItem>
+              <SidebarItem
+                icon={<BookOpen className="w-5 h-5" />}
+                onClick={() => setIsJournalModalOpen(true)}
+              >
+                New Entry
+              </SidebarItem>
+              <SidebarItem
+                icon={<ListChecks className="w-5 h-5" />}
+                onClick={() => setIsSubtaskModalOpen(true)}
+              >
+                Add Subtask
+              </SidebarItem>
+            </SidebarSection>
+          )}
+          
+          {sidebarCollapsed && (
+            <div className="space-y-2 mt-4">
+              <SidebarItem
+                icon={<Plus className="w-5 h-5" />}
+                onClick={() => setIsTaskModalOpen(true)}
+              />
+              <SidebarItem
+                icon={<BookOpen className="w-5 h-5" />}
+                onClick={() => setIsJournalModalOpen(true)}
+              />
+              <SidebarItem
+                icon={<ListChecks className="w-5 h-5" />}
+                onClick={() => setIsSubtaskModalOpen(true)}
+              />
+            </div>
+          )}
         </SidebarContent>
 
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
@@ -173,6 +228,20 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </SidebarItem>
         </div>
       </Sidebar>
+
+      {/* Floating expand button when sidebar is collapsed */}
+      {sidebarCollapsed && (
+        <div className="fixed top-16 left-4 z-50">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleSidebar}
+            className="bg-white dark:bg-gray-800 shadow-md hover:shadow-lg border border-gray-200 dark:border-gray-700 w-8 h-8 p-0"
+          >
+            <PanelLeft className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">

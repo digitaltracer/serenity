@@ -21,7 +21,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           {
             'bg-blue-600 text-white hover:bg-blue-700': variant === 'primary',
             'bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700': variant === 'secondary',
-            'hover:bg-gray-100 dark:hover:bg-gray-800': variant === 'ghost',
+            'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800': variant === 'ghost',
             'bg-red-600 text-white hover:bg-red-700': variant === 'destructive',
           },
           

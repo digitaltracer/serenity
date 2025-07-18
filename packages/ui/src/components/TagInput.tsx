@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { selectTagSuggestions } from '@serenity/core';
+import { selectAllUsedTags } from '@serenity/core';
 import { cn } from '../utils/cn';
 import { Tag, X } from 'lucide-react';
 
@@ -27,7 +27,26 @@ const TagInput: React.FC<TagInputProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const suggestions = useSelector(selectTagSuggestions(inputValue));
+  const allUsedTags = useSelector(selectAllUsedTags);
+  
+  const getSuggestions = (query: string) => {
+    if (!query.trim()) return allUsedTags.slice(0, 10);
+    
+    const queryLower = query.toLowerCase();
+    return allUsedTags
+      .filter(tag => tag.toLowerCase().includes(queryLower))
+      .sort((a, b) => {
+        // Prioritize tags that start with the query
+        const aStarts = a.toLowerCase().startsWith(queryLower);
+        const bStarts = b.toLowerCase().startsWith(queryLower);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return a.localeCompare(b);
+      })
+      .slice(0, 10);
+  };
+  
+  const suggestions = getSuggestions(inputValue);
   const filteredSuggestions = suggestions.filter(tag => !value.includes(tag));
 
   useEffect(() => {
@@ -49,12 +68,12 @@ const TagInput: React.FC<TagInputProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setInputValue(newValue);
-    setIsOpen(newValue.length > 0 && filteredSuggestions.length > 0);
+    setIsOpen(filteredSuggestions.length > 0);
     setHighlightedIndex(-1);
   };
 
   const handleInputFocus = () => {
-    if (inputValue.length > 0 && filteredSuggestions.length > 0) {
+    if (filteredSuggestions.length > 0) {
       setIsOpen(true);
     }
   };

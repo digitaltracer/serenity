@@ -59,7 +59,7 @@ export const HomePage: React.FC = () => {
           return (
             <Card 
               key={feature.title} 
-              className="cursor-pointer hover:shadow-lg transition-shadow"
+              className="cursor-pointer hover:shadow-lg transition-shadow bg-white dark:bg-gray-800"
               onClick={() => navigate(feature.route)}
             >
               <CardHeader>
@@ -67,9 +67,9 @@ export const HomePage: React.FC = () => {
                   <div className={`p-2 rounded-lg bg-gray-100 dark:bg-gray-700 ${feature.color}`}>
                     <Icon className="w-6 h-6" />
                   </div>
-                  <CardTitle>{feature.title}</CardTitle>
+                  <CardTitle className="text-gray-900 dark:text-gray-100">{feature.title}</CardTitle>
                 </div>
-                <CardDescription>{feature.description}</CardDescription>
+                <CardDescription className="text-gray-600 dark:text-gray-400">{feature.description}</CardDescription>
               </CardHeader>
             </Card>
           );
@@ -78,7 +78,7 @@ export const HomePage: React.FC = () => {
 
       {/* Get Started */}
       <div className="text-center">
-        <Card className="inline-block">
+        <Card className="inline-block bg-white dark:bg-gray-800">
           <CardContent className="pt-6">
             <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
               Ready to get started?

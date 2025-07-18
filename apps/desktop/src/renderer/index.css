@@ -5,16 +5,28 @@
 @layer base {
   html {
     font-family: 'Inter', system-ui, sans-serif;
+    height: 100%;
   }
   
   body {
     margin: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-color: #f9fafb;
+    height: 100%;
+  }
+  
+  body.dark {
+    background-color: #030712;
+    color: #f9fafb;
   }
 
   * {
     box-sizing: border-box;
+  }
+  
+  #root {
+    height: 100%;
   }
 }
 

@@ -142,4 +142,12 @@ export const initializeWithSampleData = (dispatch: any) => {
 
   // Add sample journal entries
   dispatch({ type: 'journal/setEntries', payload: sampleJournalEntries });
+  
+  // Initialize tags from sample data
+  const allTags = [
+    ...sampleTasks.flatMap(task => task.tags),
+    ...sampleJournalEntries.flatMap(entry => entry.tags)
+  ];
+  const uniqueTags = [...new Set(allTags)];
+  dispatch({ type: 'tags/setUsedTags', payload: uniqueTags });
 };

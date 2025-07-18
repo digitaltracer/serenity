@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { Provider, useDispatch } from 'react-redux';
 import { store, initializeWithSampleData } from '@serenity/core';
 import { Layout } from './components/Layout';

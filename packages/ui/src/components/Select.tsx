@@ -20,13 +20,16 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         <div className="relative">
           <select
             className={cn(
-              // Professional styling for both light and dark themes
-              'flex h-12 w-full rounded-lg border border-gray-300 bg-white backdrop-blur-sm px-4 py-2.5 text-base',
-              'text-gray-900 transition-all duration-150',
-              'focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500/60',
-              'focus:bg-gray-50',
-              'dark:border-gray-700/50 dark:bg-gray-900/40 dark:text-gray-100',
-              'dark:focus:ring-gray-400/40 dark:focus:border-gray-400/60 dark:focus:bg-gray-800/50',
+              // Premium select styling with elegant gradients and shadows
+              'flex h-12 w-full rounded-lg border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm px-4 py-2.5 text-base',
+              'text-gray-900 transition-all duration-200 ease-out',
+              'shadow-sm shadow-gray-200/30 ring-1 ring-gray-100/50',
+              'focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400/60',
+              'focus:shadow-md focus:shadow-blue-200/40',
+              'dark:border-gray-600/60 dark:from-gray-800 dark:to-gray-900 dark:text-gray-100',
+              'dark:shadow-black/20 dark:ring-gray-800/40',
+              'dark:focus:ring-gray-400/40 dark:focus:border-gray-400/60',
+              'dark:focus:shadow-black/40',
               'disabled:cursor-not-allowed disabled:opacity-50',
               'appearance-none cursor-pointer',
               // Custom option styling

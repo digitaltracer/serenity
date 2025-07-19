@@ -36,10 +36,16 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
   return (
     <div
       className={cn(
-        'group relative border rounded-lg p-4 transition-all hover:shadow-md cursor-pointer',
-        'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700',
+        // Premium card design with elegant gradients and shadows
+        'group relative rounded-xl border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm p-6',
+        'shadow-lg shadow-gray-200/40 ring-1 ring-gray-100/80',
+        'dark:border-gray-700/40 dark:from-gray-800/80 dark:to-gray-900/60 dark:shadow-black/25 dark:ring-gray-800/60',
+        'transition-all duration-300 ease-out cursor-pointer',
+        'hover:shadow-xl hover:shadow-gray-300/50 hover:border-gray-300/80',
+        'dark:hover:shadow-black/40 dark:hover:border-gray-600/60',
+        'hover:-translate-y-0.5 hover:scale-[1.01] transform-gpu',
         {
-          'ring-2 ring-blue-500 border-blue-300': entry.pinned,
+          'ring-2 ring-blue-500/50 border-blue-300/80 dark:ring-blue-400/50 dark:border-blue-600/60': entry.pinned,
         },
         className
       )}

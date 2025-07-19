@@ -24,12 +24,18 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onToggleSubtask, on
   return (
     <div
       className={cn(
-        'group relative border rounded-lg p-4 transition-all hover:shadow-md cursor-pointer',
-        'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700',
+        // Premium card design with elegant gradients and shadows
+        'group relative rounded-xl border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm p-6',
+        'shadow-lg shadow-gray-200/40 ring-1 ring-gray-100/80',
+        'dark:border-gray-700/40 dark:from-gray-800/80 dark:to-gray-900/60 dark:shadow-black/25 dark:ring-gray-800/60',
+        'transition-all duration-300 ease-out cursor-pointer',
+        'hover:shadow-xl hover:shadow-gray-300/50 hover:border-gray-300/80',
+        'dark:hover:shadow-black/40 dark:hover:border-gray-600/60',
+        'hover:-translate-y-0.5 hover:scale-[1.01] transform-gpu',
         {
           'opacity-60': task.completed,
-          'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-900/10': isOverdue,
-          'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/10': isDueToday && !isOverdue,
+          'border-red-300/80 from-red-50/30 to-red-25/60 dark:border-red-700/60 dark:from-red-900/20 dark:to-red-800/10': isOverdue,
+          'border-blue-300/80 from-blue-50/30 to-blue-25/60 dark:border-blue-700/60 dark:from-blue-900/20 dark:to-blue-800/10': isDueToday && !isOverdue,
         },
         className
       )}

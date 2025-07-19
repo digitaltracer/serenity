@@ -38,7 +38,9 @@ export const HomePage: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="flex-1 h-full bg-gray-50 dark:bg-gray-900">
+      <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-6xl mx-auto">
       {/* Header */}
       <div className="text-center mb-12">
         <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -96,6 +98,8 @@ export const HomePage: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+      </div>
+        </div>
       </div>
     </div>
   );

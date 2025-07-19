@@ -124,7 +124,9 @@ export const AnalyticsPage: React.FC = () => {
   }, [tasks, journalEntries]);
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="flex-1 h-full bg-gray-50 dark:bg-gray-900">
+      <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
@@ -179,10 +181,36 @@ export const AnalyticsPage: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-              {analyticsData.completionRate}%
+            <div className="flex items-center justify-center mb-4">
+              <div className="relative w-16 h-16">
+                <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 100 100">
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    stroke="currentColor"
+                    strokeWidth="8"
+                    fill="none"
+                    className="text-gray-200 dark:text-gray-700"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    stroke="currentColor"
+                    strokeWidth="8"
+                    fill="none"
+                    strokeDasharray={`${analyticsData.completionRate * 2.51} 251`}
+                    className="text-blue-600 dark:text-blue-400"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-sm font-bold text-gray-900 dark:text-white">
+                    {analyticsData.completionRate}%
+                  </span>
+                </div>
+              </div>
             </div>
-            <ProgressBar value={analyticsData.completionRate} variant="success" />
           </CardContent>
         </Card>
 
@@ -288,6 +316,8 @@ export const AnalyticsPage: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+        </div>
+      </div>
     </div>
   );
 };

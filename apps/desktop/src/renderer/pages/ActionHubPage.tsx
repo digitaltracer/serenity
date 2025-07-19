@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@serenity/core';
-import { addTask, toggleTask, deleteTask, updateTask } from '@serenity/core';
-import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, TagInput } from '@serenity/ui';
-import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info } from 'lucide-react';
+import { addTask, toggleTask, deleteTask, updateTask, addProject } from '@serenity/core';
+import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, TagInput, DatePicker, Textarea } from '@serenity/ui';
+import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical } from 'lucide-react';
 
 export const ActionHubPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -18,6 +18,12 @@ export const ActionHubPage: React.FC = () => {
   const [newTaskProject, setNewTaskProject] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [newTaskTags, setNewTaskTags] = useState<string[]>([]);
+  const [newTaskDueDate, setNewTaskDueDate] = useState<Date | null>(null);
+  const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [editingTask, setEditingTask] = useState<string | null>(null);
+  const [showCreateProjectForm, setShowCreateProjectForm] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectColor, setNewProjectColor] = useState('#8B5CF6');
 
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -31,32 +37,87 @@ export const ActionHubPage: React.FC = () => {
   const completedTasks = tasks.filter(task => task.completed);
   const totalTasks = tasks.length;
   const progressPercentage = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
+  
+  // Projects calculations
+  const activeProjects = projects.filter(p => !p.archived);
+  const projectTasks = tasks.filter(t => t.projectId);
+  
+  // Calculate project statuses based on their tasks
+  const getProjectStatus = (project: any) => {
+    const pTasks = tasks.filter(t => t.projectId === project.id);
+    if (pTasks.length === 0) return 'yet-to-start';
+    const completedTasks = pTasks.filter(t => t.completed);
+    if (completedTasks.length === pTasks.length) return 'completed';
+    if (completedTasks.length > 0) return 'in-progress';
+    return 'yet-to-start';
+  };
+  
+  const inProgressProjects = activeProjects.filter(p => getProjectStatus(p) === 'in-progress');
+  const yetToStartProjects = activeProjects.filter(p => getProjectStatus(p) === 'yet-to-start');
+  const completedProjects = activeProjects.filter(p => getProjectStatus(p) === 'completed');
+  const projectsProgressPercentage = activeProjects.length > 0 ? Math.round((completedProjects.length / activeProjects.length) * 100) : 0;
 
   const handleFilterChange = (filter: 'all' | 'active' | 'completed') => {
     setActiveFilter(filter);
   };
 
+  const handleCreateProject = () => {
+    if (newProjectName.trim()) {
+      const projectData = {
+        name: newProjectName,
+        color: newProjectColor,
+        description: '',
+        archived: false
+      };
+      
+      dispatch(addProject(projectData));
+      setNewProjectName('');
+      setNewProjectColor('#8B5CF6');
+      setShowCreateProjectForm(false);
+    }
+  };
+
   const handleCreateTask = () => {
     if (newTaskTitle.trim()) {
-      const newTask = {
+      const taskData = {
         title: newTaskTitle,
+        description: newTaskDescription,
         projectId: newTaskProject || undefined,
         priority: newTaskPriority,
         tags: newTaskTags,
+        dueDate: newTaskDueDate?.toISOString(),
         completed: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       
-      dispatch(addTask(newTask));
+      if (editingTask) {
+        dispatch(updateTask({ ...taskData, id: editingTask }));
+      } else {
+        dispatch(addTask(taskData));
+      }
       
       // Reset form
       setNewTaskTitle('');
+      setNewTaskDescription('');
       setNewTaskProject('');
       setNewTaskPriority('medium');
       setNewTaskTags([]);
+      setNewTaskDueDate(null);
       setShowCreateForm(false);
+      setEditingTask(null);
     }
+  };
+
+  const handleEditTask = (task: any) => {
+    setNewTaskTitle(task.title);
+    setNewTaskDescription(task.description || '');
+    setNewTaskProject(task.projectId || '');
+    setNewTaskPriority(task.priority);
+    setNewTaskTags(task.tags || []);
+    setNewTaskDueDate(task.dueDate ? new Date(task.dueDate) : null);
+    setEditingTask(task.id);
+    setShowCreateForm(true);
   };
 
   const projectOptions = projects.map(project => ({
@@ -78,33 +139,32 @@ export const ActionHubPage: React.FC = () => {
             </p>
           </div>
         </div>
-        
+      </div>
+
+      <div className="flex-1 overflow-auto p-6">
         {/* Tabs */}
-        <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg w-fit">
+        <div className="flex space-x-1 bg-gradient-to-br from-gray-100 to-gray-200/30 dark:from-gray-800 dark:to-gray-900/60 backdrop-blur-sm border border-gray-200/60 dark:border-gray-700/40 p-1.5 rounded-xl w-fit mb-6 shadow-sm shadow-gray-200/30 dark:shadow-black/20">
           <button
             onClick={() => setActiveTab('tasks')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
               activeTab === 'tasks'
-                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                ? 'bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-700 dark:to-gray-800 text-gray-900 dark:text-white shadow-md shadow-gray-200/40 dark:shadow-black/40 ring-1 ring-gray-100/50 dark:ring-gray-600/30'
+                : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50/50 dark:hover:bg-gray-700/30'
             }`}
           >
             Tasks
           </button>
           <button
             onClick={() => setActiveTab('projects')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
               activeTab === 'projects'
-                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                ? 'bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-700 dark:to-gray-800 text-gray-900 dark:text-white shadow-md shadow-gray-200/40 dark:shadow-black/40 ring-1 ring-gray-100/50 dark:ring-gray-600/30'
+                : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50/50 dark:hover:bg-gray-700/30'
             }`}
           >
             Projects
           </button>
         </div>
-      </div>
-
-      <div className="flex-1 overflow-auto p-6">
         {activeTab === 'tasks' ? (
           <div>
             {/* Progress and Add Task - Side by Side when collapsed */}
@@ -192,25 +252,33 @@ export const ActionHubPage: React.FC = () => {
                 {/* Add Task Placeholder - Right Side */}
                 <div className="flex-1">
                   <div 
-                    className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                    className="border border-dashed border-gray-300/80 dark:border-gray-600/60 rounded-xl p-8 text-center cursor-pointer bg-gradient-to-br from-gray-50/50 to-white/80 dark:from-gray-800/40 dark:to-gray-900/30 backdrop-blur-sm shadow-sm shadow-gray-200/30 dark:shadow-black/20 ring-1 ring-gray-100/40 dark:ring-gray-800/30 transition-all duration-300 ease-out hover:border-blue-300/80 dark:hover:border-blue-500/60 hover:from-blue-50/40 hover:to-blue-25/60 dark:hover:from-blue-900/20 dark:hover:to-blue-800/10 hover:shadow-md hover:shadow-blue-200/40 dark:hover:shadow-blue-900/30 hover:-translate-y-0.5 hover:scale-[1.01] transform-gpu"
                     onClick={() => setShowCreateForm(true)}
                   >
-                    <Plus className="w-5 h-5 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500 dark:text-gray-400 text-base">Add new task...</p>
+                    <Plus className="w-5 h-5 text-gray-500 dark:text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-600 dark:text-gray-400 text-base font-medium">Add new task...</p>
                   </div>
                 </div>
               </div>
             ) : (
               /* Full Width Create Form */
               <div className="mb-6">
-                <div className="bg-white dark:bg-gray-800 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-6">
+                <div className="bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-800/80 dark:to-gray-900/60 border border-gray-200/60 dark:border-gray-700/40 rounded-xl p-6 shadow-lg shadow-gray-200/40 dark:shadow-black/25 ring-1 ring-gray-100/80 dark:ring-gray-800/60 backdrop-blur-sm">
                   <div className="space-y-4">
                     <Input
-                      placeholder="What needs to be done? (Type @ to mention projects)"
+                      placeholder="What needs to be done?"
                       value={newTaskTitle}
                       onChange={(e) => setNewTaskTitle(e.target.value)}
                       className="text-base"
                       autoFocus
+                    />
+                    
+                    <Textarea
+                      placeholder="Add task description or details..."
+                      value={newTaskDescription}
+                      onChange={(e) => setNewTaskDescription(e.target.value)}
+                      rows={3}
+                      className="text-sm"
                     />
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -219,14 +287,14 @@ export const ActionHubPage: React.FC = () => {
                           <span className="text-xs text-white">⏰</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <Select
+                          <CustomSelect
                             options={[
                               { value: 'medium', label: 'Medium' },
                               { value: 'low', label: 'Low' },
                               { value: 'high', label: 'High' }
                             ]}
                             value={newTaskPriority}
-                            onChange={(e) => setNewTaskPriority(e.target.value as 'low' | 'medium' | 'high')}
+                            onChange={(value) => setNewTaskPriority(value as 'low' | 'medium' | 'high')}
                           />
                         </div>
                       </div>
@@ -234,13 +302,13 @@ export const ActionHubPage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-gray-400" />
                         <div className="flex-1 min-w-0">
-                          <Select
+                          <CustomSelect
                             options={[
                               { value: '', label: 'Select project' },
                               ...projectOptions
                             ]}
                             value={newTaskProject}
-                            onChange={(e) => setNewTaskProject(e.target.value)}
+                            onChange={(value) => setNewTaskProject(value)}
                           />
                         </div>
                       </div>
@@ -248,10 +316,10 @@ export const ActionHubPage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-gray-400" />
                         <div className="flex-1 min-w-0">
-                          <Input
-                            type="date"
+                          <DatePicker
+                            value={newTaskDueDate}
+                            onChange={setNewTaskDueDate}
                             placeholder="Due date"
-                            className="w-full"
                           />
                         </div>
                       </div>
@@ -269,11 +337,20 @@ export const ActionHubPage: React.FC = () => {
                     </div>
                     
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" onClick={() => setShowCreateForm(false)}>
+                      <Button variant="ghost" onClick={() => {
+                        setShowCreateForm(false);
+                        setEditingTask(null);
+                        setNewTaskTitle('');
+                        setNewTaskDescription('');
+                        setNewTaskProject('');
+                        setNewTaskPriority('medium');
+                        setNewTaskTags([]);
+                        setNewTaskDueDate(null);
+                      }}>
                         Cancel
                       </Button>
                       <Button onClick={handleCreateTask} disabled={!newTaskTitle.trim()}>
-                        Add Task
+                        {editingTask ? 'Update Task' : 'Add Task'}
                       </Button>
                     </div>
                   </div>
@@ -284,13 +361,13 @@ export const ActionHubPage: React.FC = () => {
             {/* Search and Filters - Above task cards */}
             <div className="flex items-center justify-between mb-6 gap-4">
               {/* Search */}
-              <div className="relative flex-1 max-w-md">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
                   placeholder="Search tasks, projects, or tags..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 h-12"
+                  className="pl-10 h-12 rounded-xl"
                 />
               </div>
               
@@ -301,23 +378,19 @@ export const ActionHubPage: React.FC = () => {
                   { key: 'active', label: 'Active' },
                   { key: 'completed', label: 'Completed' },
                 ].map((filter) => (
-                  <button
+                  <Button
                     key={filter.key}
+                    variant={activeFilter === filter.key ? 'primary' : 'secondary'}
                     onClick={() => handleFilterChange(filter.key as 'all' | 'active' | 'completed')}
-                    className={`px-4 py-3 h-12 text-sm font-medium rounded-lg transition-colors ${
-                      activeFilter === filter.key
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                    }`}
+                    className="h-12 rounded-xl"
                   >
                     {filter.label}
-                  </button>
+                  </Button>
                 ))}
                 
-                <button className="flex items-center gap-2 px-4 py-3 h-12 text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors">
-                  <Filter className="w-4 h-4" />
-                  More Filters
-                </button>
+                <Button variant="secondary" className="h-12 w-12 p-0 rounded-xl">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
               </div>
             </div>
             
@@ -339,9 +412,7 @@ export const ActionHubPage: React.FC = () => {
                     key={task.id}
                     task={task}
                     onToggle={() => dispatch(toggleTask(task.id))}
-                    onEdit={() => {
-                      // Handle edit
-                    }}
+                    onClick={handleEditTask}
                     onDelete={() => dispatch(deleteTask(task.id))}
                   />
                 ))
@@ -350,16 +421,159 @@ export const ActionHubPage: React.FC = () => {
           </div>
         ) : (
           /* Projects View */
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                Projects
-              </h2>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                New Project
-              </Button>
+          <div>
+            {/* Projects Progress and Add Project - Side by Side */}
+            <div className="flex gap-6 mb-6">
+              {/* Projects Progress Card - Left Side */}
+              <div className="w-80">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                        Projects Progress
+                      </h3>
+                      <Info className="w-4 h-4 text-gray-400" />
+                    </div>
+                    
+                    {/* Circular Progress */}
+                    <div className="flex items-center justify-center mb-6">
+                      <div className="relative w-24 h-24">
+                        <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="40"
+                            stroke="currentColor"
+                            strokeWidth="8"
+                            fill="none"
+                            className="text-gray-200 dark:text-gray-700"
+                          />
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="40"
+                            stroke="currentColor"
+                            strokeWidth="8"
+                            fill="none"
+                            strokeDasharray={`${projectsProgressPercentage * 2.51} 251`}
+                            className="text-green-600 dark:text-green-400"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-xl font-bold text-gray-900 dark:text-white">
+                            {projectsProgressPercentage}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Stats */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Completed</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{completedProjects.length}</span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">In Progress</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{inProgressProjects.length}</span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Yet to Start</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{yetToStartProjects.length}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {completedProjects.length} of {activeProjects.length} projects completed
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              {/* Add New Project */}
+              <div className="flex-1">
+                {!showCreateProjectForm ? (
+                  <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer border-dashed border-2 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500" onClick={() => setShowCreateProjectForm(true)}>
+                    <CardContent className="p-6 flex flex-col items-center justify-center text-center h-full">
+                      <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center mb-3">
+                        <Plus className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">New Project</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Create a new project to organize your tasks</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="h-full">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Create New Project</h3>
+                        <Button variant="ghost" size="sm" onClick={() => setShowCreateProjectForm(false)}>
+                          ✕
+                        </Button>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <Input
+                          placeholder="Project name..."
+                          value={newProjectName}
+                          onChange={(e) => setNewProjectName(e.target.value)}
+                          className="rounded-xl"
+                          onKeyDown={(e) => e.key === 'Enter' && handleCreateProject()}
+                        />
+                        
+                        <div className="flex gap-3 items-center">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Color:</span>
+                            <div className="relative">
+                              <input
+                                type="color"
+                                value={newProjectColor}
+                                onChange={(e) => setNewProjectColor(e.target.value)}
+                                className="w-8 h-8 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer bg-transparent"
+                                style={{
+                                  WebkitAppearance: 'none',
+                                  MozAppearance: 'none',
+                                  appearance: 'none',
+                                  background: 'transparent',
+                                  border: '2px solid',
+                                  borderColor: 'rgb(209 213 219)',
+                                }}
+                              />
+                              <div 
+                                className="absolute inset-1 rounded-md pointer-events-none"
+                                style={{ backgroundColor: newProjectColor }}
+                              />
+                            </div>
+                          </div>
+                          
+                          <Button onClick={handleCreateProject} className="flex-1 rounded-xl">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create Project
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
+            
+            
+            {/* Projects Grid */}
+            <div className="space-y-6">
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {projects.map((project) => {
@@ -395,10 +609,9 @@ export const ActionHubPage: React.FC = () => {
                         
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                           <div 
-                            className="h-2 rounded-full transition-all duration-300"
+                            className="h-2 rounded-full transition-all duration-300 bg-blue-600 dark:bg-blue-400"
                             style={{ 
-                              width: `${projectProgress}%`,
-                              backgroundColor: project.color 
+                              width: `${projectProgress}%`
                             }}
                           />
                         </div>
@@ -422,6 +635,7 @@ export const ActionHubPage: React.FC = () => {
                   </Card>
                 );
               })}
+            </div>
             </div>
           </div>
         )}

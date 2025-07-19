@@ -92,7 +92,7 @@ const Modal: React.FC<ModalProps> = ({
       >
         {/* Header with enhanced styling */}
         {title && (
-          <div className="flex items-center justify-between p-8 pb-6 border-b border-gray-200/30 dark:border-gray-700/20">
+          <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-200/30 dark:border-gray-700/20">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
               {title}
             </h2>
@@ -100,15 +100,15 @@ const Modal: React.FC<ModalProps> = ({
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="h-10 w-10 p-0 hover:bg-gray-800/50 text-gray-400 hover:text-white"
+              className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
         )}
         
         {/* Content with better spacing */}
-        <div className="p-8">
+        <div className="p-6">
           {children}
         </div>
       </div>

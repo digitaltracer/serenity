@@ -81,20 +81,26 @@ export const JournalPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="flex-1 h-full bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Journal</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Capture thoughts, ideas, and reflections
-          </p>
+      <div className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+              Journal
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Capture thoughts, ideas, and reflections
+            </p>
+          </div>
+          <Button onClick={handleCreateEntry} className="rounded-xl">
+            <Plus className="w-4 h-4 mr-2" />
+            New Entry
+          </Button>
         </div>
-        <Button onClick={handleCreateEntry}>
-          <Plus className="w-4 h-4 mr-2" />
-          New Entry
-        </Button>
       </div>
+
+      <div className="flex-1 overflow-auto p-6">
 
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -145,6 +151,7 @@ export const JournalPage: React.FC = () => {
             placeholder="Search entries, tags, or content..."
             value={searchQuery}
             onChange={handleSearchChange}
+            className="rounded-xl"
           />
         </div>
         
@@ -153,12 +160,14 @@ export const JournalPage: React.FC = () => {
           <Button
             variant={activeView === 'all' ? 'primary' : 'secondary'}
             onClick={() => setActiveView('all')}
+            className="rounded-xl"
           >
             All Entries
           </Button>
           <Button
             variant={activeView === 'pinned' ? 'primary' : 'secondary'}
             onClick={() => setActiveView('pinned')}
+            className="rounded-xl"
           >
             <Pin className="w-4 h-4 mr-2" />
             Pinned
@@ -189,7 +198,7 @@ export const JournalPage: React.FC = () => {
               <p className="text-gray-600 dark:text-gray-400 mb-4">
                 Create your first journal entry to begin capturing your thoughts and experiences.
               </p>
-              <Button onClick={handleCreateEntry}>
+              <Button onClick={handleCreateEntry} className="rounded-xl">
                 <Plus className="w-4 h-4 mr-2" />
                 Write Your First Entry
               </Button>
@@ -205,6 +214,7 @@ export const JournalPage: React.FC = () => {
             />
           ))
         )}
+      </div>
       </div>
     </div>
   );

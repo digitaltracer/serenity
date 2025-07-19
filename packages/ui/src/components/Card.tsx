@@ -11,13 +11,15 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={cn(
-          // Professional card styling for both light and dark themes
-          'rounded-xl border border-gray-200 bg-white backdrop-blur-sm shadow-lg shadow-gray-200/50',
-          'dark:border-gray-700/30 dark:bg-gray-900/30 dark:shadow-black/20',
-          'transition-all duration-300 hover:shadow-xl hover:shadow-gray-300/50',
-          'hover:border-gray-300 dark:hover:border-gray-600/40',
-          'dark:hover:shadow-black/30',
-          'hover:-translate-y-1 transform-gpu',
+          // Premium card design with subtle gradients and elegant shadows
+          'rounded-xl border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm',
+          'shadow-lg shadow-gray-200/40',
+          'dark:border-gray-700/40 dark:from-gray-800/80 dark:to-gray-900/60 dark:shadow-black/25',
+          'transition-all duration-300 ease-out',
+          'hover:shadow-xl hover:shadow-gray-300/50 hover:border-gray-300/80',
+          'dark:hover:shadow-black/40 dark:hover:border-gray-600/60',
+          'hover:-translate-y-0.5 hover:scale-[1.01] transform-gpu',
+          'ring-1 ring-gray-100/80 dark:ring-gray-800/60',
           className
         )}
         {...props}

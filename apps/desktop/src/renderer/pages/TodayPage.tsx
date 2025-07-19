@@ -1,13 +1,22 @@
-import React from 'react';
-import { useSelector } from 'react-redux';
-import { selectTodayTasks } from '@serenity/core';
-import { Card, CardHeader, CardTitle, CardContent, TaskCard, ProgressBar } from '@serenity/ui';
+import React, { useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectTodayTasks, toggleTask, updateTask } from '@serenity/core';
+import { Card, CardHeader, CardTitle, CardContent, TaskCard, ProgressBar, Button, Input, CustomSelect, TagInput, DatePicker, Textarea } from '@serenity/ui';
 import { Calendar, Clock } from 'lucide-react';
 
 export const TodayPage: React.FC = () => {
+  const dispatch = useDispatch();
   const todayTasks = useSelector(selectTodayTasks);
   const completedToday = todayTasks.filter(task => task.completed);
   const progressToday = todayTasks.length > 0 ? (completedToday.length / todayTasks.length) * 100 : 0;
+  
+  // Edit task state
+  const [editingTask, setEditingTask] = useState<string | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
+  const [editTaskDescription, setEditTaskDescription] = useState('');
+  const [editTaskPriority, setEditTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [editTaskTags, setEditTaskTags] = useState<string[]>([]);
+  const [editTaskDueDate, setEditTaskDueDate] = useState<Date | null>(null);
 
   const currentDate = new Date();
   const dateString = currentDate.toLocaleDateString('en-US', {
@@ -16,6 +25,48 @@ export const TodayPage: React.FC = () => {
     month: 'long',
     day: 'numeric'
   });
+
+  const handleEditTask = (task: any) => {
+    setEditTaskTitle(task.title);
+    setEditTaskDescription(task.description || '');
+    setEditTaskPriority(task.priority);
+    setEditTaskTags(task.tags || []);
+    setEditTaskDueDate(task.dueDate ? new Date(task.dueDate) : null);
+    setEditingTask(task.id);
+  };
+
+  const handleUpdateTask = () => {
+    if (editTaskTitle.trim() && editingTask) {
+      const taskData = {
+        id: editingTask,
+        title: editTaskTitle,
+        description: editTaskDescription,
+        priority: editTaskPriority,
+        tags: editTaskTags,
+        dueDate: editTaskDueDate?.toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      
+      dispatch(updateTask(taskData));
+      
+      // Reset form
+      setEditTaskTitle('');
+      setEditTaskDescription('');
+      setEditTaskPriority('medium');
+      setEditTaskTags([]);
+      setEditTaskDueDate(null);
+      setEditingTask(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditTaskTitle('');
+    setEditTaskDescription('');
+    setEditTaskPriority('medium');
+    setEditTaskTags([]);
+    setEditTaskDueDate(null);
+    setEditingTask(null);
+  };
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -84,16 +135,87 @@ export const TodayPage: React.FC = () => {
           </Card>
         ) : (
           todayTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onToggle={(taskId) => {
-                console.log('Toggle task:', taskId);
-              }}
-              onClick={(task) => {
-                console.log('Open task:', task);
-              }}
-            />
+            editingTask === task.id ? (
+              /* Edit Form */
+              <div key={task.id} className="mb-6">
+                <div className="bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-800/80 dark:to-gray-900/60 border border-gray-200/60 dark:border-gray-700/40 rounded-xl p-6 shadow-lg shadow-gray-200/40 dark:shadow-black/25 ring-1 ring-gray-100/80 dark:ring-gray-800/60 backdrop-blur-sm">
+                  <div className="space-y-4">
+                    <Input
+                      placeholder="Task title"
+                      value={editTaskTitle}
+                      onChange={(e) => setEditTaskTitle(e.target.value)}
+                      className="text-base"
+                      autoFocus
+                    />
+                    
+                    <Textarea
+                      placeholder="Task description or details..."
+                      value={editTaskDescription}
+                      onChange={(e) => setEditTaskDescription(e.target.value)}
+                      rows={3}
+                      className="text-sm"
+                    />
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 bg-gray-400 rounded flex items-center justify-center">
+                          <span className="text-xs text-white">⏰</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <CustomSelect
+                            options={[
+                              { value: 'medium', label: 'Medium' },
+                              { value: 'low', label: 'Low' },
+                              { value: 'high', label: 'High' }
+                            ]}
+                            value={editTaskPriority}
+                            onChange={(value) => setEditTaskPriority(value as 'low' | 'medium' | 'high')}
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <div className="flex-1 min-w-0">
+                          <DatePicker
+                            value={editTaskDueDate}
+                            onChange={setEditTaskDueDate}
+                            placeholder="Due date"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">🏷️</span>
+                        <div className="flex-1 min-w-0">
+                          <TagInput
+                            value={editTaskTags}
+                            onChange={setEditTaskTags}
+                            placeholder="Add tags"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" onClick={handleCancelEdit}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleUpdateTask} disabled={!editTaskTitle.trim()}>
+                        Update Task
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onToggle={() => dispatch(toggleTask(task.id))}
+                onClick={handleEditTask}
+              />
+            )
           ))
         )}
       </div>

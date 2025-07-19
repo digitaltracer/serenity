@@ -11,8 +11,13 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={cn(
-          'rounded-lg border border-gray-200 bg-white shadow-sm',
-          'dark:border-gray-800 dark:bg-gray-900',
+          // Professional card styling for both light and dark themes
+          'rounded-xl border border-gray-200 bg-white backdrop-blur-sm shadow-lg shadow-gray-200/50',
+          'dark:border-gray-700/30 dark:bg-gray-900/30 dark:shadow-black/20',
+          'transition-all duration-300 hover:shadow-xl hover:shadow-gray-300/50',
+          'hover:border-gray-300 dark:hover:border-gray-600/40',
+          'dark:hover:shadow-black/30',
+          'hover:-translate-y-1 transform-gpu',
           className
         )}
         {...props}
@@ -28,7 +33,11 @@ const CardHeader = React.forwardRef<HTMLDivElement, CardProps>(
     return (
       <div
         ref={ref}
-        className={cn('flex flex-col space-y-1.5 p-6', className)}
+        className={cn(
+          'flex flex-col space-y-2 p-8 pb-6',
+          'border-b border-gray-200 dark:border-gray-700/20',
+          className
+        )}
         {...props}
       >
         {children}
@@ -42,7 +51,11 @@ const CardTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTML
     return (
       <h3
         ref={ref}
-        className={cn('text-lg font-semibold leading-none tracking-tight', className)}
+        className={cn(
+          'text-xl font-semibold leading-tight tracking-tight text-gray-900',
+          'dark:text-white',
+          className
+        )}
         {...props}
       >
         {children}
@@ -56,7 +69,10 @@ const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttribu
     return (
       <p
         ref={ref}
-        className={cn('text-sm text-gray-600 dark:text-gray-400', className)}
+        className={cn(
+          'text-sm text-gray-600 dark:text-gray-400 leading-relaxed',
+          className
+        )}
         {...props}
       >
         {children}
@@ -70,7 +86,7 @@ const CardContent = React.forwardRef<HTMLDivElement, CardProps>(
     return (
       <div
         ref={ref}
-        className={cn('p-6 pt-0', className)}
+        className={cn('p-8 pt-6', className)}
         {...props}
       >
         {children}

@@ -19,9 +19,11 @@ const Sidebar: React.FC<SidebarProps> = ({ children, className, collapsed }) => 
   return (
     <div
       className={cn(
-        'flex flex-col h-full bg-white border-r border-gray-200',
-        'dark:bg-gray-900 dark:border-gray-800',
-        'transition-all duration-300',
+        // Professional sidebar styling for both light and dark themes
+        'flex flex-col h-full bg-gray-50/80 backdrop-blur-md border-r border-gray-200',
+        'dark:bg-gray-900/30 dark:border-gray-700/30',
+        'transition-all duration-300 ease-in-out shadow-lg shadow-gray-200/30',
+        'dark:shadow-black/20',
         {
           'w-56': !collapsed,
           'w-20': collapsed,
@@ -39,7 +41,11 @@ const SidebarHeader: React.FC<{ children: React.ReactNode; className?: string }>
   className 
 }) => {
   return (
-    <div className={cn('p-4 border-b border-gray-200 dark:border-gray-800', className)}>
+    <div className={cn(
+      'p-6 border-b border-gray-200 dark:border-gray-700/20',
+      'bg-gradient-to-b from-gray-100/50 to-transparent dark:from-gray-800/5',
+      className
+    )}>
       {children}
     </div>
   );
@@ -50,7 +56,7 @@ const SidebarContent: React.FC<{ children: React.ReactNode; className?: string }
   className 
 }) => {
   return (
-    <div className={cn('flex-1 overflow-y-auto p-2', className)}>
+    <div className={cn('flex-1 overflow-y-auto p-4', className)}>
       {children}
     </div>
   );
@@ -66,11 +72,12 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   return (
     <div
       className={cn(
-        'flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors',
-        'hover:bg-gray-100 dark:hover:bg-gray-700',
+        'flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-all duration-150',
+        'hover:bg-gray-200 dark:hover:bg-gray-800/40',
         {
-          'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300': active,
-          'text-gray-700 dark:text-gray-200': !active,
+          // Active state styling for both themes
+          'bg-gray-300 text-gray-900 border border-gray-400 dark:bg-gray-600/40 dark:text-gray-100 dark:border-gray-500/50': active,
+          'text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white': !active,
           'justify-center': !children, // Center icon when no text
         },
         className
@@ -93,11 +100,11 @@ const SidebarSection: React.FC<{
   className?: string;
 }> = ({ title, children, className }) => {
   return (
-    <div className={cn('mb-4', className)}>
-      <h3 className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-300">
+    <div className={cn('mb-6', className)}>
+      <h3 className="px-4 mb-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
         {title}
       </h3>
-      <div className="space-y-1">
+      <div className="space-y-2">
         {children}
       </div>
     </div>

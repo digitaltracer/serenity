@@ -1,15 +1,86 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { cn } from '../utils/cn';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  floatingLabel?: boolean;
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, ...props }, ref) => {
+  ({ className, label, error, floatingLabel = true, ...props }, ref) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const [hasValue, setHasValue] = useState(!!props.value || !!props.defaultValue);
+
+    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+      setIsFocused(true);
+      props.onFocus?.(e);
+    };
+
+    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+      setIsFocused(false);
+      props.onBlur?.(e);
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setHasValue(!!e.target.value);
+      props.onChange?.(e);
+    };
+
+    if (floatingLabel && label) {
+      return (
+        <div className="relative">
+          <input
+            className={cn(
+              // Professional styling for both light and dark themes
+              'flex h-12 w-full rounded-lg border border-gray-300 bg-white backdrop-blur-sm px-4 py-2.5 text-base',
+              'text-gray-900 transition-all duration-150',
+              'focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500/60',
+              'focus:bg-gray-50',
+              'dark:border-gray-700/50 dark:bg-gray-900/40 dark:text-gray-100',
+              'dark:focus:ring-gray-400/40 dark:focus:border-gray-400/60 dark:focus:bg-gray-800/50',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+              'placeholder:text-transparent',
+              {
+                'border-red-500/60 focus:ring-red-500/40 focus:border-red-500/60': error,
+              },
+              className
+            )}
+            ref={ref}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            onChange={handleChange}
+            {...props}
+          />
+          
+          {/* Floating Label */}
+          <label
+            className={cn(
+              'absolute left-4 transition-all duration-200 pointer-events-none',
+              'text-gray-600 dark:text-gray-400',
+              {
+                'top-0.5 text-xs text-gray-700 dark:text-gray-300': isFocused || hasValue,
+                'top-1/2 -translate-y-1/2 text-base': !isFocused && !hasValue,
+                'text-red-400': error,
+              }
+            )}
+          >
+            {label}
+          </label>
+
+          {error && (
+            <p className="mt-2 text-sm text-red-400 flex items-center gap-1">
+              <span className="w-1 h-1 bg-red-400 rounded-full"></span>
+              {error}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // Standard input without floating label
     return (
-      <div className="space-y-1">
+      <div className="space-y-2">
         {label && (
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
             {label}
@@ -17,12 +88,16 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         )}
         <input
           className={cn(
-            'flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm',
-            'placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            // Professional styling for both light and dark themes
+            'flex h-12 w-full rounded-lg border border-gray-300 bg-white backdrop-blur-sm px-4 py-2.5 text-base',
+            'text-gray-900 placeholder:text-gray-500 transition-all duration-150',
+            'focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500/60',
+            'focus:bg-gray-50',
+            'dark:border-gray-700/50 dark:bg-gray-900/40 dark:text-gray-100 dark:placeholder:text-gray-500',
+            'dark:focus:ring-gray-400/40 dark:focus:border-gray-400/60 dark:focus:bg-gray-800/50',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            'dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400',
             {
-              'border-red-500 focus:ring-red-500': error,
+              'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50': error,
             },
             className
           )}
@@ -30,7 +105,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           {...props}
         />
         {error && (
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          <p className="text-sm text-red-400 flex items-center gap-1">
+            <span className="w-1 h-1 bg-red-400 rounded-full"></span>
+            {error}
+          </p>
         )}
       </div>
     );

@@ -15,3 +15,6 @@ export * from './ThemeToggle';
 export * from './SubtaskModal';
 export * from './TagInput';
 export * from './DatePicker';
+export * from './Tooltip';
+export * from './PageTransition';
+export * from './FadeIn';

@@ -152,14 +152,12 @@ export const JournalPage: React.FC = () => {
         <div className="flex gap-2">
           <Button
             variant={activeView === 'all' ? 'primary' : 'secondary'}
-            size="sm"
             onClick={() => setActiveView('all')}
           >
             All Entries
           </Button>
           <Button
             variant={activeView === 'pinned' ? 'primary' : 'secondary'}
-            size="sm"
             onClick={() => setActiveView('pinned')}
           >
             <Pin className="w-4 h-4 mr-2" />

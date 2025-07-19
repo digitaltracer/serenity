@@ -107,7 +107,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Sidebar collapsed={sidebarCollapsed}>
         {/* Draggable top section - reserve space for window controls */}
         <div 
-          className="h-12 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-end px-4"
+          className="h-12 bg-white/5 dark:bg-gray-900/30 backdrop-blur-md border-b border-gray-200/10 dark:border-gray-700/20 flex items-center justify-end px-4"
           style={{ WebkitAppRegion: 'drag' } as any}
         >
           {!sidebarCollapsed && (
@@ -239,7 +239,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Drag Region Header */}
         <div 
-          className="h-10 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 flex items-center justify-end px-4"
+          className="h-10 bg-white/5 dark:bg-gray-900/20 backdrop-blur-md border-b border-gray-200/10 dark:border-gray-700/20 flex items-center justify-end px-4"
           style={{ WebkitAppRegion: 'drag' } as any}
         >
           <div 
@@ -255,7 +255,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
         
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto">
           {children}
         </main>
       </div>

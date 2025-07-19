@@ -170,15 +170,19 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const isEmptyContent = !value || value === '<br>' || value === '<div><br></div>' || value.trim() === '';
 
   return (
-    <div className={cn('relative border border-gray-300 dark:border-gray-600 rounded-lg', className)}>
-      {/* Toolbar */}
+    <div className={cn(
+      'relative border border-gray-700/50 rounded-lg',
+      'bg-gray-900/40 backdrop-blur-sm',
+      className
+    )}>
+      {/* Clean Toolbar */}
       {showToolbar && (
-        <div className="flex items-center gap-1 p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-t-lg">
+        <div className="flex items-center gap-2 p-3 border-b border-gray-700/30 bg-gray-800/30 backdrop-blur-sm rounded-t-lg">
           {toolbarButtons.map((button, index) => (
             <React.Fragment key={index}>
               {formatButton(button.command, button.icon, button.value)}
               {(index === 2 || index === 5 || index === 7) && (
-                <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
+                <div className="w-px h-6 bg-gray-600/50 mx-1" />
               )}
             </React.Fragment>
           ))}
@@ -190,12 +194,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         ref={editorRef}
         contentEditable
         className={cn(
-          'w-full p-4 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800',
-          'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50',
-          'prose prose-sm dark:prose-invert max-w-none',
+          'w-full p-4 text-gray-100 bg-transparent',
+          'focus:outline-none focus:ring-1 focus:ring-gray-400/30',
+          'prose prose-sm prose-invert max-w-none',
+          'placeholder:text-gray-500',
           showToolbar ? 'rounded-b-lg' : 'rounded-lg',
           {
-            'text-gray-500 dark:text-gray-400': isEmptyContent,
+            'text-gray-500': isEmptyContent,
           }
         )}
         style={{ minHeight }}
@@ -210,8 +215,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       {/* Placeholder */}
       {isEmptyContent && (
         <div
-          className="absolute top-4 left-4 text-gray-500 dark:text-gray-400 pointer-events-none"
-          style={{ top: showToolbar ? '60px' : '16px' }}
+          className="absolute text-gray-500 pointer-events-none"
+          style={{ 
+            top: showToolbar ? '68px' : '16px',
+            left: '16px'
+          }}
         >
           {placeholder}
         </div>

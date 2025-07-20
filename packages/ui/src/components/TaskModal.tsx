@@ -4,7 +4,7 @@ import { Modal } from './Modal';
 import { Button } from './Button';
 import { Input } from './Input';
 import { Textarea } from './Textarea';
-import { Select } from './Select';
+import { CustomSelect } from './CustomSelect';
 import { TagInput } from './TagInput';
 import { DatePicker } from './DatePicker';
 import { Calendar, Flag, Folder } from 'lucide-react';
@@ -134,10 +134,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
         {/* Priority and Due Date */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
+          <CustomSelect
             label="Priority"
             value={formData.priority}
-            onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as Task['priority'] }))}
+            onChange={(value) => setFormData(prev => ({ ...prev, priority: value as Task['priority'] }))}
             options={priorityOptions}
           />
           
@@ -150,19 +150,19 @@ const TaskModal: React.FC<TaskModalProps> = ({
         </div>
 
         {/* Project */}
-        <Select
+        <CustomSelect
           label="Project"
           value={formData.projectId}
-          onChange={(e) => setFormData(prev => ({ ...prev, projectId: e.target.value }))}
+          onChange={(value) => setFormData(prev => ({ ...prev, projectId: value }))}
           options={projectOptions}
         />
 
         {/* Recurring */}
-        <Select
+        <CustomSelect
           label="Repeat"
           value={formData.recurring?.type || ''}
-          onChange={(e) => {
-            const recurringType = e.target.value;
+          onChange={(value) => {
+            const recurringType = value;
             setFormData(prev => ({
               ...prev,
               recurring: recurringType ? {

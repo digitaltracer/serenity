@@ -3,7 +3,7 @@ import { JournalEntry } from '@serenity/core';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { Input } from './Input';
-import { Select } from './Select';
+import { CustomSelect } from './CustomSelect';
 import { RichTextEditor } from './RichTextEditor';
 import { TagInput } from './TagInput';
 import { DatePicker } from './DatePicker';
@@ -95,16 +95,17 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={entry ? 'Edit Journal Entry' : 'New Journal Entry'}
-      size="xl"
+      size="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3 text-sm">
         {/* Title and Date */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-3">
           <Input
             label="Title (optional)"
             placeholder="Give your entry a title..."
             value={formData.title}
             onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+            className="text-sm h-9"
           />
           
           <DatePicker
@@ -112,33 +113,35 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
             value={formData.date}
             onChange={(date) => setFormData(prev => ({ ...prev, date: date || new Date() }))}
             required
+            className="text-sm"
           />
         </div>
 
         {/* Content Editor */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
             Content
           </label>
           <RichTextEditor
             value={formData.content}
             onChange={(content) => setFormData(prev => ({ ...prev, content }))}
             placeholder="Write your thoughts..."
-            minHeight={300}
+            minHeight={150}
           />
         </div>
 
         {/* Mood and Pin */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
+        <div className="space-y-3">
+          <CustomSelect
             label="Mood"
             value={formData.mood}
-            onChange={(e) => setFormData(prev => ({ ...prev, mood: e.target.value as JournalEntry['mood'] }))}
+            onChange={(value) => setFormData(prev => ({ ...prev, mood: value as JournalEntry['mood'] }))}
             options={moodOptions}
+            className="text-sm"
           />
           
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
               Options
             </label>
             <div className="flex items-center gap-2">
@@ -147,8 +150,9 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
                 variant={formData.pinned ? 'primary' : 'secondary'}
                 size="sm"
                 onClick={() => setFormData(prev => ({ ...prev, pinned: !prev.pinned }))}
+                className="text-xs h-8 rounded-lg"
               >
-                <Pin className="w-4 h-4 mr-2" />
+                <Pin className="w-3 h-3 mr-1" />
                 {formData.pinned ? 'Pinned' : 'Pin Entry'}
               </Button>
             </div>
@@ -162,14 +166,15 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
           onChange={handleTagsChange}
           placeholder="Add a tag..."
           maxTags={8}
+          className="text-sm"
         />
 
         {/* Actions */}
-        <div className="flex gap-3 pt-4">
-          <Button type="submit" className="flex-1">
+        <div className="flex gap-2 pt-3 border-t border-gray-200/30 dark:border-gray-700/20">
+          <Button type="submit" className="flex-1 rounded-lg text-sm h-9">
             {entry ? 'Update Entry' : 'Save Entry'}
           </Button>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose} className="rounded-lg text-sm h-9">
             Cancel
           </Button>
         </div>

@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@serenity/core';
 import { addTask, toggleTask, deleteTask, updateTask, addProject } from '@serenity/core';
 import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, TagInput, DatePicker, Textarea } from '@serenity/ui';
-import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical } from 'lucide-react';
+import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List } from 'lucide-react';
 
 export const ActionHubPage: React.FC = () => {
   const dispatch = useDispatch();
   const { tasks } = useSelector((state: RootState) => state.tasks);
   const { projects } = useSelector((state: RootState) => state.projects);
+  const createFormRef = useRef<HTMLDivElement>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'completed'>('all');
@@ -118,6 +119,14 @@ export const ActionHubPage: React.FC = () => {
     setNewTaskDueDate(task.dueDate ? new Date(task.dueDate) : null);
     setEditingTask(task.id);
     setShowCreateForm(true);
+    
+    // Scroll to the form after a short delay to ensure it's rendered
+    setTimeout(() => {
+      createFormRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }, 100);
   };
 
   const projectOptions = projects.map(project => ({
@@ -215,28 +224,22 @@ export const ActionHubPage: React.FC = () => {
                       
                       {/* Stats */}
                       <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                            <span className="text-sm text-gray-600 dark:text-gray-400">Completed</span>
-                          </div>
-                          <span className="text-sm font-medium text-gray-900 dark:text-white">{completedTasks.length}</span>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">Completed</span>
+                          <span className="ml-auto font-semibold text-green-600 dark:text-green-400">{completedTasks.length}</span>
                         </div>
                         
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                            <span className="text-sm text-gray-600 dark:text-gray-400">Remaining</span>
-                          </div>
-                          <span className="text-sm font-medium text-gray-900 dark:text-white">{totalTasks - completedTasks.length}</span>
+                        <div className="flex items-center gap-2">
+                          <Target className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">Remaining</span>
+                          <span className="ml-auto font-semibold text-orange-600 dark:text-orange-400">{totalTasks - completedTasks.length}</span>
                         </div>
                         
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                            <span className="text-sm text-gray-600 dark:text-gray-400">Total</span>
-                          </div>
-                          <span className="text-sm font-medium text-gray-900 dark:text-white">{totalTasks}</span>
+                        <div className="flex items-center gap-2">
+                          <List className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">Total Tasks</span>
+                          <span className="ml-auto font-semibold text-blue-600 dark:text-blue-400">{totalTasks}</span>
                         </div>
                       </div>
                       
@@ -253,7 +256,16 @@ export const ActionHubPage: React.FC = () => {
                 <div className="flex-1">
                   <div 
                     className="border border-dashed border-gray-300/80 dark:border-gray-600/60 rounded-xl p-8 text-center cursor-pointer bg-gradient-to-br from-gray-50/50 to-white/80 dark:from-gray-800/40 dark:to-gray-900/30 backdrop-blur-sm shadow-sm shadow-gray-200/30 dark:shadow-black/20 ring-1 ring-gray-100/40 dark:ring-gray-800/30 transition-all duration-300 ease-out hover:border-blue-300/80 dark:hover:border-blue-500/60 hover:from-blue-50/40 hover:to-blue-25/60 dark:hover:from-blue-900/20 dark:hover:to-blue-800/10 hover:shadow-md hover:shadow-blue-200/40 dark:hover:shadow-blue-900/30 hover:-translate-y-0.5 hover:scale-[1.01] transform-gpu"
-                    onClick={() => setShowCreateForm(true)}
+                    onClick={() => {
+                      setShowCreateForm(true);
+                      // Scroll to the form after a short delay to ensure it's rendered
+                      setTimeout(() => {
+                        createFormRef.current?.scrollIntoView({
+                          behavior: 'smooth',
+                          block: 'start'
+                        });
+                      }, 100);
+                    }}
                   >
                     <Plus className="w-5 h-5 text-gray-500 dark:text-gray-400 mx-auto mb-2" />
                     <p className="text-gray-600 dark:text-gray-400 text-base font-medium">Add new task...</p>
@@ -262,7 +274,7 @@ export const ActionHubPage: React.FC = () => {
               </div>
             ) : (
               /* Full Width Create Form */
-              <div className="mb-6">
+              <div className="mb-6" ref={createFormRef}>
                 <div className="bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-800/80 dark:to-gray-900/60 border border-gray-200/60 dark:border-gray-700/40 rounded-xl p-6 shadow-lg shadow-gray-200/40 dark:shadow-black/25 ring-1 ring-gray-100/80 dark:ring-gray-800/60 backdrop-blur-sm">
                   <div className="space-y-4">
                     <Input
@@ -283,9 +295,7 @@ export const ActionHubPage: React.FC = () => {
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-gray-400 rounded flex items-center justify-center">
-                          <span className="text-xs text-white">⏰</span>
-                        </div>
+                        <Flag className="w-4 h-4 text-gray-400" />
                         <div className="flex-1 min-w-0">
                           <CustomSelect
                             options={[
@@ -300,7 +310,7 @@ export const ActionHubPage: React.FC = () => {
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <Folder className="w-4 h-4 text-gray-400" />
                         <div className="flex-1 min-w-0">
                           <CustomSelect
                             options={[
@@ -469,28 +479,22 @@ export const ActionHubPage: React.FC = () => {
                     
                     {/* Stats */}
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Completed</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{completedProjects.length}</span>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Completed</span>
+                        <span className="ml-auto font-semibold text-green-600 dark:text-green-400">{completedProjects.length}</span>
                       </div>
                       
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">In Progress</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{inProgressProjects.length}</span>
+                      <div className="flex items-center gap-2">
+                        <Target className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">In Progress</span>
+                        <span className="ml-auto font-semibold text-orange-600 dark:text-orange-400">{inProgressProjects.length}</span>
                       </div>
                       
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Yet to Start</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{yetToStartProjects.length}</span>
+                      <div className="flex items-center gap-2">
+                        <List className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Yet to Start</span>
+                        <span className="ml-auto font-semibold text-blue-600 dark:text-blue-400">{yetToStartProjects.length}</span>
                       </div>
                     </div>
                     

@@ -70,6 +70,20 @@ const TagInput: React.FC<TagInputProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
+    
+    // Check if user typed a comma
+    if (newValue.includes(',')) {
+      const beforeComma = newValue.split(',')[0].trim();
+      const afterComma = newValue.split(',').slice(1).join(',');
+      
+      if (beforeComma) {
+        addTag(beforeComma);
+      }
+      
+      setInputValue(afterComma);
+      return;
+    }
+    
     setInputValue(newValue);
     if (getSuggestions(newValue).filter(tag => !value.includes(tag)).length > 0) {
       if (containerRef.current) {
@@ -121,6 +135,11 @@ const TagInput: React.FC<TagInputProps> = ({
       if (highlightedIndex >= 0 && highlightedIndex < filteredSuggestions.length) {
         addTag(filteredSuggestions[highlightedIndex]);
       } else if (inputValue.trim()) {
+        addTag(inputValue);
+      }
+    } else if (e.key === ',' || e.key === 'Tab') {
+      e.preventDefault();
+      if (inputValue.trim()) {
         addTag(inputValue);
       }
     } else if (e.key === 'ArrowDown') {

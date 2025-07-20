@@ -43,7 +43,19 @@ export const JournalPage: React.FC = () => {
 
   const avgWordsPerEntry = entries.length > 0 ? Math.round(totalWords / entries.length) : 0;
 
-  const displayedEntries = activeView === 'pinned' ? pinnedEntries : entries;
+  // Filter entries based on search query and view
+  const filteredEntries = activeView === 'pinned' ? pinnedEntries : entries;
+  const displayedEntries = filteredEntries.filter(entry => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase();
+    return (
+      entry.title?.toLowerCase().includes(query) ||
+      entry.content.toLowerCase().includes(query) ||
+      entry.tags.some(tag => tag.toLowerCase().includes(query)) ||
+      entry.mood?.toLowerCase().includes(query)
+    );
+  });
 
   const handleCreateEntry = () => {
     setEditingEntry(null);

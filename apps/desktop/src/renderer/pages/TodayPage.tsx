@@ -1,14 +1,36 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectTodayTasks, toggleTask, updateTask } from '@serenity/core';
+import { selectTodayTasks, selectAllTasks, toggleTask, updateTask, RootState } from '@serenity/core';
 import { Card, CardHeader, CardTitle, CardContent, TaskCard, ProgressBar, Button, Input, CustomSelect, TagInput, DatePicker, Textarea } from '@serenity/ui';
-import { Calendar, Clock } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, AlertTriangle, Target } from 'lucide-react';
 
 export const TodayPage: React.FC = () => {
   const dispatch = useDispatch();
+  const allTasks = useSelector(selectAllTasks);
   const todayTasks = useSelector(selectTodayTasks);
-  const completedToday = todayTasks.filter(task => task.completed);
-  const progressToday = todayTasks.length > 0 ? (completedToday.length / todayTasks.length) * 100 : 0;
+  
+  // Calculate today's statistics
+  const today = new Date();
+  const todayString = today.toISOString().split('T')[0];
+  
+  // Tasks planned for today (due today)
+  const plannedToday = todayTasks.length;
+  
+  // Tasks completed today (regardless of due date)
+  const completedToday = allTasks.filter(task => {
+    if (!task.completed || !task.updatedAt) return false;
+    const completedDate = new Date(task.updatedAt).toISOString().split('T')[0];
+    return completedDate === todayString;
+  }).length;
+  
+  // Overdue tasks (due before today and not completed)
+  const overdueTasks = allTasks.filter(task => {
+    if (!task.dueDate || task.completed) return false;
+    const taskDateString = new Date(task.dueDate).toISOString().split('T')[0];
+    return taskDateString < todayString;
+  });
+  
+  const progressToday = todayTasks.length > 0 ? (todayTasks.filter(task => task.completed).length / todayTasks.length) * 100 : 0;
   
   // Edit task state
   const [editingTask, setEditingTask] = useState<string | null>(null);
@@ -104,13 +126,27 @@ export const TodayPage: React.FC = () => {
             <CardTitle>Today's Focus</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-              <Clock className="w-5 h-5" />
-              <span className="font-medium">3 tasks planned</span>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Planned for today</span>
+                <span className="ml-auto font-semibold text-blue-600 dark:text-blue-400">{plannedToday}</span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Completed today</span>
+                <span className="ml-auto font-semibold text-green-600 dark:text-green-400">{completedToday}</span>
+              </div>
+              
+              {overdueTasks.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Overdue</span>
+                  <span className="ml-auto font-semibold text-red-600 dark:text-red-400">{overdueTasks.length}</span>
+                </div>
+              )}
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              2 tasks left to complete
-            </p>
           </CardContent>
         </Card>
       </div>
@@ -219,6 +255,43 @@ export const TodayPage: React.FC = () => {
           ))
         )}
       </div>
+      
+      {/* Overdue Tasks */}
+      {overdueTasks.length > 0 && (
+        <div className="space-y-4 mt-8">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+            <h2 className="text-xl font-semibold text-red-700 dark:text-red-400 mb-4">
+              Overdue Tasks ({overdueTasks.length})
+            </h2>
+          </div>
+          
+          {overdueTasks.map(task => (
+            <div key={task.id} className="border-l-4 border-red-500 pl-4">
+              <TaskCard
+                task={task}
+                onToggle={() => dispatch(toggleTask(task.id))}
+                onClick={handleEditTask}
+                className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/30"
+              />
+            </div>
+          ))}
+          
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                  {overdueTasks.length} {overdueTasks.length === 1 ? 'task is' : 'tasks are'} overdue
+                </p>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  Consider updating due dates or completing these tasks to stay on track.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

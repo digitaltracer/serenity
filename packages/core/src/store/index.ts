@@ -5,4 +5,5 @@ export * from './slices/journalSlice';
 export * from './slices/userSlice';
 export * from './slices/uiSlice';
 export * from './slices/tagsSlice';
+export * from './slices/authSlice';
 export * from './slices/sampleData';

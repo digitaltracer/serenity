@@ -55,3 +55,15 @@ export const sortTasksByPriority = <T extends { priority: 'low' | 'medium' | 'hi
     (a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]
   );
 };
+
+// Export storage utilities
+export * from './storage';
+
+// Export privacy utilities
+export * from './privacy';
+
+// Export enhanced security utilities
+export * from './secureStorage';
+export * from './encryption';
+export * from './secureExport';
+export * from './useAutoLock';

@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu:new-entry', () => callback('new-entry'));
     ipcRenderer.on('menu:quick-add', () => callback('quick-add'));
     ipcRenderer.on('menu:navigate', (_, route) => callback('navigate', route));
+    ipcRenderer.on('menu:lock-app', () => callback('lock-app'));
   },
 
   // Remove menu listeners
@@ -29,6 +30,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('menu:new-entry');
     ipcRenderer.removeAllListeners('menu:quick-add');
     ipcRenderer.removeAllListeners('menu:navigate');
+    ipcRenderer.removeAllListeners('menu:lock-app');
   },
 });
 

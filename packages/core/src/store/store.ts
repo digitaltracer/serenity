@@ -5,6 +5,7 @@ import journalReducer from './slices/journalSlice';
 import userReducer from './slices/userSlice';
 import uiReducer from './slices/uiSlice';
 import tagsReducer from './slices/tagsSlice';
+import authReducer from './slices/authSlice';
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ export const store = configureStore({
     user: userReducer,
     ui: uiReducer,
     tags: tagsReducer,
+    auth: authReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

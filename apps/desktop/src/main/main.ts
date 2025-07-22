@@ -151,6 +151,12 @@ class AppManager {
             click: () => this.sendToRenderer('menu:navigate', 'analytics')
           },
           { type: 'separator' },
+          {
+            label: 'Lock App',
+            accelerator: 'CmdOrCtrl+L',
+            click: () => this.sendToRenderer('menu:lock-app')
+          },
+          { type: 'separator' },
           { role: 'reload' },
           { role: 'forceReload' },
           { role: 'toggleDevTools' },

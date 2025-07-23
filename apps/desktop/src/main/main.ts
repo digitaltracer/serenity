@@ -183,9 +183,87 @@ class AppManager {
 
   private setupIPC(): void {
     // Handle database operations
-    ipcMain.handle('database:test-connection', async (_, config) => {
-      // This will be implemented when we add database connection
-      return { success: true };
+    ipcMain.handle('database:test-connection', async (_, connectionUrl: string) => {
+      try {
+        console.log('Testing database connection:', connectionUrl);
+        
+        // Import database functions in main process where Node.js modules are available
+        const pgPromise = await import('pg-promise');
+        
+        // Parse connection URL
+        const url = new URL(connectionUrl);
+        console.log('Parsed URL:', {
+          protocol: url.protocol,
+          hostname: url.hostname,
+          port: url.port,
+          pathname: url.pathname,
+          username: url.username,
+          password: url.password ? '***' : 'none'
+        });
+        
+        if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') {
+          throw new Error('Invalid PostgreSQL URL format');
+        }
+
+        // Create a temporary connection directly for testing
+        const pgp = pgPromise.default({
+          capSQL: true,
+        });
+
+        const config = {
+          host: url.hostname,
+          port: parseInt(url.port) || 5432,
+          database: url.pathname.slice(1), // Remove leading slash
+          user: url.username,
+          password: url.password,
+          ssl: url.searchParams.get('ssl') === 'true' || url.searchParams.get('sslmode') === 'require'
+        };
+
+        console.log('Database config:', {
+          ...config,
+          password: config.password ? '***' : 'none'
+        });
+
+        // Create temporary connection for testing
+        const connectionString = `postgres://${config.user}:${config.password}@${config.host}:${config.port}/${config.database}`;
+        const testDb = pgp({
+          connectionString,
+          ssl: config.ssl ? { rejectUnauthorized: false } : false,
+        });
+
+        // Test the connection
+        await testDb.one('SELECT 1 as test');
+        console.log('Database connection test successful');
+        
+        // Clean up
+        await testDb.$pool.end();
+        
+        return { success: true, error: null };
+      } catch (error) {
+        console.error('Database connection test failed:', error);
+        
+        let userFriendlyError = 'Connection failed';
+        if (error instanceof Error) {
+          if (error.message.includes('no pg_hba.conf entry')) {
+            userFriendlyError = 'Server authentication failed. Try adding "?sslmode=require" to your connection URL or contact your database administrator.';
+          } else if (error.message.includes('ECONNREFUSED')) {
+            userFriendlyError = 'Connection refused. Check if the database server is running and accessible.';
+          } else if (error.message.includes('ENOTFOUND')) {
+            userFriendlyError = 'Host not found. Check the server address in your connection URL.';
+          } else if (error.message.includes('password authentication failed')) {
+            userFriendlyError = 'Invalid username or password.';
+          } else if (error.message.includes('database') && error.message.includes('does not exist')) {
+            userFriendlyError = 'Database does not exist on the server.';
+          } else {
+            userFriendlyError = error.message;
+          }
+        }
+        
+        return { 
+          success: false, 
+          error: userFriendlyError
+        };
+      }
     });
 
     // Handle biometric authentication

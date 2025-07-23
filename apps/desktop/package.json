@@ -1,6 +1,7 @@
 {
   "name": "@serenity/desktop",
   "version": "0.1.0",
+  "author": "Adarsh <adarshnb@gmail.com>",
   "description": "Serenity Notes Desktop Application",
   "main": "dist/main.js",
   "homepage": "./",
@@ -22,32 +23,33 @@
     "clean": "rm -rf dist release"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^1.9.5",
     "@serenity/core": "*",
-    "@serenity/ui": "*",
     "@serenity/database": "*",
+    "@serenity/ui": "*",
+    "electron-store": "^8.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.15.0",
-    "@reduxjs/toolkit": "^1.9.5",
     "react-redux": "^8.1.2",
-    "electron-store": "^8.1.0"
+    "react-router-dom": "^6.15.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.20",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.0.4",
-    "concurrently": "^8.2.0",
-    "electron": "^26.0.0",
-    "electron-builder": "^24.6.4",
-    "typescript": "^5.2.2",
-    "vite": "^4.4.9",
-    "tailwindcss": "^3.3.3",
     "autoprefixer": "^10.4.15",
-    "postcss": "^8.4.29"
+    "concurrently": "^8.2.0",
+    "electron": "^26.6.10",
+    "electron-builder": "^24.6.4",
+    "postcss": "^8.4.29",
+    "tailwindcss": "^3.3.3",
+    "typescript": "^5.2.2",
+    "vite": "^4.4.9"
   },
   "build": {
     "appId": "com.serenity.notes",
     "productName": "Serenity Notes",
+    "electronVersion": "26.6.10",
     "directories": {
       "output": "release",
       "buildResources": "assets"
@@ -61,7 +63,9 @@
       {
         "from": "assets/",
         "to": "assets/",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "mac": {
@@ -70,11 +74,17 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "darkModeSupport": true
@@ -84,11 +94,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -97,15 +111,21 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "deb",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "rpm",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "category": "Office"

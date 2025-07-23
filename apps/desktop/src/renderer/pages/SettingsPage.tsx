@@ -173,12 +173,21 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleDatabaseSave = (connectionUrl: string) => {
+  const handleDatabaseSave = async (connectionUrl: string) => {
     try {
+      // Test the connection first before saving
+      const { testDatabaseConnection } = await import('@serenity/core');
+      const isConnected = await testDatabaseConnection(connectionUrl);
+      
+      if (!isConnected) {
+        showError('Connection Failed', 'Unable to connect to database. Please check your connection details.');
+        return;
+      }
+      
       saveDatabaseConnection(connectionUrl);
       setDbConnection(getDatabaseConnection());
       setDbConnected(true);
-      showSuccess('Database Connected', 'Database connection saved successfully');
+      showSuccess('Database Connected', 'Database connection tested and saved successfully');
     } catch (error) {
       console.error('Failed to save database connection:', error);
       showError('Connection Failed', 'Failed to save database connection');

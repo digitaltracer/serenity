@@ -5,7 +5,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('electronAPI', {
   // Database operations
   database: {
-    testConnection: (config: any) => ipcRenderer.invoke('database:test-connection', config),
+    testConnection: (connectionUrl: string) => ipcRenderer.invoke('database:test-connection', connectionUrl),
   },
 
   // Window operations
@@ -43,7 +43,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 // Type definitions for the exposed API
 export interface ElectronAPI {
   database: {
-    testConnection: (config: any) => Promise<{ success: boolean }>;
+    testConnection: (connectionUrl: string) => Promise<{ success: boolean; error?: string }>;
   };
   window: {
     minimize: () => Promise<void>;

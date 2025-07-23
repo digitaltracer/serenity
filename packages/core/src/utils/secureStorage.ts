@@ -3,6 +3,8 @@
  * Falls back to encrypted localStorage for development/non-Electron environments
  */
 
+/// <reference path="../types/electron.d.ts" />
+
 // Check if we're in an Electron environment
 const isElectron = () => {
   return typeof window !== 'undefined' && 
@@ -417,13 +419,3 @@ export const validateMasterPasswordSecure = async (password: string): Promise<bo
   }
 };
 
-declare global {
-  interface Window {
-    electronAPI?: {
-      safeStorage?: {
-        encryptString: (plaintext: string) => Promise<string>;
-        decryptString: (encrypted: string) => Promise<string>;
-      };
-    };
-  }
-}

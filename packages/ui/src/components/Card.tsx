@@ -1,4 +1,6 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
+import { selectCompactMode } from '@serenity/core';
 import { cn } from '../utils/cn';
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -32,12 +34,19 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
 
 const CardHeader = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, children, ...props }, ref) => {
+    const compactMode = useSelector(selectCompactMode);
+    
     return (
       <div
         ref={ref}
         className={cn(
-          'flex flex-col space-y-2 p-8 pb-6',
+          'flex flex-col space-y-2',
           'border-b border-gray-200 dark:border-gray-700/20',
+          // Compact mode responsive padding
+          {
+            'p-8 pb-6': !compactMode,
+            'p-6 pb-4': compactMode,
+          },
           className
         )}
         {...props}
@@ -85,10 +94,19 @@ const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttribu
 
 const CardContent = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, children, ...props }, ref) => {
+    const compactMode = useSelector(selectCompactMode);
+    
     return (
       <div
         ref={ref}
-        className={cn('p-8 pt-6', className)}
+        className={cn(
+          // Compact mode responsive padding
+          {
+            'p-8 pt-6': !compactMode,
+            'p-6 pt-4': compactMode,
+          },
+          className
+        )}
         {...props}
       >
         {children}

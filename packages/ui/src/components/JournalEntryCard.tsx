@@ -1,5 +1,6 @@
 import React from 'react';
-import { JournalEntry } from '@serenity/core';
+import { JournalEntry, selectCompactMode } from '@serenity/core';
+import { useSelector } from 'react-redux';
 import { cn } from '../utils/cn';
 import { Pin, Calendar, Tag } from 'lucide-react';
 
@@ -16,6 +17,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
   onTogglePin,
   className,
 }) => {
+  const compactMode = useSelector(selectCompactMode);
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString('en-US', {
       month: 'short',
@@ -37,21 +39,30 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
     <div
       className={cn(
         // Premium card design with elegant gradients and shadows
-        'group relative rounded-xl border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm p-6',
+        'group relative rounded-xl border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm',
         'shadow-lg shadow-gray-200/40 ring-1 ring-gray-100/80',
         'dark:border-gray-700/40 dark:from-gray-800/80 dark:to-gray-900/60 dark:shadow-black/25 dark:ring-gray-800/60',
         'transition-all duration-300 ease-out cursor-pointer',
         'hover:shadow-xl hover:shadow-gray-300/50 hover:border-gray-300/80',
         'dark:hover:shadow-black/40 dark:hover:border-gray-600/60',
         'hover:-translate-y-0.5 hover:scale-[1.01] transform-gpu',
+        // Compact mode responsive padding
         {
+          'p-6': !compactMode,
+          'p-4': compactMode,
           'ring-2 ring-blue-500/50 border-blue-300/80 dark:ring-blue-400/50 dark:border-blue-600/60': entry.pinned,
         },
         className
       )}
       onClick={() => onClick?.(entry)}
     >
-      <div className="flex items-start justify-between mb-3">
+      <div className={cn(
+        'flex items-start justify-between',
+        {
+          'mb-3': !compactMode,
+          'mb-2': compactMode,
+        }
+      )}>
         <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
           <Calendar className="w-4 h-4" />
           {formatDate(entry.date)}
@@ -74,12 +85,24 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
       </div>
 
       {entry.title && (
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
+        <h3 className={cn(
+          'font-semibold text-gray-900 dark:text-gray-100',
+          {
+            'mb-2': !compactMode,
+            'mb-1.5': compactMode,
+          }
+        )}>
           {entry.title}
         </h3>
       )}
 
-      <div className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed mb-3">
+      <div className={cn(
+        'text-gray-700 dark:text-gray-300 text-sm leading-relaxed',
+        {
+          'mb-3': !compactMode,
+          'mb-2': compactMode,
+        }
+      )}>
         {truncateContent(entry.content)}
       </div>
 

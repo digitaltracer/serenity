@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { Input } from './Input';
-import { Database, CheckCircle, AlertCircle, Loader, Eye, EyeOff } from 'lucide-react';
+import { Database, CheckCircle, AlertCircle, Loader, Eye, EyeOff, Shield } from 'lucide-react';
 
 interface DatabaseConfigModalProps {
   isOpen: boolean;
@@ -22,9 +22,38 @@ export const DatabaseConfigModal: React.FC<DatabaseConfigModalProps> = ({
   onSave,
   initialConnectionUrl = ''
 }) => {
+  // Detect if initial URL has SSL configured
+  const detectSSLFromUrl = (url: string) => {
+    try {
+      const parsedUrl = new URL(url);
+      return parsedUrl.searchParams.get('sslmode') === 'require';
+    } catch {
+      return url.includes('sslmode=require');
+    }
+  };
+
   const [connectionUrl, setConnectionUrl] = useState(initialConnectionUrl);
   const [showPassword, setShowPassword] = useState(false);
+  const [requireSSL, setRequireSSL] = useState(
+    initialConnectionUrl ? detectSSLFromUrl(initialConnectionUrl) : true
+  ); // Default to SSL enabled for modern security
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({ type: 'idle' });
+
+  const buildConnectionUrl = useCallback((baseUrl: string, ssl: boolean) => {
+    try {
+      const url = new URL(baseUrl);
+      if (ssl) {
+        url.searchParams.set('sslmode', 'require');
+      } else {
+        url.searchParams.delete('sslmode');
+      }
+      return url.toString();
+    } catch {
+      // If URL parsing fails, just append manually
+      const separator = baseUrl.includes('?') ? '&' : '?';
+      return ssl ? `${baseUrl}${separator}sslmode=require` : baseUrl.replace(/[?&]sslmode=require/g, '');
+    }
+  }, []);
 
   const testConnection = useCallback(async () => {
     if (!connectionUrl.trim()) {
@@ -38,26 +67,32 @@ export const DatabaseConfigModal: React.FC<DatabaseConfigModalProps> = ({
     setConnectionStatus({ type: 'testing' });
 
     try {
-      // Simulate connection test - in real app, this would make actual database connection
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Dynamic import to avoid bundling issues
+      const { testDatabaseConnection } = await import('@serenity/core');
       
-      // Basic URL validation
-      const url = new URL(connectionUrl);
-      if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') {
-        throw new Error('Invalid PostgreSQL URL format');
+      // Build the final connection URL with SSL setting
+      const finalConnectionUrl = buildConnectionUrl(connectionUrl, requireSSL);
+      
+      const isConnected = await testDatabaseConnection(finalConnectionUrl);
+      
+      if (isConnected) {
+        setConnectionStatus({ 
+          type: 'success', 
+          message: 'Connection successful!' 
+        });
+      } else {
+        setConnectionStatus({ 
+          type: 'error', 
+          message: 'Connection failed - please check your credentials and network' 
+        });
       }
-
-      setConnectionStatus({ 
-        type: 'success', 
-        message: 'Connection successful!' 
-      });
     } catch (error) {
       setConnectionStatus({ 
         type: 'error', 
         message: error instanceof Error ? error.message : 'Connection failed' 
       });
     }
-  }, [connectionUrl]);
+  }, [connectionUrl, requireSSL, buildConnectionUrl]);
 
   const handleSave = useCallback(() => {
     if (!connectionUrl.trim()) {
@@ -68,14 +103,17 @@ export const DatabaseConfigModal: React.FC<DatabaseConfigModalProps> = ({
       return;
     }
 
-    onSave(connectionUrl);
+    // Save the connection URL with SSL setting applied
+    const finalConnectionUrl = buildConnectionUrl(connectionUrl, requireSSL);
+    onSave(finalConnectionUrl);
     onClose();
-  }, [connectionUrl, onSave, onClose]);
+  }, [connectionUrl, requireSSL, buildConnectionUrl, onSave, onClose]);
 
   const handleClose = useCallback(() => {
     setConnectionUrl(initialConnectionUrl);
     setConnectionStatus({ type: 'idle' });
     setShowPassword(false);
+    setRequireSSL(true);
     onClose();
   }, [initialConnectionUrl, onClose]);
 
@@ -156,6 +194,44 @@ export const DatabaseConfigModal: React.FC<DatabaseConfigModalProps> = ({
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Format: postgresql://username:password@host:port/database
           </p>
+        </div>
+
+        {/* SSL Configuration */}
+        <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+              <Shield className="w-4 h-4 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-900 dark:text-gray-100">Require SSL Connection</h4>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {requireSSL ? 'Secure encrypted connection (recommended)' : 'Unencrypted connection (not recommended)'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={requireSSL}
+            onClick={() => setRequireSSL(!requireSSL)}
+            className={`
+              relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 ease-out
+              focus:outline-none focus:ring-2 focus:ring-green-500/60 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900
+              ${requireSSL 
+                ? 'bg-gradient-to-r from-green-500 to-green-600 shadow-lg shadow-green-500/30' 
+                : 'bg-gray-200 dark:bg-gray-700 shadow-inner'
+              }
+              cursor-pointer hover:scale-105 transform-gpu
+            `}
+          >
+            <span
+              className={`
+                inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-all duration-300 ease-out
+                ${requireSSL ? 'translate-x-6' : 'translate-x-1'}
+                ${requireSSL ? 'shadow-lg' : 'shadow-sm'}
+              `}
+            />
+          </button>
         </div>
 
         {/* Connection Status */}

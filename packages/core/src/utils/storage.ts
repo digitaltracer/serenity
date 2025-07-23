@@ -3,6 +3,8 @@
  * Uses localStorage for now, but in production should use encrypted storage
  */
 
+/// <reference path="../types/electron.d.ts" />
+
 const STORAGE_KEYS = {
   DATABASE_CONNECTION: 'serenity_db_connection',
   DATABASE_CONNECTED: 'serenity_db_connected',
@@ -104,8 +106,7 @@ export const updateConnectionStatus = (connected: boolean): void => {
 };
 
 /**
- * Test database connection (mock implementation)
- * In production, this would make an actual database connection
+ * Test database connection using Electron IPC to main process
  */
 export const testDatabaseConnection = async (connectionUrl: string): Promise<boolean> => {
   try {
@@ -114,12 +115,17 @@ export const testDatabaseConnection = async (connectionUrl: string): Promise<boo
     if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') {
       throw new Error('Invalid PostgreSQL URL format');
     }
-    
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Mock successful connection
-    return true;
+
+    // Check if we're in Electron environment
+    if (typeof window !== 'undefined' && window.electronAPI) {
+      // Use Electron IPC to test connection in main process
+      const result = await window.electronAPI.database.testConnection(connectionUrl);
+      return result.success;
+    } else {
+      // Fallback for non-Electron environments (tests, web, etc.)
+      console.warn('Database connection testing not available outside Electron environment');
+      return false;
+    }
   } catch (error) {
     console.error('Database connection test failed:', error);
     return false;

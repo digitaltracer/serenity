@@ -16,6 +16,7 @@
     "@turbo/gen": "^1.10.7",
     "@typescript-eslint/eslint-plugin": "^6.7.0",
     "@typescript-eslint/parser": "^6.7.0",
+    "electron-builder": "^26.0.12",
     "eslint": "^8.48.0",
     "eslint-config-prettier": "^9.0.0",
     "prettier": "^3.0.3",

@@ -1,4 +1,6 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
+import { selectCompactMode } from '@serenity/core';
 import { cn } from '../utils/cn';
 
 export interface SidebarProps {
@@ -40,10 +42,17 @@ const SidebarHeader: React.FC<{ children: React.ReactNode; className?: string }>
   children, 
   className 
 }) => {
+  const compactMode = useSelector(selectCompactMode);
+  
   return (
     <div className={cn(
-      'p-6 border-b border-gray-200 dark:border-gray-700/20',
+      'border-b border-gray-200 dark:border-gray-700/20',
       'bg-gradient-to-b from-gray-100/50 to-transparent dark:from-gray-800/5',
+      // Compact mode responsive padding
+      {
+        'p-6': !compactMode,
+        'p-4': compactMode,
+      },
       className
     )}>
       {children}
@@ -69,12 +78,17 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   onClick, 
   className 
 }) => {
+  const compactMode = useSelector(selectCompactMode);
+  
   return (
     <div
       className={cn(
-        'flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-all duration-150',
+        'flex items-center rounded-lg cursor-pointer transition-all duration-150',
         'hover:bg-gray-200 dark:hover:bg-gray-800/40',
+        // Compact mode responsive padding and spacing
         {
+          'gap-3 px-4 py-3': !compactMode,
+          'gap-2 px-3 py-2': compactMode,
           // Active state styling for both themes
           'bg-gray-300 text-gray-900 border border-gray-400 dark:bg-gray-600/40 dark:text-gray-100 dark:border-gray-500/50': active,
           'text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white': !active,
@@ -99,9 +113,25 @@ const SidebarSection: React.FC<{
   children: React.ReactNode; 
   className?: string;
 }> = ({ title, children, className }) => {
+  const compactMode = useSelector(selectCompactMode);
+  
   return (
-    <div className={cn('mb-6', className)}>
-      <h3 className="px-4 mb-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+    <div className={cn(
+      // Compact mode responsive margin
+      {
+        'mb-6': !compactMode,
+        'mb-4': compactMode,
+      },
+      className
+    )}>
+      <h3 className={cn(
+        'text-xs font-semibold text-gray-400 uppercase tracking-wider',
+        // Compact mode responsive spacing
+        {
+          'px-4 mb-3': !compactMode,
+          'px-3 mb-2': compactMode,
+        }
+      )}>
         {title}
       </h3>
       <div className="space-y-2">

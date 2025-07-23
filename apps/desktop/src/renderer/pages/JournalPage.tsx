@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { 
   selectAllEntries, 
   selectPinnedEntries,
+  selectCompactMode,
   addEntry, 
   updateEntry,
   togglePin,
@@ -17,7 +18,8 @@ import {
   Button, 
   Input,
   JournalEntryCard,
-  JournalEntryModal
+  JournalEntryModal,
+  cn
 } from '@serenity/ui';
 import { Plus, BookOpen, Search, Pin } from 'lucide-react';
 
@@ -25,6 +27,7 @@ export const JournalPage: React.FC = () => {
   const dispatch = useDispatch();
   const entries = useSelector(selectAllEntries);
   const pinnedEntries = useSelector(selectPinnedEntries);
+  const compactMode = useSelector(selectCompactMode);
   const [searchQuery, setSearchQuery] = useState('');
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
@@ -112,10 +115,22 @@ export const JournalPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className={cn(
+        'flex-1 overflow-auto',
+        {
+          'p-6': !compactMode,
+          'p-4': compactMode,
+        }
+      )}>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className={cn(
+        'grid grid-cols-1 md:grid-cols-3',
+        {
+          'gap-6 mb-6': !compactMode,
+          'gap-4 mb-4': compactMode,
+        }
+      )}>
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -199,7 +214,12 @@ export const JournalPage: React.FC = () => {
       />
 
       {/* Entries List */}
-      <div className="space-y-4">
+      <div className={cn(
+        {
+          'space-y-4': !compactMode,
+          'space-y-2': compactMode,
+        }
+      )}>
         {entries.length === 0 ? (
           <Card>
             <CardContent className="text-center py-12">

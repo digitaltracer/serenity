@@ -1,5 +1,6 @@
 import React from 'react';
-import { Task } from '@serenity/core';
+import { Task, selectCompactMode } from '@serenity/core';
+import { useSelector } from 'react-redux';
 import { cn } from '../utils/cn';
 import { CheckCircle2, Circle, Calendar, Flag, RefreshCw, ListTodo } from 'lucide-react';
 
@@ -12,6 +13,8 @@ export interface TaskCardProps {
 }
 
 const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onToggleSubtask, onClick, className }) => {
+  const compactMode = useSelector(selectCompactMode);
+  
   const priorityColors = {
     high: 'text-red-500 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20',
     medium: 'text-yellow-500 border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20',
@@ -25,14 +28,17 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onToggleSubtask, on
     <div
       className={cn(
         // Premium card design with elegant gradients and shadows
-        'group relative rounded-xl border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm p-6',
+        'group relative rounded-xl border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm',
         'shadow-lg shadow-gray-200/40 ring-1 ring-gray-100/80',
         'dark:border-gray-700/40 dark:from-gray-800/80 dark:to-gray-900/60 dark:shadow-black/25 dark:ring-gray-800/60',
         'transition-all duration-300 ease-out cursor-pointer',
         'hover:shadow-xl hover:shadow-gray-300/50 hover:border-gray-300/80',
         'dark:hover:shadow-black/40 dark:hover:border-gray-600/60',
         'hover:-translate-y-0.5 hover:scale-[1.01] transform-gpu',
+        // Compact mode responsive padding
         {
+          'p-6': !compactMode,
+          'p-4': compactMode,
           'opacity-60': task.completed,
           'border-red-300/80 from-red-50/30 to-red-25/60 dark:border-red-700/60 dark:from-red-900/20 dark:to-red-800/10': isOverdue,
           'border-blue-300/80 from-blue-50/30 to-blue-25/60 dark:border-blue-700/60 dark:from-blue-900/20 dark:to-blue-800/10': isDueToday && !isOverdue,
@@ -41,7 +47,13 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onToggleSubtask, on
       )}
       onClick={() => onClick?.(task)}
     >
-      <div className="flex items-start gap-3">
+      <div className={cn(
+        'flex items-start',
+        {
+          'gap-3': !compactMode,
+          'gap-2': compactMode,
+        }
+      )}>
         {/* Checkbox */}
         <button
           className="flex-shrink-0 mt-0.5 transition-colors"
@@ -85,14 +97,26 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onToggleSubtask, on
 
           {/* Description */}
           {task.description && (
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+            <p className={cn(
+              'text-sm text-gray-600 dark:text-gray-400 line-clamp-2',
+              {
+                'mt-1': !compactMode,
+                'mt-0.5': compactMode,
+              }
+            )}>
               {task.description}
             </p>
           )}
 
           {/* Subtasks */}
           {task.subtasks && task.subtasks.length > 0 && (
-            <div className="mt-2 space-y-1">
+            <div className={cn(
+              'space-y-1',
+              {
+                'mt-2': !compactMode,
+                'mt-1.5': compactMode,
+              }
+            )}>
               {task.subtasks.slice(0, 3).map((subtask) => (
                 <div key={subtask.id} className="flex items-center gap-2 text-sm">
                   <button
@@ -127,7 +151,13 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onToggleSubtask, on
           )}
 
           {/* Footer */}
-          <div className="flex items-center justify-between mt-3">
+          <div className={cn(
+            'flex items-center justify-between',
+            {
+              'mt-3': !compactMode,
+              'mt-2': compactMode,
+            }
+          )}>
             <div className="flex items-center gap-2">
               {/* Due Date */}
               {task.dueDate && (

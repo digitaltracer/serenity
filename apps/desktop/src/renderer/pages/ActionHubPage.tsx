@@ -1,14 +1,15 @@
 import React, { useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '@serenity/core';
+import { RootState, selectCompactMode } from '@serenity/core';
 import { addTask, toggleTask, deleteTask, updateTask, addProject } from '@serenity/core';
-import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, TagInput, DatePicker, Textarea } from '@serenity/ui';
+import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, TagInput, DatePicker, Textarea, cn } from '@serenity/ui';
 import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List } from 'lucide-react';
 
 export const ActionHubPage: React.FC = () => {
   const dispatch = useDispatch();
   const { tasks } = useSelector((state: RootState) => state.tasks);
   const { projects } = useSelector((state: RootState) => state.projects);
+  const compactMode = useSelector(selectCompactMode);
   const createFormRef = useRef<HTMLDivElement>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -150,9 +151,21 @@ export const ActionHubPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className={cn(
+        'flex-1 overflow-auto',
+        {
+          'p-6': !compactMode,
+          'p-4': compactMode,
+        }
+      )}>
         {/* Tabs */}
-        <div className="flex space-x-1 bg-gradient-to-br from-gray-100 to-gray-200/30 dark:from-gray-800 dark:to-gray-900/60 backdrop-blur-sm border border-gray-200/60 dark:border-gray-700/40 p-1.5 rounded-xl w-fit mb-6 shadow-sm shadow-gray-200/30 dark:shadow-black/20">
+        <div className={cn(
+          'flex space-x-1 bg-gradient-to-br from-gray-100 to-gray-200/30 dark:from-gray-800 dark:to-gray-900/60 backdrop-blur-sm border border-gray-200/60 dark:border-gray-700/40 p-1.5 rounded-xl w-fit shadow-sm shadow-gray-200/30 dark:shadow-black/20',
+          {
+            'mb-6': !compactMode,
+            'mb-4': compactMode,
+          }
+        )}>
           <button
             onClick={() => setActiveTab('tasks')}
             className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
@@ -178,7 +191,13 @@ export const ActionHubPage: React.FC = () => {
           <div>
             {/* Progress and Add Task - Side by Side when collapsed */}
             {!showCreateForm ? (
-              <div className="flex gap-6 mb-6">
+              <div className={cn(
+                'flex',
+                {
+                  'gap-6 mb-6': !compactMode,
+                  'gap-4 mb-4': compactMode,
+                }
+              )}>
                 {/* Overall Progress Card - Left Side */}
                 <div className="w-80">
                   <Card>
@@ -405,7 +424,12 @@ export const ActionHubPage: React.FC = () => {
             </div>
             
             {/* Tasks List - Full Width */}
-            <div className="space-y-3">
+            <div className={cn(
+              {
+                'space-y-3': !compactMode,
+                'space-y-2': compactMode,
+              }
+            )}>
               {filteredTasks.length === 0 ? (
                 <div className="text-center py-12">
                   <CheckCircle2 className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />

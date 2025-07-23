@@ -13,11 +13,11 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "npm run clean && tsc",
     "dev": "tsc --watch",
     "lint": "eslint src/**/*.ts",
     "test": "jest",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^1.9.5",

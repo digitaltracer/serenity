@@ -1,3 +1,4 @@
+/// <reference path="../types/electron.d.ts" />
 import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from './Button';
 import { Input } from './Input';
@@ -8,7 +9,8 @@ import {
   AlertCircle, 
   Loader,
   Shield,
-  KeyRound
+  KeyRound,
+  Fingerprint
 } from 'lucide-react';
 
 interface AppLockScreenProps {
@@ -34,6 +36,50 @@ export const AppLockScreen: React.FC<AppLockScreenProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [remainingLockoutTime, setRemainingLockoutTime] = useState(lockoutTime);
+  
+  // Touch ID state
+  const [touchIdAvailable, setTouchIdAvailable] = useState(false);
+  const [touchIdAuthenticating, setTouchIdAuthenticating] = useState(false);
+
+  // Check Touch ID availability on mount
+  useEffect(() => {
+    const checkTouchIdAvailability = async () => {
+      if ((window.electronAPI as any)?.biometric?.isAvailable) {
+        try {
+          const result = await (window.electronAPI as any).biometric.isAvailable();
+          setTouchIdAvailable(result.available);
+        } catch (error) {
+          console.error('Failed to check Touch ID availability:', error);
+          setTouchIdAvailable(false);
+        }
+      }
+    };
+
+    checkTouchIdAvailability();
+  }, []);
+
+  // Handle Touch ID authentication
+  const handleTouchIdAuth = useCallback(async () => {
+    if (!touchIdAvailable || touchIdAuthenticating) return;
+
+    setTouchIdAuthenticating(true);
+    try {
+      if ((window.electronAPI as any)?.biometric?.authenticate) {
+        const result = await (window.electronAPI as any).biometric.authenticate('Unlock Serenity Notes');
+        if (result.success) {
+          // Touch ID succeeded, unlock without password
+          await onUnlock(''); // Empty password since we used biometric auth
+        } else if (!result.cancelled) {
+          // Only show error if not cancelled by user
+          console.error('Touch ID failed:', result.error);
+        }
+      }
+    } catch (error) {
+      console.error('Touch ID error:', error);
+    } finally {
+      setTouchIdAuthenticating(false);
+    }
+  }, [touchIdAvailable, touchIdAuthenticating, onUnlock]);
 
   // Handle lockout countdown
   useEffect(() => {
@@ -202,6 +248,40 @@ export const AppLockScreen: React.FC<AppLockScreenProps> = ({
                 'Unlock'
               )}
             </Button>
+
+            {/* Touch ID Button */}
+            {touchIdAvailable && !isLocked && (
+              <div className="text-center">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleTouchIdAuth}
+                  disabled={touchIdAuthenticating || isSubmitting}
+                  className="w-full py-3 text-lg font-medium"
+                >
+                  {touchIdAuthenticating ? (
+                    <>
+                      <Loader className="w-5 h-5 mr-2 animate-spin" />
+                      Authenticating...
+                    </>
+                  ) : (
+                    <>
+                      <Fingerprint className="w-5 h-5 mr-2" />
+                      Use Touch ID
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {/* Divider between authentication methods */}
+            {touchIdAvailable && !isLocked && (
+              <div className="flex items-center gap-4">
+                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+                <span className="text-sm text-gray-500 dark:text-gray-400">or</span>
+                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+              </div>
+            )}
 
             {/* Forgot Password */}
             {onForgotPassword && (

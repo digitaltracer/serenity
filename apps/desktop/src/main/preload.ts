@@ -15,6 +15,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     close: () => ipcRenderer.invoke('window:close'),
   },
 
+  // Biometric authentication
+  biometric: {
+    isAvailable: () => ipcRenderer.invoke('biometric:isAvailable'),
+    authenticate: (reason?: string) => ipcRenderer.invoke('biometric:authenticate', reason),
+  },
+
   // Menu events
   onMenuAction: (callback: (event: string, data?: any) => void) => {
     ipcRenderer.on('menu:new-task', () => callback('new-task'));
@@ -43,6 +49,10 @@ export interface ElectronAPI {
     minimize: () => Promise<void>;
     maximize: () => Promise<void>;
     close: () => Promise<void>;
+  };
+  biometric: {
+    isAvailable: () => Promise<{ available: boolean; type: string | null }>;
+    authenticate: (reason?: string) => Promise<{ success: boolean; error?: string | null; cancelled?: boolean }>;
   };
   onMenuAction: (callback: (event: string, data?: any) => void) => void;
   removeMenuListeners: () => void;

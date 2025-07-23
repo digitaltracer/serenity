@@ -8,6 +8,7 @@ import {
   validatePassword,
   resetPassword,
   factoryReset,
+  unlockApp,
   selectIsLocked, 
   selectIsInitialized,
   selectHasMasterPassword,
@@ -57,6 +58,13 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
   // Handle password validation
   const handleUnlock = useCallback(async (password: string): Promise<boolean> => {
     try {
+      // If password is empty, it means biometric auth was used - directly unlock
+      if (password === '') {
+        dispatch(unlockApp());
+        return true;
+      }
+      
+      // Otherwise validate password normally
       const result = await dispatch(validatePassword(password) as any);
       if (result.type === 'auth/validatePassword/fulfilled') {
         return true;

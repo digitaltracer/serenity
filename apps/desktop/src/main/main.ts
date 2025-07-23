@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, Menu, shell, ipcMain, systemPreferences } from 'electron';
 import { join } from 'path';
 import { isDev } from './utils';
 
@@ -186,6 +186,42 @@ class AppManager {
     ipcMain.handle('database:test-connection', async (_, config) => {
       // This will be implemented when we add database connection
       return { success: true };
+    });
+
+    // Handle biometric authentication
+    ipcMain.handle('biometric:isAvailable', async () => {
+      if (process.platform === 'darwin') {
+        try {
+          const authType = systemPreferences.getMediaAccessStatus('microphone');
+          // Check if Touch ID is available
+          const canPromptTouchID = await systemPreferences.canPromptTouchID();
+          return { available: canPromptTouchID, type: 'touchid' };
+        } catch (error) {
+          console.error('Error checking Touch ID availability:', error);
+          return { available: false, type: null };
+        }
+      } else {
+        // Windows Hello, Linux fingerprint, etc. could be added here
+        return { available: false, type: null };
+      }
+    });
+
+    ipcMain.handle('biometric:authenticate', async (_, reason = 'authenticate') => {
+      if (process.platform === 'darwin') {
+        try {
+          await systemPreferences.promptTouchID(reason);
+          return { success: true, error: null };
+        } catch (error) {
+          console.error('Touch ID authentication failed:', error);
+          return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Authentication failed',
+            cancelled: (error as any)?.message?.includes('cancelled') || (error as any)?.message?.includes('User cancel')
+          };
+        }
+      } else {
+        return { success: false, error: 'Biometric authentication not available on this platform' };
+      }
     });
 
     // Handle window operations

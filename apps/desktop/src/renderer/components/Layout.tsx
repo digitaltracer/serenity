@@ -26,7 +26,8 @@ import {
   closeSubtaskModal,
   selectShortcuts,
   Task,
-  JournalEntry
+  JournalEntry,
+  SearchResult
 } from '@serenity/core';
 import { 
   Sidebar, 
@@ -112,6 +113,23 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const handleCreateSubtask = (taskId: string, subtaskTitle: string) => {
     dispatch(addSubtask({ taskId, title: subtaskTitle }));
     dispatch(closeSubtaskModal());
+  };
+
+  const handleSearchResultSelect = (result: SearchResult) => {
+    // Navigate to the appropriate page based on the result type
+    switch (result.type) {
+      case 'tasks':
+        navigate('/actionhub');
+        break;
+      case 'journal':
+        navigate('/journal');
+        break;
+      case 'projects':
+        navigate('/actionhub'); // Projects are typically managed in ActionHub
+        break;
+      default:
+        navigate('/');
+    }
   };
 
   const navigationItems = [
@@ -327,6 +345,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <GlobalSearchModal
         isOpen={isGlobalSearchOpen}
         onClose={() => dispatch(closeGlobalSearch())}
+        onSelectResult={handleSearchResultSelect}
       />
     </div>
   );

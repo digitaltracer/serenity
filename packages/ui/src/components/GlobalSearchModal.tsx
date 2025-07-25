@@ -100,12 +100,17 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
   // Focus search input when modal opens
   useEffect(() => {
-    if (isOpen && searchInputRef.current) {
+    if (isOpen) {
+      // Clear search when opening
+      dispatch(clearSearch());
+      setSelectedResultIndex(0);
+      
+      // Focus input after modal animation
       setTimeout(() => {
         searchInputRef.current?.focus();
-      }, 100);
+      }, 150);
     }
-  }, [isOpen]);
+  }, [isOpen, dispatch]);
 
   // Perform search when query changes
   useEffect(() => {

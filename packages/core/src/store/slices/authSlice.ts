@@ -32,11 +32,34 @@ const initialState: AuthState = {
 export const initializeAuth = createAsyncThunk(
   'auth/initialize',
   async () => {
+    console.log('🚀 Auth initialization started');
+    const startTime = performance.now();
+    
     try {
-      // Check if master password exists and get privacy settings
+      // First, do a quick check if we even need expensive crypto operations
+      const hasEncryptedData = localStorage.getItem('encrypted_privacy_settings') !== null;
+      
+      if (!hasEncryptedData) {
+        console.log('⚡ No encrypted data found, using fast initialization');
+        console.log(`✅ Auth initialization completed in ${(performance.now() - startTime).toFixed(2)}ms`);
+        return {
+          hasMasterPassword: false,
+          autoLockTimeout: 15,
+          isLocked: false,
+        };
+      }
+      
+      // Only do expensive crypto operations if we have encrypted data
+      console.log('🔐 Encrypted data found, loading securely...');
+      const settingsStart = performance.now();
       const privacySettings = await getPrivacySettingsSecure();
+      console.log(`✅ Privacy settings loaded in ${(performance.now() - settingsStart).toFixed(2)}ms`);
+      
       const hasMasterPassword = privacySettings?.masterPasswordEnabled || false;
       const autoLockTimeout = privacySettings?.autoLockTimeout || 15;
+      
+      console.log(`🔐 Auth config: masterPassword=${hasMasterPassword}, timeout=${autoLockTimeout}`);
+      console.log(`✅ Auth initialization completed in ${(performance.now() - startTime).toFixed(2)}ms`);
       
       return {
         hasMasterPassword,
@@ -44,7 +67,8 @@ export const initializeAuth = createAsyncThunk(
         isLocked: hasMasterPassword, // Lock if master password is enabled
       };
     } catch (error) {
-      console.error('Failed to initialize auth:', error);
+      console.error('❌ Failed to initialize auth:', error);
+      console.log(`⚠️ Falling back to defaults after ${(performance.now() - startTime).toFixed(2)}ms`);
       return {
         hasMasterPassword: false,
         autoLockTimeout: 15,
@@ -197,9 +221,9 @@ const authSlice = createSlice({
       .addCase(initializeAuth.fulfilled, (state, action) => {
         state.isValidating = false;
         state.isInitialized = true;
-        state.hasMasterPassword = action.payload.hasMasterPassword;
-        state.autoLockTimeout = action.payload.autoLockTimeout;
-        state.isLocked = action.payload.isLocked;
+        state.hasMasterPassword = (action.payload as any).hasMasterPassword;
+        state.autoLockTimeout = (action.payload as any).autoLockTimeout;
+        state.isLocked = (action.payload as any).isLocked;
       })
       .addCase(initializeAuth.rejected, (state) => {
         state.isValidating = false;

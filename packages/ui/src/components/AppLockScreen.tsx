@@ -1,4 +1,4 @@
-/// <reference path="../types/electron.d.ts" />
+/// <reference path="../../../core/src/types/electron.d.ts" />
 import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from './Button';
 import { Input } from './Input';

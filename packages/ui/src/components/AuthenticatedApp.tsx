@@ -2,7 +2,9 @@ import React, { useEffect, useCallback, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppLockScreen } from './AppLockScreen';
 import { PasswordResetModal } from './PasswordResetModal';
+import { LoadingScreen } from './LoadingScreen';
 import { useToast } from './Toast';
+import { useCryptoOperations } from '../hooks/useCryptoOperations';
 import { 
   initializeAuth, 
   validatePassword,
@@ -34,6 +36,7 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
   const dispatch = useDispatch();
   const { showSuccess, showError } = useToast();
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const { cryptoProgress, startCryptoOperation, updateProgress, completeCryptoOperation, failCryptoOperation } = useCryptoOperations();
   
   const isLocked = useSelector(selectIsLocked);
   const isInitialized = useSelector(selectIsInitialized);
@@ -51,9 +54,69 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
   // Initialize authentication on app startup
   useEffect(() => {
     if (!isInitialized) {
-      dispatch(initializeAuth() as any);
+      const initializeApp = async () => {
+        try {
+          console.log('🚀 Starting app initialization...');
+          
+          // Import crypto utils only when needed
+          const { shouldShowCryptoLoading, initializeCrypto } = await import('@serenity/core');
+          
+          if (shouldShowCryptoLoading()) {
+            console.log('🔐 Encryption enabled, showing crypto loading screen');
+            startCryptoOperation();
+            
+            // Initialize crypto with progress updates
+            const success = await initializeCrypto((progress, stage, message) => {
+              updateProgress({ 
+                progress, 
+                stage: stage as any, 
+                message 
+              });
+            });
+            
+            if (success) {
+              completeCryptoOperation();
+            } else {
+              failCryptoOperation('Failed to initialize encryption');
+            }
+          } else {
+            console.log('⚡ No encryption needed, proceeding with normal initialization');
+          }
+          
+          // Add a minimum delay to show loading screen (even if initialization is fast)
+          await new Promise(resolve => setTimeout(resolve, 800));
+          
+          // Start auth initialization
+          dispatch(initializeAuth() as any);
+          
+        } catch (error) {
+          console.error('❌ Failed to initialize app:', error);
+          // Fall back to default auth initialization
+          dispatch(initializeAuth() as any);
+        }
+      };
+      
+      // Set a timeout to force initialization completion if it hangs
+      const timeoutId = setTimeout(() => {
+        console.warn('App initialization timed out, falling back to default state');
+        // Force initialization to complete
+        dispatch({
+          type: 'auth/initialize/fulfilled',
+          payload: {
+            hasMasterPassword: false,
+            autoLockTimeout: 15,
+            isLocked: false,
+          }
+        });
+      }, 2000); // 2 second timeout to allow loading screen to be visible
+
+      initializeApp().finally(() => {
+        clearTimeout(timeoutId);
+      });
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [dispatch, isInitialized]);
+  }, [dispatch, isInitialized, startCryptoOperation, updateProgress, completeCryptoOperation, failCryptoOperation]);
 
   // Handle password validation
   const handleUnlock = useCallback(async (password: string): Promise<boolean> => {
@@ -168,20 +231,14 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
 
   // Show loading state while initializing
   if (!isInitialized) {
+    console.log('🔄 Loading screen shown - isInitialized:', isInitialized, 'isValidating:', isValidating);
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-4 animate-pulse">
-            <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            Initializing Serenity Notes
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Setting up your secure workspace...
-          </p>
-        </div>
-      </div>
+      <LoadingScreen 
+        title="Loading Serenity Notes"
+        message="Initializing application..."
+        progress={20}
+        stage="loading"
+      />
     );
   }
 
@@ -207,6 +264,18 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
           onExportData={handleExportData}
         />
       </>
+    );
+  }
+
+  // Show crypto loading screen if needed
+  if (cryptoProgress.isLoading) {
+    return (
+      <LoadingScreen 
+        title="Loading Serenity Notes"
+        message={cryptoProgress.message}
+        progress={cryptoProgress.progress}
+        stage={cryptoProgress.stage}
+      />
     );
   }
 

@@ -11,6 +11,20 @@ import {
   selectAllTasks,
   addEntry,
   addUsedTags,
+  selectIsGlobalSearchOpen,
+  openGlobalSearch,
+  closeGlobalSearch,
+  openHelpModal,
+  selectTaskModalOpen,
+  selectJournalModalOpen,
+  selectSubtaskModalOpen,
+  openTaskModal,
+  closeTaskModal,
+  openJournalModal,
+  closeJournalModal,
+  openSubtaskModal,
+  closeSubtaskModal,
+  selectShortcuts,
   Task,
   JournalEntry
 } from '@serenity/core';
@@ -24,7 +38,8 @@ import {
   TaskModal,
   JournalEntryModal,
   ThemeToggle,
-  SubtaskModal
+  SubtaskModal,
+  GlobalSearchModal
 } from '@serenity/ui';
 import { 
   Home,
@@ -38,7 +53,9 @@ import {
   ListChecks,
   PanelLeft,
   PanelLeftClose,
-  Square
+  Square,
+  Search,
+  HelpCircle
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -50,11 +67,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const sidebarCollapsed = useSelector(selectSidebarCollapsed);
   const currentTheme = useSelector(selectTheme);
   const tasks = useSelector(selectAllTasks);
+  const isGlobalSearchOpen = useSelector(selectIsGlobalSearchOpen);
+  const isTaskModalOpen = useSelector(selectTaskModalOpen);
+  const isJournalModalOpen = useSelector(selectJournalModalOpen);
+  const isSubtaskModalOpen = useSelector(selectSubtaskModalOpen);
+  const shortcuts = useSelector(selectShortcuts);
+  
+  // Find relevant shortcuts for buttons
+  const searchShortcut = shortcuts.find(s => s.action === 'OPEN_GLOBAL_SEARCH');
+  const helpShortcut = shortcuts.find(s => s.action === 'SHOW_SHORTCUTS_HELP');
   const location = useLocation();
   const navigate = useNavigate();
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
-  const [isSubtaskModalOpen, setIsSubtaskModalOpen] = useState(false);
 
   const toggleSidebar = () => {
     dispatch(setSidebarCollapsed(!sidebarCollapsed));
@@ -68,7 +91,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       dispatch(addUsedTags(taskData.tags));
     }
     
-    setIsTaskModalOpen(false);
+    dispatch(closeTaskModal());
   };
 
   const handleCreateJournalEntry = (entryData: Partial<JournalEntry>) => {
@@ -79,7 +102,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       dispatch(addUsedTags(entryData.tags));
     }
     
-    setIsJournalModalOpen(false);
+    dispatch(closeJournalModal());
   };
 
   const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
@@ -88,7 +111,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const handleCreateSubtask = (taskId: string, subtaskTitle: string) => {
     dispatch(addSubtask({ taskId, title: subtaskTitle }));
-    setIsSubtaskModalOpen(false);
+    dispatch(closeSubtaskModal());
   };
 
   const navigationItems = [
@@ -186,19 +209,19 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <SidebarSection title="Quick Actions">
               <SidebarItem
                 icon={<Plus className="w-5 h-5" />}
-                onClick={() => setIsTaskModalOpen(true)}
+                onClick={() => dispatch(openTaskModal())}
               >
                 New Task
               </SidebarItem>
               <SidebarItem
                 icon={<BookOpen className="w-5 h-5" />}
-                onClick={() => setIsJournalModalOpen(true)}
+                onClick={() => dispatch(openJournalModal())}
               >
                 New Entry
               </SidebarItem>
               <SidebarItem
                 icon={<ListChecks className="w-5 h-5" />}
-                onClick={() => setIsSubtaskModalOpen(true)}
+                onClick={() => dispatch(openSubtaskModal())}
               >
                 Add Subtask
               </SidebarItem>
@@ -209,15 +232,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="space-y-2 mt-4">
               <SidebarItem
                 icon={<Plus className="w-5 h-5" />}
-                onClick={() => setIsTaskModalOpen(true)}
+                onClick={() => dispatch(openTaskModal())}
               />
               <SidebarItem
                 icon={<BookOpen className="w-5 h-5" />}
-                onClick={() => setIsJournalModalOpen(true)}
+                onClick={() => dispatch(openJournalModal())}
               />
               <SidebarItem
                 icon={<ListChecks className="w-5 h-5" />}
-                onClick={() => setIsSubtaskModalOpen(true)}
+                onClick={() => dispatch(openSubtaskModal())}
               />
             </div>
           )}
@@ -246,6 +269,24 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             className="flex items-center gap-2"
             style={{ WebkitAppRegion: 'no-drag' } as any}
           >
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => dispatch(openGlobalSearch())}
+              className="opacity-70 hover:opacity-100 w-8 h-8 p-0"
+              title={`Global Search${searchShortcut ? ` (${searchShortcut.modifiers.ctrl ? (navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl+') : ''}${searchShortcut.key.toUpperCase()})` : ''}`}
+            >
+              <Search className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => dispatch(openHelpModal())}
+              className="opacity-70 hover:opacity-100 w-8 h-8 p-0"
+              title={`Keyboard Shortcuts${helpShortcut ? ` (${helpShortcut.modifiers.shift ? 'Shift+' : ''}${helpShortcut.key})` : ''}`}
+            >
+              <HelpCircle className="w-4 h-4" />
+            </Button>
             <ThemeToggle 
               theme={currentTheme}
               onThemeChange={handleThemeChange}
@@ -263,23 +304,29 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Task Modal */}
       <TaskModal
         isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
+        onClose={() => dispatch(closeTaskModal())}
         onSave={handleCreateTask}
       />
 
       {/* Journal Entry Modal */}
       <JournalEntryModal
         isOpen={isJournalModalOpen}
-        onClose={() => setIsJournalModalOpen(false)}
+        onClose={() => dispatch(closeJournalModal())}
         onSave={handleCreateJournalEntry}
       />
 
       {/* Subtask Modal */}
       <SubtaskModal
         isOpen={isSubtaskModalOpen}
-        onClose={() => setIsSubtaskModalOpen(false)}
+        onClose={() => dispatch(closeSubtaskModal())}
         onSave={handleCreateSubtask}
         tasks={tasks}
+      />
+
+      {/* Global Search Modal */}
+      <GlobalSearchModal
+        isOpen={isGlobalSearchOpen}
+        onClose={() => dispatch(closeGlobalSearch())}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { JournalEntry, selectCompactMode } from '@serenity/core';
 import { useSelector } from 'react-redux';
 import { cn } from '../utils/cn';
@@ -11,29 +11,39 @@ export interface JournalEntryCardProps {
   className?: string;
 }
 
-const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
+const JournalEntryCard = React.memo<JournalEntryCardProps>(({
   entry,
   onClick,
   onTogglePin,
   className,
 }) => {
   const compactMode = useSelector(selectCompactMode);
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
+  
+  // Memoize expensive calculations to prevent re-computation on every render
+  const entryData = useMemo(() => {
+    const formatDate = (date: Date) => {
+      return new Date(date).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    };
 
-  const getWordCount = (content: string) => {
-    return content.trim().split(/\s+/).length;
-  };
+    const getWordCount = (content: string) => {
+      return content.trim().split(/\s+/).length;
+    };
 
-  const truncateContent = (content: string, maxLength = 150) => {
-    if (content.length <= maxLength) return content;
-    return content.substring(0, maxLength) + '...';
-  };
+    const truncateContent = (content: string, maxLength = 150) => {
+      if (content.length <= maxLength) return content;
+      return content.substring(0, maxLength) + '...';
+    };
+
+    return {
+      formattedDate: formatDate(entry.date),
+      wordCount: getWordCount(entry.content),
+      truncatedContent: truncateContent(entry.content),
+    };
+  }, [entry.date, entry.content]);
 
   return (
     <div
@@ -65,7 +75,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
       )}>
         <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
           <Calendar className="w-4 h-4" />
-          {formatDate(entry.date)}
+          {entryData.formattedDate}
         </div>
 
         <button
@@ -103,7 +113,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
           'mb-2': compactMode,
         }
       )}>
-        {truncateContent(entry.content)}
+        {entryData.truncatedContent}
       </div>
 
       <div className="flex items-center justify-between">
@@ -137,11 +147,11 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
         </div>
 
         <div className="text-xs text-gray-500 dark:text-gray-400">
-          {getWordCount(entry.content)} words
+          {entryData.wordCount} words
         </div>
       </div>
     </div>
   );
-};
+});
 
 export { JournalEntryCard };

@@ -6,4 +6,8 @@ export * from './slices/userSlice';
 export * from './slices/uiSlice';
 export * from './slices/tagsSlice';
 export * from './slices/authSlice';
+export * from './slices/databaseSlice';
+export * from './slices/shortcutsSlice';
+export * from './slices/searchSlice';
+export * from './slices/dragDropSlice';
 export * from './slices/sampleData';

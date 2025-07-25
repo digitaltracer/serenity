@@ -18,6 +18,9 @@ import {
   Button, 
   Input,
   JournalEntryCard,
+  SelectableItem,
+  BulkOperationsToolbar,
+  BulkActionsButton,
   JournalEntryModal,
   cn
 } from '@serenity/ui';
@@ -108,10 +111,13 @@ export const JournalPage: React.FC = () => {
               Capture thoughts, ideas, and reflections
             </p>
           </div>
-          <Button onClick={handleCreateEntry} className="rounded-xl">
-            <Plus className="w-4 h-4 mr-2" />
-            New Entry
-          </Button>
+          <div className="flex items-center space-x-2">
+            <BulkActionsButton variant="icon" />
+            <Button onClick={handleCreateEntry} className="rounded-xl">
+              <Plus className="w-4 h-4 mr-2" />
+              New Entry
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -238,16 +244,20 @@ export const JournalPage: React.FC = () => {
           </Card>
         ) : (
           displayedEntries.map((entry) => (
-            <JournalEntryCard
-              key={entry.id}
-              entry={entry}
-              onClick={handleEditEntry}
-              onTogglePin={handleTogglePin}
-            />
+            <SelectableItem key={entry.id} id={entry.id} type="journalEntries">
+              <JournalEntryCard
+                entry={entry}
+                onClick={handleEditEntry}
+                onTogglePin={handleTogglePin}
+              />
+            </SelectableItem>
           ))
         )}
       </div>
       </div>
+      
+      {/* Bulk Operations Toolbar */}
+      <BulkOperationsToolbar />
     </div>
   );
 };

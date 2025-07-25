@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Project } from '../../types';
 import { generateId } from '../../utils';
+import { loadProjects } from '../../utils/persistence';
 
 export interface ProjectsState {
   projects: Project[];
@@ -8,8 +9,18 @@ export interface ProjectsState {
   error: string | null;
 }
 
+// Load projects from localStorage on initialization
+const initialProjects = (() => {
+  try {
+    return loadProjects();
+  } catch (error) {
+    console.error('Failed to load projects from storage:', error);
+    return [];
+  }
+})();
+
 const initialState: ProjectsState = {
-  projects: [],
+  projects: initialProjects,
   loading: false,
   error: null,
 };

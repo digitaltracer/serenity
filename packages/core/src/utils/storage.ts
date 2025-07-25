@@ -91,7 +91,7 @@ export const isDatabaseConnected = (): boolean => {
 /**
  * Update connection status
  */
-export const updateConnectionStatus = (connected: boolean): void => {
+export const updateStoredConnectionStatus = (connected: boolean): void => {
   const existingConnection = getDatabaseConnection();
   if (!existingConnection) return;
   
@@ -108,14 +108,8 @@ export const updateConnectionStatus = (connected: boolean): void => {
 /**
  * Test database connection using Electron IPC to main process
  */
-export const testDatabaseConnection = async (connectionUrl: string): Promise<boolean> => {
+export const testStoredDatabaseConnection = async (connectionUrl: string): Promise<boolean> => {
   try {
-    // Basic URL validation
-    const url = new URL(connectionUrl);
-    if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') {
-      throw new Error('Invalid PostgreSQL URL format');
-    }
-
     // Check if we're in Electron environment
     if (typeof window !== 'undefined' && window.electronAPI) {
       // Use Electron IPC to test connection in main process

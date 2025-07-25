@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, selectCompactMode } from '@serenity/core';
 import { addTask, toggleTask, deleteTask, updateTask, addProject } from '@serenity/core';
-import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, TagInput, DatePicker, Textarea, cn } from '@serenity/ui';
+import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, TagInput, DatePicker, Textarea, cn, DraggableTaskCard, SelectableItem, BulkOperationsToolbar, BulkActionsButton } from '@serenity/ui';
 import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List } from 'lucide-react';
 
 export const ActionHubPage: React.FC = () => {
@@ -147,6 +147,9 @@ export const ActionHubPage: React.FC = () => {
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Organize your tasks and boost productivity
             </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <BulkActionsButton variant="icon" />
           </div>
         </div>
       </div>
@@ -441,14 +444,17 @@ export const ActionHubPage: React.FC = () => {
                   </p>
                 </div>
               ) : (
-                filteredTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onToggle={() => dispatch(toggleTask(task.id))}
-                    onClick={handleEditTask}
-                    onDelete={() => dispatch(deleteTask(task.id))}
-                  />
+                filteredTasks.map((task, index) => (
+                  <SelectableItem key={task.id} id={task.id} type="tasks">
+                    <DraggableTaskCard
+                      task={task}
+                      onToggle={() => dispatch(toggleTask(task.id))}
+                      onClick={handleEditTask}
+                      onDelete={() => dispatch(deleteTask(task.id))}
+                      index={index}
+                      containerName="actionhub-tasks"
+                    />
+                  </SelectableItem>
                 ))
               )}
             </div>
@@ -668,6 +674,9 @@ export const ActionHubPage: React.FC = () => {
           </div>
         )}
       </div>
+      
+      {/* Bulk Operations Toolbar */}
+      <BulkOperationsToolbar />
     </div>
   );
 };

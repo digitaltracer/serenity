@@ -185,67 +185,17 @@ class AppManager {
     // Handle database operations
     ipcMain.handle('database:test-connection', async (_, connectionUrl: string) => {
       try {
-        console.log('Testing database connection:', connectionUrl);
-        
         // Import database functions in main process where Node.js modules are available
-        const pgPromise = await import('pg-promise');
+        const { testDatabaseConnection } = await import('@serenity/database');
         
-        // Parse connection URL
-        const url = new URL(connectionUrl);
-        console.log('Parsed URL:', {
-          protocol: url.protocol,
-          hostname: url.hostname,
-          port: url.port,
-          pathname: url.pathname,
-          username: url.username,
-          password: url.password ? '***' : 'none'
-        });
+        const isConnected = await testDatabaseConnection(connectionUrl);
         
-        if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') {
-          throw new Error('Invalid PostgreSQL URL format');
-        }
-
-        // Create a temporary connection directly for testing
-        const pgp = pgPromise.default({
-          capSQL: true,
-        });
-
-        const config = {
-          host: url.hostname,
-          port: parseInt(url.port) || 5432,
-          database: url.pathname.slice(1), // Remove leading slash
-          user: url.username,
-          password: url.password,
-          ssl: url.searchParams.get('ssl') === 'true' || url.searchParams.get('sslmode') === 'require'
-        };
-
-        console.log('Database config:', {
-          ...config,
-          password: config.password ? '***' : 'none'
-        });
-
-        // Create temporary connection for testing
-        const connectionString = `postgres://${config.user}:${config.password}@${config.host}:${config.port}/${config.database}`;
-        const testDb = pgp({
-          connectionString,
-          ssl: config.ssl ? { rejectUnauthorized: false } : false,
-        });
-
-        // Test the connection
-        await testDb.one('SELECT 1 as test');
-        console.log('Database connection test successful');
-        
-        // Clean up
-        await testDb.$pool.end();
-        
-        return { success: true, error: null };
+        return { success: isConnected, error: isConnected ? null : 'Connection failed' };
       } catch (error) {
-        console.error('Database connection test failed:', error);
-        
         let userFriendlyError = 'Connection failed';
         if (error instanceof Error) {
           if (error.message.includes('no pg_hba.conf entry')) {
-            userFriendlyError = 'Server authentication failed. Try adding "?sslmode=require" to your connection URL or contact your database administrator.';
+            userFriendlyError = 'Server authentication failed. Try enabling SSL connection or contact your database administrator.';
           } else if (error.message.includes('ECONNREFUSED')) {
             userFriendlyError = 'Connection refused. Check if the database server is running and accessible.';
           } else if (error.message.includes('ENOTFOUND')) {

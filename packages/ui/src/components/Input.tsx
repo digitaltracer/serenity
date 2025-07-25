@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '../utils/cn';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -11,6 +11,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, error, floatingLabel = true, ...props }, ref) => {
     const [isFocused, setIsFocused] = useState(false);
     const [hasValue, setHasValue] = useState(!!props.value || !!props.defaultValue);
+
+    // Update hasValue when props.value changes
+    useEffect(() => {
+      setHasValue(!!props.value);
+    }, [props.value]);
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(true);

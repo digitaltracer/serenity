@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Task, selectCompactMode } from '@serenity/core';
 import { useSelector } from 'react-redux';
 import { cn } from '../utils/cn';
@@ -12,7 +12,7 @@ export interface TaskCardProps {
   className?: string;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onToggleSubtask, onClick, className }) => {
+const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, onClick, className }) => {
   const compactMode = useSelector(selectCompactMode);
   
   const priorityColors = {
@@ -21,8 +21,22 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onToggleSubtask, on
     low: 'text-green-500 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20',
   };
 
-  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && !task.completed;
-  const isDueToday = task.dueDate && new Date(task.dueDate).toDateString() === new Date().toDateString();
+  // Memoize expensive date calculations to prevent re-computation on every render
+  const dateInfo = useMemo(() => {
+    if (!task.dueDate) return { isOverdue: false, isDueToday: false };
+    
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dueDate = new Date(task.dueDate);
+    const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+    
+    return {
+      isOverdue: dueDateOnly < today && !task.completed,
+      isDueToday: dueDateOnly.getTime() === today.getTime()
+    };
+  }, [task.dueDate, task.completed]);
+
+  const { isOverdue, isDueToday } = dateInfo;
 
   return (
     <div
@@ -223,6 +237,6 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onToggleSubtask, on
       </div>
     </div>
   );
-};
+});
 
 export { TaskCard };

@@ -5,12 +5,14 @@ import { store, initializeWithSampleData, useAutoLock, lockApp, selectHasMasterP
 import { AuthenticatedApp, ToastProvider, useToast } from '@serenity/ui';
 import { Layout } from './components/Layout';
 import { ThemeProvider } from './components/ThemeProvider';
+import { KeyboardShortcutsProvider } from './components/KeyboardShortcutsProvider';
 import { HomePage } from './pages/HomePage';
 import { ActionHubPage } from './pages/ActionHubPage';
 import { TodayPage } from './pages/TodayPage';
 import { JournalPage } from './pages/JournalPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { DatabasePage } from './pages/DatabasePage';
 
 // Component for handling menu events - must be inside ToastProvider
 function MenuEventHandler() {
@@ -57,8 +59,15 @@ function AppContent() {
   useAutoLock();
 
   useEffect(() => {
-    // Initialize with sample data for demonstration
-    initializeWithSampleData(dispatch);
+    // Initialize with sample data for demonstration (non-blocking)
+    const timer = setTimeout(() => {
+      console.log('📊 Initializing sample data...');
+      const startTime = performance.now();
+      initializeWithSampleData(dispatch);
+      console.log(`✅ Sample data loaded in ${(performance.now() - startTime).toFixed(2)}ms`);
+    }, 100); // Small delay to not block initial render
+    
+    return () => clearTimeout(timer);
   }, [dispatch]);
 
   return (
@@ -67,18 +76,21 @@ function AppContent() {
         <MenuEventHandler />
         <AuthenticatedApp>
           <Router>
-            <div className="h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
-              <Layout>
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/actionhub" element={<ActionHubPage />} />
-                  <Route path="/today" element={<TodayPage />} />
-                  <Route path="/journal" element={<JournalPage />} />
-                  <Route path="/analytics" element={<AnalyticsPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                </Routes>
-              </Layout>
-            </div>
+            <KeyboardShortcutsProvider>
+              <div className="h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
+                <Layout>
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/actionhub" element={<ActionHubPage />} />
+                    <Route path="/today" element={<TodayPage />} />
+                    <Route path="/journal" element={<JournalPage />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/database" element={<DatabasePage />} />
+                  </Routes>
+                </Layout>
+              </div>
+            </KeyboardShortcutsProvider>
           </Router>
         </AuthenticatedApp>
       </ToastProvider>

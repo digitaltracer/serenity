@@ -85,3 +85,6 @@ export interface Analytics {
   avgWordsPerEntry: number;
   productivityTrend: 'up' | 'down' | 'stable';
 }
+
+// Re-export database types
+export * from './database';

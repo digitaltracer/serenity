@@ -1,6 +1,7 @@
 import { createSlice, createSelector, PayloadAction } from '@reduxjs/toolkit';
 import { JournalEntry } from '../../types';
 import { generateId } from '../../utils';
+import { loadJournalEntries } from '../../utils/persistence';
 
 export interface JournalState {
   entries: JournalEntry[];
@@ -16,8 +17,18 @@ export interface JournalState {
   };
 }
 
+// Load journal entries from localStorage on initialization
+const initialEntries = (() => {
+  try {
+    return loadJournalEntries();
+  } catch (error) {
+    console.error('Failed to load journal entries from storage:', error);
+    return [];
+  }
+})();
+
 const initialState: JournalState = {
-  entries: [],
+  entries: initialEntries,
   loading: false,
   error: null,
   filters: {

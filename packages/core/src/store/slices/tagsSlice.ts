@@ -54,6 +54,7 @@ export const {
 
 // Selectors
 export const selectAllUsedTags = (state: { tags: TagsState }) => state.tags.usedTags;
+export const selectAllTags = (state: { tags: TagsState }) => state.tags.usedTags;
 
 export const selectTagSuggestions = (query: string) => (state: { tags: TagsState }) => {
   if (!query.trim()) return state.tags.usedTags.slice(0, 10);

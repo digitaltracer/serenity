@@ -55,7 +55,7 @@ const JournalEntryCard = React.memo<JournalEntryCardProps>(({
         'transition-all duration-300 ease-out cursor-pointer',
         'hover:shadow-xl hover:shadow-gray-300/50 hover:border-gray-300/80',
         'dark:hover:shadow-black/40 dark:hover:border-gray-600/60',
-        'hover:-translate-y-0.5 hover:scale-[1.01] transform-gpu',
+        'hover:-translate-y-0.5 hover:scale-[1.005] transform-gpu',
         // Compact mode responsive padding
         {
           'p-6': !compactMode,

@@ -282,6 +282,18 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'charts' | 'insights' | 'heatmap'>('overview');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [heatmapLoading, setHeatmapLoading] = useState(false);
+  
+  // Simulate loading when switching to heatmap tab or when data changes
+  React.useEffect(() => {
+    if (activeTab === 'heatmap') {
+      setHeatmapLoading(true);
+      const timer = setTimeout(() => {
+        setHeatmapLoading(false);
+      }, 800); // Simulate data processing time
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, tasks.length, journalEntries.length]);
   
   const analytics = useMemo(() => 
     calculateBasicAnalytics(tasks, journalEntries), 
@@ -965,9 +977,49 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {/* Calendar Grid */}
-                <div className="space-y-4">
-                  <div className="text-base font-medium text-gray-700 dark:text-gray-300 mb-3">Last 12 weeks</div>
+                {heatmapLoading ? (
+                  /* Loading Skeleton */
+                  <div className="space-y-4">
+                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32"></div>
+                    <div className="flex items-start">
+                      <div className="w-12 flex flex-col space-y-2 mr-3">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-8"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-8"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-8"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      </div>
+                      <div className="flex space-x-2">
+                        {Array.from({ length: 24 }, (_, week) => (
+                          <div key={week} className="flex flex-col space-y-2">
+                            {Array.from({ length: 7 }, (_, day) => (
+                              <div
+                                key={`${week}-${day}`}
+                                className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded-sm animate-pulse"
+                                style={{ animationDelay: `${(week * 7 + day) * 10}ms` }}
+                              />
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24"></div>
+                      <div className="flex items-center space-x-2">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-8"></div>
+                        {Array.from({ length: 5 }, (_, i) => (
+                          <div key={i} className="w-3 h-3 bg-gray-200 dark:bg-gray-700 rounded-sm animate-pulse" />
+                        ))}
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-8"></div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Actual Calendar Grid */
+                  <div className="space-y-4">
+                    <div className="text-base font-medium text-gray-700 dark:text-gray-300 mb-3">Last 24 weeks</div>
                   
                   {/* Day labels */}
                   <div className="flex items-start">
@@ -987,13 +1039,13 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
                         const weeks = [];
                         const today = new Date();
                         const startDate = new Date(today);
-                        startDate.setDate(today.getDate() - 84); // 12 weeks ago
+                        startDate.setDate(today.getDate() - 168); // 24 weeks ago
                         
                         // Adjust to start from Sunday
                         const dayOfWeek = startDate.getDay();
                         startDate.setDate(startDate.getDate() - dayOfWeek);
                         
-                        for (let week = 0; week < 12; week++) {
+                        for (let week = 0; week < 24; week++) {
                           const weekDays = [];
                           for (let day = 0; day < 7; day++) {
                             const currentDate = new Date(startDate);
@@ -1027,7 +1079,7 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
                             weekDays.push(
                               <div
                                 key={`${week}-${day}`}
-                                className={`w-5 h-5 rounded-sm transition-all duration-200 hover:opacity-80 hover:scale-110 cursor-pointer ${
+                                className={`w-5 h-5 rounded-sm transition-all duration-200 hover:opacity-80 hover:scale-105 cursor-pointer ${
                                   isFuture ? 'bg-gray-50 dark:bg-gray-900' : intensityColors[intensity]
                                 } border border-gray-200 dark:border-gray-700 ${
                                   isToday ? 'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-gray-800' : ''
@@ -1077,6 +1129,7 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
                     </div>
                   </div>
                 </div>
+                )}
               </div>
             </CardContent>
           </Card>

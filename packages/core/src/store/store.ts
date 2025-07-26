@@ -10,6 +10,7 @@ import databaseReducer from './slices/databaseSlice';
 import shortcutsReducer from './slices/shortcutsSlice';
 import searchReducer from './slices/searchSlice';
 import dragDropReducer from './slices/dragDropSlice';
+import goalsReducer from './slices/goalsSlice';
 import { persistenceMiddleware } from './middleware/persistenceMiddleware';
 
 export const store = configureStore({
@@ -25,12 +26,13 @@ export const store = configureStore({
     shortcuts: shortcutsReducer,
     search: searchReducer,
     dragDrop: dragDropReducer,
+    goals: goalsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
         ignoredActions: ['persist/PERSIST'],
-        ignoredActionsPaths: ['payload.date', 'payload.createdAt', 'payload.updatedAt', 'payload.dueDate', 'payload.lastConnected', 'payload.lastBackup', 'payload.lastOptimized'],
+        ignoredActionsPaths: ['payload.date', 'payload.createdAt', 'payload.updatedAt', 'payload.dueDate', 'payload.lastConnected', 'payload.lastBackup', 'payload.lastOptimized', 'payload.startDate', 'payload.endDate', 'payload.reminderDate'],
       },
     }).concat(persistenceMiddleware),
 });

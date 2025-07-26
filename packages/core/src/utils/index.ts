@@ -84,3 +84,6 @@ export * from './searchEngine';
 
 // Export drag and drop utilities
 export * from './dragDrop';
+
+// Export goal progress utilities
+export * from './goalProgress';

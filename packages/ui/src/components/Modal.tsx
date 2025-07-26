@@ -26,13 +26,24 @@ const Modal: React.FC<ModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
+      // Prevent body scrolling
+      document.body.style.overflow = 'hidden';
       // Trigger animation after mount
       setTimeout(() => setIsAnimating(true), 10);
     } else {
       setIsAnimating(false);
+      // Restore body scrolling
+      document.body.style.overflow = 'unset';
       // Wait for animation to complete before hiding
       setTimeout(() => setIsVisible(false), 200);
     }
+
+    // Cleanup function to restore scrolling if component unmounts
+    return () => {
+      if (isOpen) {
+        document.body.style.overflow = 'unset';
+      }
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -58,7 +69,7 @@ const Modal: React.FC<ModalProps> = ({
 
   const sizeClasses = {
     sm: 'max-w-sm',
-    md: 'max-w-md',
+    md: 'max-w-xl',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
   };
@@ -66,8 +77,8 @@ const Modal: React.FC<ModalProps> = ({
   return (
     <div 
       className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto",
-        "transition-all duration-200",
+        "fixed inset-0 z-50 flex items-center justify-center p-4",
+        "transition-all duration-200 overflow-y-auto",
         {
           "opacity-100": isAnimating,
           "opacity-0": !isAnimating,
@@ -106,7 +117,7 @@ const Modal: React.FC<ModalProps> = ({
         {/* Header with enhanced styling */}
         {title && (
           <div className="flex items-center justify-between p-4 pb-3 border-b border-gray-200/30 dark:border-gray-700/20">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
               {title}
             </h2>
             <Button
@@ -124,8 +135,8 @@ const Modal: React.FC<ModalProps> = ({
           </div>
         )}
         
-        {/* Content with better spacing */}
-        <div className="p-4">
+        {/* Content with better spacing and internal scrolling */}
+        <div className="p-4 max-h-[65vh] overflow-y-auto">
           {children}
         </div>
       </div>

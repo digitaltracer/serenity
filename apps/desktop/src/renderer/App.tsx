@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { Provider, useDispatch, useSelector } from 'react-redux';
-import { store, initializeWithSampleData, useAutoLock, lockApp, selectHasMasterPassword } from '@serenity/core';
+import { store, initializeWithSampleData, useAutoLock, lockApp, selectHasMasterPassword, resetShortcuts } from '@serenity/core';
 import { AuthenticatedApp, ToastProvider, useToast } from '@serenity/ui';
 import { Layout } from './components/Layout';
 import { ThemeProvider } from './components/ThemeProvider';
@@ -10,6 +10,7 @@ import { HomePage } from './pages/HomePage';
 import { ActionHubPage } from './pages/ActionHubPage';
 import { TodayPage } from './pages/TodayPage';
 import { JournalPage } from './pages/JournalPage';
+import { GoalsPage } from './pages/GoalsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { DatabasePage } from './pages/DatabasePage';
@@ -59,6 +60,24 @@ function AppContent() {
   useAutoLock();
 
   useEffect(() => {
+    // Clear any localStorage that might be interfering
+    console.log('🧹 Clearing localStorage shortcuts data...');
+    localStorage.removeItem('shortcuts');
+    localStorage.removeItem('serenity_shortcuts');
+    
+    // Reset shortcuts to ensure we have the latest defaults with global flags
+    console.log('🎹 Resetting shortcuts to defaults...');
+    dispatch(resetShortcuts());
+    
+    // Force immediate verification of shortcuts
+    setTimeout(() => {
+      const state = store.getState();
+      console.log('🔍 Immediate shortcuts verification:', {
+        shortcutsInStore: state.shortcuts?.shortcuts?.length || 0,
+        globalInStore: state.shortcuts?.shortcuts?.filter(s => s.isGlobal)?.length || 0
+      });
+    }, 100);
+    
     // Initialize with sample data for demonstration (non-blocking)
     const timer = setTimeout(() => {
       console.log('📊 Initializing sample data...');
@@ -84,6 +103,7 @@ function AppContent() {
                     <Route path="/actionhub" element={<ActionHubPage />} />
                     <Route path="/today" element={<TodayPage />} />
                     <Route path="/journal" element={<JournalPage />} />
+                    <Route path="/goals" element={<GoalsPage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/database" element={<DatabasePage />} />

@@ -38,7 +38,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           <input
             className={cn(
               // Premium input styling with elegant gradients and shadows
-              'flex h-12 w-full rounded-lg border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm px-4 py-2.5 text-base',
+              'flex h-12 w-full rounded-lg border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm px-4 py-3 text-base',
               'text-gray-900 transition-all duration-200 ease-out',
               'shadow-sm shadow-gray-200/30 ring-1 ring-gray-100/50',
               'focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400/60',
@@ -67,7 +67,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               'absolute left-4 transition-all duration-200 pointer-events-none',
               'text-gray-600 dark:text-gray-400',
               {
-                'top-0.5 text-xs text-gray-700 dark:text-gray-300': isFocused || hasValue,
+                '-top-2 text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 px-1': isFocused || hasValue,
                 'top-1/2 -translate-y-1/2 text-base': !isFocused && !hasValue,
                 'text-red-400': error,
               }
@@ -97,7 +97,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <input
           className={cn(
             // Premium input styling with elegant gradients and shadows
-            'flex h-12 w-full rounded-lg border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm px-4 py-2.5 text-base',
+            'flex h-12 w-full rounded-lg border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm px-4 py-3 text-base',
             'text-gray-900 placeholder:text-gray-500 transition-all duration-200 ease-out',
             'shadow-sm shadow-gray-200/30 ring-1 ring-gray-100/50',
             'focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400/60',

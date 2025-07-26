@@ -86,5 +86,66 @@ export interface Analytics {
   productivityTrend: 'up' | 'down' | 'stable';
 }
 
+export interface Goal {
+  id: string;
+  title: string;
+  description?: string;
+  
+  // Specific, actionable goal types
+  type: 'weekly_tasks' | 'project_tasks' | 'priority_tasks' | 'daily_streak' | 'journal_weekly' | 'completion_rate';
+  
+  // Goal-specific configuration
+  config: {
+    targetCount?: number;           // for count-based goals
+    projectId?: string;             // for project-specific goals  
+    priority?: 'high' | 'medium' | 'low'; // for priority-based goals
+    streakDays?: number;            // for streak goals
+    targetRate?: number;            // for completion rate goals (0-100)
+    timeframe: 'daily' | 'weekly' | 'monthly';
+  };
+  
+  // Auto-calculated progress
+  progress: {
+    current: number;
+    target: number;
+    percentage: number;
+    isCompleted: boolean;
+    periodStart: Date;
+    periodEnd: Date;
+  };
+  
+  status: 'active' | 'completed' | 'paused' | 'failed';
+  priority: 'low' | 'medium' | 'high';
+  reminders: Reminder[];
+  createdAt: Date;
+  updatedAt: Date;
+  userId?: string;
+}
+
+export interface Reminder {
+  id: string;
+  goalId?: string;
+  taskId?: string;
+  title: string;
+  description?: string;
+  reminderDate: Date;
+  type: 'goal_check' | 'task_due' | 'habit_reminder' | 'custom';
+  status: 'pending' | 'sent' | 'dismissed' | 'snoozed';
+  repeatPattern?: {
+    type: 'daily' | 'weekly' | 'monthly' | 'custom';
+    interval: number;
+    endDate?: Date;
+  };
+  notificationSettings: {
+    enabled: boolean;
+    sound: boolean;
+    popup: boolean;
+    beforeMinutes: number; // remind X minutes before
+  };
+  createdAt: Date;
+  updatedAt: Date;
+  userId?: string;
+}
+
 // Re-export database types
 export * from './database';

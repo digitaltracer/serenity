@@ -125,11 +125,11 @@ export const useContextualKeyboardShortcuts = (
   // Filter shortcuts based on context
   const contextualShortcuts = shortcuts.filter(shortcut => {
     // Global shortcuts are always available
-    if (shortcut.global) return true;
+    if (shortcut.isGlobal) return true;
     
     // Context-specific filtering logic can be added here
     // For now, include all non-global shortcuts
-    return !shortcut.global;
+    return !shortcut.isGlobal;
   });
   
   useKeyboardShortcuts(handler, {

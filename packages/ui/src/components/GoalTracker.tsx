@@ -6,8 +6,10 @@
 import React, { useMemo, useState } from 'react';
 import { Target, TrendingUp, Award, Calendar, Plus, Edit2, Trash2 } from 'lucide-react';
 import { InteractiveChart } from './InteractiveChart';
+import { Goal as CoreGoal } from '@serenity/core';
 
-export interface Goal {
+// Legacy Goal interface for backward compatibility
+export interface LegacyGoal {
   id: string;
   title: string;
   description?: string;
@@ -23,12 +25,12 @@ export interface Goal {
 }
 
 interface GoalTrackerProps {
-  goals: Goal[];
+  goals: LegacyGoal[];
   tasks?: any[];
   journalEntries?: any[];
   className?: string;
-  onGoalCreate?: (goal: Omit<Goal, 'id' | 'current' | 'createdAt'>) => void;
-  onGoalUpdate?: (goalId: string, updates: Partial<Goal>) => void;
+  onGoalCreate?: (goal: Omit<LegacyGoal, 'id' | 'current' | 'createdAt'>) => void;
+  onGoalUpdate?: (goalId: string, updates: Partial<LegacyGoal>) => void;
   onGoalDelete?: (goalId: string) => void;
   showCreateButton?: boolean;
   showProgress?: boolean;
@@ -47,7 +49,7 @@ export const GoalTracker: React.FC<GoalTrackerProps> = ({
   showProgress = true,
   showChart = true,
 }) => {
-  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
+  const [selectedGoal, setSelectedGoal] = useState<LegacyGoal | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   // Calculate current progress for goals based on actual data

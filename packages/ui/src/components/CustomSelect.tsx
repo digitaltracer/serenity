@@ -34,11 +34,17 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const selectedOption = options.find(option => option.value === value);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current && 
+        !containerRef.current.contains(event.target as Node) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
         setHighlightedIndex(-1);
       }
@@ -106,8 +112,17 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
             if (!disabled) {
               if (!isOpen && buttonRef.current) {
                 const rect = buttonRef.current.getBoundingClientRect();
+                const dropdownHeight = Math.min(options.length * 48 + 16, 240); // Estimate dropdown height
+                const spaceBelow = window.innerHeight - rect.bottom - 10;
+                const spaceAbove = rect.top - 10;
+                
+                // Position above if not enough space below
+                const shouldPositionAbove = spaceBelow < dropdownHeight && spaceAbove > dropdownHeight;
+                
                 setDropdownPosition({
-                  top: rect.bottom + window.scrollY + 8,
+                  top: shouldPositionAbove 
+                    ? rect.top + window.scrollY - dropdownHeight - 8
+                    : rect.bottom + window.scrollY + 8,
                   left: rect.left + window.scrollX,
                   width: rect.width
                 });
@@ -150,7 +165,8 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         {isOpen && (
           <Portal>
             <div 
-              className="absolute z-50 bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-800/90 dark:to-gray-900/60 border border-gray-200/60 dark:border-gray-700/40 rounded-lg shadow-xl shadow-gray-300/50 dark:shadow-black/40 backdrop-blur-sm ring-1 ring-gray-100/80 dark:ring-gray-800/60 max-h-60 overflow-y-auto" 
+              ref={dropdownRef}
+              className="fixed z-50 bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-800/90 dark:to-gray-900/60 border border-gray-200/60 dark:border-gray-700/40 rounded-lg shadow-xl shadow-gray-300/50 dark:shadow-black/40 backdrop-blur-sm ring-1 ring-gray-100/80 dark:ring-gray-800/60 max-h-60 overflow-y-auto" 
               style={{
                 top: dropdownPosition.top,
                 left: dropdownPosition.left,

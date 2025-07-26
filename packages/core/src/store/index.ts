@@ -10,4 +10,5 @@ export * from './slices/databaseSlice';
 export * from './slices/shortcutsSlice';
 export * from './slices/searchSlice';
 export * from './slices/dragDropSlice';
+export * from './slices/goalsSlice';
 export * from './slices/sampleData';

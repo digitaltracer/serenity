@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   selectAllEntries, 
@@ -8,6 +8,9 @@ import {
   updateEntry,
   togglePin,
   setJournalFilter,
+  updateGoalsProgress,
+  selectAllTasks,
+  selectAllProjects,
   JournalEntry 
 } from '@serenity/core';
 import { 
@@ -30,11 +33,18 @@ export const JournalPage: React.FC = () => {
   const dispatch = useDispatch();
   const entries = useSelector(selectAllEntries);
   const pinnedEntries = useSelector(selectPinnedEntries);
+  const tasks = useSelector(selectAllTasks);
+  const projects = useSelector(selectAllProjects);
   const compactMode = useSelector(selectCompactMode);
   const [searchQuery, setSearchQuery] = useState('');
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
   const [activeView, setActiveView] = useState<'all' | 'pinned'>('all');
+
+  // Auto-update goal progress when journal entries change
+  useEffect(() => {
+    dispatch(updateGoalsProgress({ tasks, journalEntries: entries, projects }));
+  }, [dispatch, tasks, entries, projects]);
 
   const thisMonthEntries = entries.filter(entry => {
     const entryDate = new Date(entry.date);
@@ -113,8 +123,8 @@ export const JournalPage: React.FC = () => {
           </div>
           <div className="flex items-center space-x-2">
             <BulkActionsButton variant="icon" />
-            <Button onClick={handleCreateEntry} className="rounded-xl">
-              <Plus className="w-4 h-4 mr-2" />
+            <Button onClick={handleCreateEntry} className="rounded-xl gap-2">
+              <Plus className="w-4 h-4" />
               New Entry
             </Button>
           </div>

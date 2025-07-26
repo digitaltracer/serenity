@@ -164,8 +164,42 @@ export const KeyboardShortcutsProvider: React.FC<KeyboardShortcutsProviderProps>
     console.log('🎹 Keyboard shortcuts state:', {
       totalShortcuts: shortcuts.length,
       enabledShortcuts: shortcuts.filter(s => s.enabled).length,
-      globalShortcuts: shortcuts.filter(s => s.global).length,
+      globalShortcuts: shortcuts.filter(s => s.isGlobal).length,
       shortcutsEnabled
+    });
+    
+    // Debug: Log first few shortcuts to see their structure
+    console.log('🔍 First 5 shortcuts:', shortcuts.slice(0, 5).map(s => ({
+      id: s.id,
+      key: s.key,
+      isGlobal: s.isGlobal,
+      enabled: s.enabled,
+      action: s.action,
+      modifiers: s.modifiers
+    })));
+    
+    // Debug: Log all global shortcuts specifically
+    const globalOnes = shortcuts.filter(s => s.isGlobal);
+    console.log('🌍 All global shortcuts:', globalOnes.map(s => ({
+      id: s.id,
+      key: s.key,
+      isGlobal: s.isGlobal,
+      action: s.action
+    })));
+    
+    // Debug: Check if DEFAULT_SHORTCUTS is being used correctly
+    console.log('📋 Checking DEFAULT_SHORTCUTS import...');
+    import('@serenity/core').then(core => {
+      const { DEFAULT_SHORTCUTS } = core;
+      console.log('📦 DEFAULT_SHORTCUTS from core:', {
+        total: DEFAULT_SHORTCUTS?.length || 0,
+        globalCount: DEFAULT_SHORTCUTS?.filter(s => s.isGlobal)?.length || 0,
+        firstFive: DEFAULT_SHORTCUTS?.slice(0, 5)?.map(s => ({
+          id: s.id,
+          isGlobal: s.isGlobal,
+          key: s.key
+        })) || []
+      });
     });
   }, [shortcuts, shortcutsEnabled]);
 

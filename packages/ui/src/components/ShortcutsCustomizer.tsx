@@ -329,7 +329,7 @@ export const ShortcutsCustomizer: React.FC<ShortcutsCustomizerProps> = ({
                           </h4>
                           <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
                             <span className="capitalize">{shortcut.category}</span>
-                            {shortcut.global && (
+                            {shortcut.isGlobal && (
                               <>
                                 <span>•</span>
                                 <span className="text-blue-600 dark:text-blue-400">Global</span>

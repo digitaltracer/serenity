@@ -11,7 +11,7 @@ export interface KeyboardShortcut {
   category: ShortcutCategory;
   action: string;
   enabled: boolean;
-  global?: boolean; // Available across all contexts
+  isGlobal?: boolean; // Available across all contexts
 }
 
 export interface KeyModifiers {
@@ -42,94 +42,94 @@ export const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
   {
     id: 'quick-add-task',
     key: 'n',
-    modifiers: { ctrl: true },
+    modifiers: { meta: true },
     description: 'Quick add new task',
     category: 'general',
     action: 'QUICK_ADD_TASK',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
   {
     id: 'quick-add-journal',
     key: 'j',
-    modifiers: { ctrl: true },
+    modifiers: { meta: true },
     description: 'Quick add journal entry',
     category: 'general',
     action: 'QUICK_ADD_JOURNAL',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
   {
     id: 'global-search',
     key: 'k',
-    modifiers: { ctrl: true },
+    modifiers: { meta: true },
     description: 'Open global search',
     category: 'search',
     action: 'OPEN_GLOBAL_SEARCH',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
   {
     id: 'command-palette',
     key: 'p',
-    modifiers: { ctrl: true, shift: true },
+    modifiers: { meta: true, shift: true },
     description: 'Open command palette',
     category: 'general',
     action: 'OPEN_COMMAND_PALETTE',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
 
   // Navigation shortcuts
   {
     id: 'nav-home',
     key: '1',
-    modifiers: { ctrl: true },
+    modifiers: { meta: true },
     description: 'Go to Home',
     category: 'navigation',
     action: 'NAVIGATE_HOME',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
   {
     id: 'nav-actionhub',
     key: '2',
-    modifiers: { ctrl: true },
+    modifiers: { meta: true },
     description: 'Go to ActionHub',
     category: 'navigation',
     action: 'NAVIGATE_ACTIONHUB',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
   {
     id: 'nav-journal',
     key: '3',
-    modifiers: { ctrl: true },
+    modifiers: { meta: true },
     description: 'Go to Journal',
     category: 'navigation',
     action: 'NAVIGATE_JOURNAL',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
   {
     id: 'nav-analytics',
     key: '4',
-    modifiers: { ctrl: true },
+    modifiers: { meta: true },
     description: 'Go to Analytics',
     category: 'navigation',
     action: 'NAVIGATE_ANALYTICS',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
   {
     id: 'nav-settings',
     key: '5',
-    modifiers: { ctrl: true },
+    modifiers: { meta: true },
     description: 'Go to Settings',
     category: 'navigation',
     action: 'NAVIGATE_SETTINGS',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
 
   // Task shortcuts
@@ -201,41 +201,42 @@ export const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
   {
     id: 'toggle-sidebar',
     key: 'b',
-    modifiers: { ctrl: true },
+    modifiers: { meta: true },
     description: 'Toggle sidebar',
     category: 'ui',
     action: 'TOGGLE_SIDEBAR',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
   {
     id: 'toggle-theme',
     key: 't',
-    modifiers: { ctrl: true, shift: true },
+    modifiers: { meta: true, shift: true },
     description: 'Toggle theme (light/dark)',
     category: 'ui',
     action: 'TOGGLE_THEME',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
   {
     id: 'toggle-compact-mode',
     key: 'c',
-    modifiers: { ctrl: true, shift: true },
+    modifiers: { meta: true, shift: true },
     description: 'Toggle compact mode',
     category: 'ui',
     action: 'TOGGLE_COMPACT_MODE',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
   {
     id: 'focus-search',
     key: 'f',
-    modifiers: { ctrl: true },
+    modifiers: { meta: true },
     description: 'Focus search field',
     category: 'search',
     action: 'FOCUS_SEARCH',
     enabled: true,
+    isGlobal: true,
   },
 
   // Journal shortcuts
@@ -262,12 +263,12 @@ export const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
   {
     id: 'project-create',
     key: 'p',
-    modifiers: { ctrl: true, shift: true },
+    modifiers: { meta: true, shift: true },
     description: 'Create new project',
     category: 'projects',
     action: 'CREATE_PROJECT',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
 
   // Selection and bulk operations
@@ -317,7 +318,7 @@ export const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
     category: 'ui',
     action: 'CLOSE_MODAL',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
   {
     id: 'save-and-close',
@@ -376,7 +377,7 @@ export const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
     category: 'general',
     action: 'SHOW_SHORTCUTS_HELP',
     enabled: true,
-    global: true,
+    isGlobal: true,
   },
 ];
 
@@ -444,7 +445,6 @@ export const matchesShortcut = (event: KeyboardEvent, shortcut: KeyboardShortcut
   const expectedMeta = shortcut.modifiers.meta || false;
   
   // Handle cross-platform ctrl/cmd key mapping
-  // On Mac, Cmd key (metaKey) can substitute for Ctrl in shortcuts
   const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
   
   let actualCtrl, actualMeta;
@@ -453,6 +453,18 @@ export const matchesShortcut = (event: KeyboardEvent, shortcut: KeyboardShortcut
     // On Mac, for Ctrl shortcuts, accept either Ctrl or Cmd
     actualCtrl = event.ctrlKey || event.metaKey;
     actualMeta = false; // Don't check meta separately when it's being used as Ctrl
+  } else if (expectedMeta && !expectedCtrl) {
+    // Cross-platform meta key handling: 
+    // On Mac, meta means Command key (metaKey)
+    // On Windows/Linux, meta means Windows key, but for shortcuts we want Ctrl behavior
+    if (isMac) {
+      actualMeta = event.metaKey;
+      actualCtrl = event.ctrlKey;
+    } else {
+      // On Windows/Linux, treat meta shortcuts as Ctrl shortcuts for usability
+      actualMeta = event.ctrlKey;  // Ctrl key acts as meta key
+      actualCtrl = false;  // Don't check ctrl separately since we're using it as meta
+    }
   } else {
     // Normal behavior: check keys as-is
     actualCtrl = event.ctrlKey;
@@ -502,7 +514,7 @@ export const getEnabledShortcuts = (shortcuts: KeyboardShortcut[]): KeyboardShor
  * Get global shortcuts (available in all contexts)
  */
 export const getGlobalShortcuts = (shortcuts: KeyboardShortcut[]): KeyboardShortcut[] => {
-  return shortcuts.filter(shortcut => shortcut.global && shortcut.enabled);
+  return shortcuts.filter(shortcut => shortcut.isGlobal && shortcut.enabled);
 };
 
 /**

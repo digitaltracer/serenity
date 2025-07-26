@@ -13,7 +13,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         className={cn(
           // Base styles - professional and subtle
-          'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-150',
+          'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-150 text-center',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900',
           'disabled:pointer-events-none disabled:opacity-50',
           'transform active:scale-98',
@@ -45,11 +45,11 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             'ring-1 ring-red-500/30': variant === 'destructive',
           },
           
-          // Sizes - consistent with inputs
+          // Sizes - professional and balanced
           {
-            'h-10 px-4 text-sm min-w-[2.5rem]': size === 'sm',
-            'h-12 px-6 text-base min-w-[3rem]': size === 'md',
-            'h-14 px-8 text-lg min-w-[3.5rem]': size === 'lg',
+            'h-10 px-3 text-sm min-w-[2.5rem]': size === 'sm',
+            'h-12 px-4 text-base min-w-[3rem]': size === 'md',
+            'h-14 px-6 text-lg min-w-[3.5rem]': size === 'lg',
           },
           
           className

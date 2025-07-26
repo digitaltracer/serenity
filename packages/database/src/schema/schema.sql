@@ -75,6 +75,22 @@ CREATE TABLE IF NOT EXISTS task_journal_links (
     UNIQUE(task_id, journal_entry_id)
 );
 
+-- Goals table
+CREATE TABLE IF NOT EXISTS goals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    type VARCHAR(20) CHECK (type IN ('weekly_tasks', 'project_tasks', 'priority_tasks', 'daily_streak', 'journal_weekly', 'completion_rate')) NOT NULL,
+    config JSONB NOT NULL DEFAULT '{}',
+    progress JSONB NOT NULL DEFAULT '{}',
+    status VARCHAR(20) CHECK (status IN ('active', 'completed', 'paused', 'failed')) DEFAULT 'active',
+    priority VARCHAR(10) CHECK (priority IN ('low', 'medium', 'high')) DEFAULT 'medium',
+    reminders JSONB DEFAULT '[]',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Analytics/tracking table
 CREATE TABLE IF NOT EXISTS daily_stats (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -111,6 +127,11 @@ CREATE INDEX IF NOT EXISTS idx_journal_pinned ON journal_entries(pinned);
 
 CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date ON daily_stats(user_id, date);
 
+CREATE INDEX IF NOT EXISTS idx_goals_user_id ON goals(user_id);
+CREATE INDEX IF NOT EXISTS idx_goals_type ON goals(type);
+CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
+CREATE INDEX IF NOT EXISTS idx_goals_priority ON goals(priority);
+
 -- Triggers for updated_at timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -136,6 +157,9 @@ CREATE TRIGGER update_journal_entries_updated_at BEFORE UPDATE ON journal_entrie
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_daily_stats_updated_at BEFORE UPDATE ON daily_stats
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_goals_updated_at BEFORE UPDATE ON goals
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Function to update word count for journal entries

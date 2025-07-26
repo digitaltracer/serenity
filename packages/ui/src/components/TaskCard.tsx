@@ -48,7 +48,7 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
         'transition-all duration-300 ease-out cursor-pointer',
         'hover:shadow-xl hover:shadow-gray-300/50 hover:border-gray-300/80',
         'dark:hover:shadow-black/40 dark:hover:border-gray-600/60',
-        'hover:-translate-y-0.5 hover:scale-[1.01] transform-gpu',
+        'hover:-translate-y-0.5 hover:scale-[1.005] transform-gpu',
         // Compact mode responsive padding
         {
           'p-6': !compactMode,
@@ -199,7 +199,7 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
               )}
 
               {/* Recurring */}
-              {task.recurring && (
+              {task.recurring && task.recurring.type && (
                 <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                   <RefreshCw className="w-3 h-3" />
                   {task.recurring.type}

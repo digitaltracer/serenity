@@ -52,3 +52,6 @@ export * from './TimeRangePicker';
 export * from './SmartInsights';
 export * from './ExportButton';
 export * from './AdvancedAnalytics';
+export * from './GoalModal';
+export * from './GoalCard';
+export * from './GoalsPage';

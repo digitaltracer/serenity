@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, selectCompactMode } from '@serenity/core';
-import { addTask, toggleTask, deleteTask, updateTask, addProject } from '@serenity/core';
+import { addTask, toggleTask, deleteTask, updateTask, addProject, updateGoalsProgress, selectAllEntries, selectAllProjects } from '@serenity/core';
 import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, TagInput, DatePicker, Textarea, cn, DraggableTaskCard, SelectableItem, BulkOperationsToolbar, BulkActionsButton } from '@serenity/ui';
 import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List } from 'lucide-react';
 
@@ -9,7 +9,14 @@ export const ActionHubPage: React.FC = () => {
   const dispatch = useDispatch();
   const { tasks } = useSelector((state: RootState) => state.tasks);
   const { projects } = useSelector((state: RootState) => state.projects);
+  const journalEntries = useSelector(selectAllEntries);
+  const allProjects = useSelector(selectAllProjects);
   const compactMode = useSelector(selectCompactMode);
+
+  // Auto-update goal progress when tasks change
+  useEffect(() => {
+    dispatch(updateGoalsProgress({ tasks, journalEntries, projects: allProjects }));
+  }, [dispatch, tasks, journalEntries, allProjects]);
   const createFormRef = useRef<HTMLDivElement>(null);
   
   const [searchQuery, setSearchQuery] = useState('');

@@ -56,7 +56,8 @@ import {
   PanelLeftClose,
   Square,
   Search,
-  HelpCircle
+  HelpCircle,
+  Target
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -137,6 +138,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/actionhub', label: 'ActionHub', icon: CheckSquare },
     { path: '/today', label: 'Today', icon: Calendar },
     { path: '/journal', label: 'Journal', icon: BookOpen },
+    { path: '/goals', label: 'Goals', icon: Target },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   ];
 

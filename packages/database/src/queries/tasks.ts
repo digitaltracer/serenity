@@ -150,17 +150,32 @@ export const getOverdueTasks = async (userId: string): Promise<Task[]> => {
 
 // Helper function to map database row to Task object
 const mapTaskFromDB = (row: any): Task => {
+  // Safe JSON parsing helper
+  const safeJsonParse = (jsonString: string | null, fallback: any = undefined) => {
+    if (!jsonString) return fallback;
+    try {
+      return JSON.parse(jsonString);
+    } catch (error) {
+      console.warn('Failed to parse recurring pattern JSON:', error, 'Using fallback:', fallback);
+      return fallback;
+    }
+  };
+
+  // Parse recurring pattern safely
+  const recurring = safeJsonParse(row.recurring_pattern, undefined);
+
   return {
     id: row.id,
-    title: row.title,
-    description: row.description,
-    completed: row.completed,
-    priority: row.priority,
+    title: row.title || '',
+    description: row.description || '',
+    completed: Boolean(row.completed),
+    priority: row.priority || 'medium',
     dueDate: row.due_date ? new Date(row.due_date) : undefined,
-    projectId: row.project_id,
-    tags: row.tags || [],
+    projectId: row.project_id || undefined,
+    tags: Array.isArray(row.tags) ? row.tags : [],
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
-    recurring: row.recurring_pattern ? JSON.parse(row.recurring_pattern) : undefined,
+    recurring: recurring && typeof recurring === 'object' && recurring.type ? recurring : undefined,
+    userId: row.user_id,
   };
 };

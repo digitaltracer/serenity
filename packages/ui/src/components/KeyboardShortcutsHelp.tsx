@@ -238,7 +238,7 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
                           <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                             {shortcut.description}
                           </p>
-                          {shortcut.global && (
+                          {shortcut.isGlobal && (
                             <p className="text-xs text-blue-600 dark:text-blue-400">
                               Global shortcut
                             </p>
@@ -303,7 +303,7 @@ export const ShortcutsReference: React.FC<{
 }> = ({ shortcuts, category, className = '' }) => {
   const relevantShortcuts = category 
     ? getShortcutsByCategory(shortcuts, category).slice(0, 3)
-    : shortcuts.filter(s => s.global).slice(0, 3);
+    : shortcuts.filter(s => s.isGlobal).slice(0, 3);
 
   if (relevantShortcuts.length === 0) return null;
 

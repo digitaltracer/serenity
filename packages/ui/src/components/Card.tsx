@@ -20,7 +20,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
           'transition-all duration-300 ease-out',
           'hover:shadow-xl hover:shadow-gray-300/50 hover:border-gray-300/80',
           'dark:hover:shadow-black/40 dark:hover:border-gray-600/60',
-          'hover:-translate-y-0.5 hover:scale-[1.01] transform-gpu',
+          'hover:-translate-y-0.5 hover:scale-[1.005] transform-gpu',
           'ring-1 ring-gray-100/80 dark:ring-gray-800/60',
           className
         )}

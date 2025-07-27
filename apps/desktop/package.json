@@ -27,6 +27,7 @@
     "@serenity/core": "*",
     "@serenity/database": "*",
     "@serenity/ui": "*",
+    "better-sqlite3": "^11.5.0",
     "electron-store": "^8.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -34,6 +35,7 @@
     "react-router-dom": "^6.15.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
     "@types/react": "^18.2.20",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.0.4",

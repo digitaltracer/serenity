@@ -2,17 +2,18 @@ import React, { useMemo } from 'react';
 import { Task, selectCompactMode } from '@serenity/core';
 import { useSelector } from 'react-redux';
 import { cn } from '../utils/cn';
-import { CheckCircle2, Circle, Calendar, Flag, RefreshCw, ListTodo } from 'lucide-react';
+import { CheckCircle2, Circle, Calendar, Flag, RefreshCw, ListTodo, Trash2, MoreVertical } from 'lucide-react';
 
 export interface TaskCardProps {
   task: Task;
   onToggle?: (taskId: string) => void;
   onToggleSubtask?: (taskId: string, subtaskId: string) => void;
   onClick?: (task: Task) => void;
+  onDelete?: (taskId: string) => void;
   className?: string;
 }
 
-const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, onClick, className }) => {
+const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, onClick, onDelete, className }) => {
   const compactMode = useSelector(selectCompactMode);
   
   const priorityColors = {
@@ -97,15 +98,31 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
               {task.title}
             </h3>
 
-            {/* Priority Badge */}
-            <div
-              className={cn(
-                'flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border',
-                priorityColors[task.priority]
+            <div className="flex items-center gap-2">
+              {/* Priority Badge */}
+              <div
+                className={cn(
+                  'flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border',
+                  priorityColors[task.priority]
+                )}
+              >
+                <Flag className="w-3 h-3" />
+                {task.priority}
+              </div>
+
+              {/* Delete Button */}
+              {onDelete && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(task.id);
+                  }}
+                  className="p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  title="Delete task"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               )}
-            >
-              <Flag className="w-3 h-3" />
-              {task.priority}
             </div>
           </div>
 

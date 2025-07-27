@@ -6,6 +6,7 @@ import {
   selectCompactMode,
   addEntry, 
   updateEntry,
+  deleteEntry,
   togglePin,
   setJournalFilter,
   updateGoalsProgress,
@@ -100,6 +101,10 @@ export const JournalPage: React.FC = () => {
 
   const handleTogglePin = (entryId: string) => {
     dispatch(togglePin(entryId));
+  };
+
+  const handleDeleteEntry = (entryId: string) => {
+    dispatch(deleteEntry(entryId));
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,6 +264,7 @@ export const JournalPage: React.FC = () => {
                 entry={entry}
                 onClick={handleEditEntry}
                 onTogglePin={handleTogglePin}
+                onDelete={handleDeleteEntry}
               />
             </SelectableItem>
           ))

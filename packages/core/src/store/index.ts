@@ -1,4 +1,5 @@
 export { store, type RootState, type AppDispatch } from './store';
+export { initializeSQLitePersistence } from './middleware/hybridPersistenceMiddleware';
 export * from './slices/tasksSlice';
 export * from './slices/projectsSlice';
 export * from './slices/journalSlice';

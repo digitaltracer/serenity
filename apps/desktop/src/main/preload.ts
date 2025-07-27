@@ -3,9 +3,41 @@ import { contextBridge, ipcRenderer } from 'electron';
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Database operations
+  // Database operations (PostgreSQL - legacy)
   database: {
     testConnection: (connectionUrl: string) => ipcRenderer.invoke('database:test-connection', connectionUrl),
+  },
+
+  // SQLite operations (new)
+  sqlite: {
+    // Database management
+    initialize: () => ipcRenderer.invoke('sqlite:initialize'),
+    testConnection: () => ipcRenderer.invoke('sqlite:test-connection'),
+    testPersistence: () => ipcRenderer.invoke('sqlite:test-persistence'),
+    verifyDataLoading: () => ipcRenderer.invoke('sqlite:verify-data-loading'),
+    getStats: () => ipcRenderer.invoke('sqlite:get-stats'),
+    backup: (backupPath?: string) => ipcRenderer.invoke('sqlite:backup', backupPath),
+    importFromLocalStorage: (data: any) => ipcRenderer.invoke('sqlite:import-from-localstorage', data),
+    exportAllData: () => ipcRenderer.invoke('sqlite:export-all-data'),
+
+    // Task operations
+    getTasks: () => ipcRenderer.invoke('sqlite:get-tasks'),
+    createTask: (task: any) => ipcRenderer.invoke('sqlite:create-task', task),
+    createTaskWithId: (task: any) => ipcRenderer.invoke('sqlite:create-task-with-id', task),
+    updateTask: (id: string, updates: any) => ipcRenderer.invoke('sqlite:update-task', id, updates),
+    deleteTask: (id: string) => ipcRenderer.invoke('sqlite:delete-task', id),
+
+    // Project operations
+    getProjects: () => ipcRenderer.invoke('sqlite:get-projects'),
+    createProject: (project: any) => ipcRenderer.invoke('sqlite:create-project', project),
+    updateProject: (id: string, updates: any) => ipcRenderer.invoke('sqlite:update-project', id, updates),
+    deleteProject: (id: string) => ipcRenderer.invoke('sqlite:delete-project', id),
+
+    // Journal operations
+    getJournalEntries: () => ipcRenderer.invoke('sqlite:get-journal-entries'),
+    createJournalEntry: (entry: any) => ipcRenderer.invoke('sqlite:create-journal-entry', entry),
+    updateJournalEntry: (id: string, updates: any) => ipcRenderer.invoke('sqlite:update-journal-entry', id, updates),
+    deleteJournalEntry: (id: string) => ipcRenderer.invoke('sqlite:delete-journal-entry', id),
   },
 
   // Window operations
@@ -44,6 +76,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
 export interface ElectronAPI {
   database: {
     testConnection: (connectionUrl: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  sqlite: {
+    // Database management
+    initialize: () => Promise<{ success: boolean; error?: string }>;
+    testConnection: () => Promise<{ success: boolean; error?: string }>;
+    testPersistence: () => Promise<{ success: boolean; createdTask?: any; allTasks?: any[]; totalTasks?: number; error?: string }>;
+    verifyDataLoading: () => Promise<{ success: boolean; tasks?: any[]; projects?: any[]; journal?: any[]; counts?: any; error?: string }>;
+    getStats: () => Promise<{ success: boolean; data?: any; error?: string }>;
+    backup: (backupPath?: string) => Promise<{ success: boolean; path?: string; error?: string }>;
+    importFromLocalStorage: (data: any) => Promise<{ success: boolean; result?: any; error?: string }>;
+    exportAllData: () => Promise<{ success: boolean; data?: any; error?: string }>;
+
+    // Task operations
+    getTasks: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
+    createTask: (task: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+    createTaskWithId: (task: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+    updateTask: (id: string, updates: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+    deleteTask: (id: string) => Promise<{ success: boolean; data?: boolean; error?: string }>;
+
+    // Project operations
+    getProjects: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
+    createProject: (project: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+    updateProject: (id: string, updates: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+    deleteProject: (id: string) => Promise<{ success: boolean; data?: boolean; error?: string }>;
+
+    // Journal operations
+    getJournalEntries: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
+    createJournalEntry: (entry: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+    updateJournalEntry: (id: string, updates: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+    deleteJournalEntry: (id: string) => Promise<{ success: boolean; data?: boolean; error?: string }>;
   };
   window: {
     minimize: () => Promise<void>;

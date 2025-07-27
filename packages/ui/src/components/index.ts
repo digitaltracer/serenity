@@ -8,6 +8,7 @@ export * from './JournalEntryCard';
 export * from './Modal';
 export * from './Select';
 export * from './CustomSelect';
+export * from './ProjectComboBox';
 export * from './Toggle';
 export * from './Textarea';
 export * from './TaskModal';

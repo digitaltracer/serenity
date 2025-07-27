@@ -7,8 +7,11 @@ import {
   selectTheme,
   setTheme,
   addTask, 
+  addProject,
   addSubtask,
+  deleteTask,
   selectAllTasks,
+  selectAllProjects,
   addEntry,
   addUsedTags,
   selectIsGlobalSearchOpen,
@@ -69,6 +72,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const sidebarCollapsed = useSelector(selectSidebarCollapsed);
   const currentTheme = useSelector(selectTheme);
   const tasks = useSelector(selectAllTasks);
+  const projects = useSelector(selectAllProjects);
   const isGlobalSearchOpen = useSelector(selectIsGlobalSearchOpen);
   const isTaskModalOpen = useSelector(selectTaskModalOpen);
   const isJournalModalOpen = useSelector(selectJournalModalOpen);
@@ -94,6 +98,28 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
     
     dispatch(closeTaskModal());
+  };
+
+  const handleCreateProject = (projectName: string) => {
+    const projectData = {
+      name: projectName,
+      color: '#8B5CF6', // Default purple color
+      description: '',
+      archived: false
+    };
+    
+    dispatch(addProject(projectData));
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    dispatch(deleteTask(taskId));
+  };
+
+  const handleArchiveTask = (taskId: string) => {
+    // For now, we'll implement archive as setting a special tag or status
+    // This can be expanded later with a proper archive field
+    console.log('Archive task:', taskId);
+    // TODO: Implement proper archiving when archive field is added to Task interface
   };
 
   const handleCreateJournalEntry = (entryData: Partial<JournalEntry>) => {
@@ -326,6 +352,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         isOpen={isTaskModalOpen}
         onClose={() => dispatch(closeTaskModal())}
         onSave={handleCreateTask}
+        projects={projects}
+        onCreateProject={handleCreateProject}
+        onDelete={handleDeleteTask}
+        onArchive={handleArchiveTask}
       />
 
       {/* Journal Entry Modal */}

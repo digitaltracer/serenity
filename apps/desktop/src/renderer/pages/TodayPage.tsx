@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectTodayTasks, selectAllTasks, toggleTask, updateTask, RootState } from '@serenity/core';
+import { selectTodayTasks, selectAllTasks, toggleTask, updateTask, deleteTask, RootState } from '@serenity/core';
 import { Card, CardHeader, CardTitle, CardContent, TaskCard, ProgressBar, Button, Input, CustomSelect, TagInput, DatePicker, Textarea } from '@serenity/ui';
 import { Calendar, Clock, CheckCircle, AlertTriangle, Target } from 'lucide-react';
 
@@ -250,6 +250,7 @@ export const TodayPage: React.FC = () => {
                 task={task}
                 onToggle={() => dispatch(toggleTask(task.id))}
                 onClick={handleEditTask}
+                onDelete={() => dispatch(deleteTask(task.id))}
               />
             )
           ))
@@ -272,6 +273,7 @@ export const TodayPage: React.FC = () => {
                 task={task}
                 onToggle={() => dispatch(toggleTask(task.id))}
                 onClick={handleEditTask}
+                onDelete={() => dispatch(deleteTask(task.id))}
                 className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/30"
               />
             </div>

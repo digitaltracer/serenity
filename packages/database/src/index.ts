@@ -1,8 +1,10 @@
-// PostgreSQL exports (temporarily restored)
+// PostgreSQL exports (for backwards compatibility)
 export * from './connection';
 export * from './queries';
 
-// SQLite-based database system (work in progress)
-// export * from './database';
-// export * from './sqlite';
-// export * from './migrations/migration-manager';
+// SQLite-based database system
+export * from './adapters/SQLiteAdapter';
+export * from './sqlite/SQLiteService';
+export * from './queries/sqlite/tasks';
+export * from './queries/sqlite/projects';
+export * from './queries/sqlite/journal';

@@ -2,12 +2,13 @@ import React, { useMemo } from 'react';
 import { JournalEntry, selectCompactMode } from '@serenity/core';
 import { useSelector } from 'react-redux';
 import { cn } from '../utils/cn';
-import { Pin, Calendar, Tag } from 'lucide-react';
+import { Pin, Calendar, Tag, Trash2 } from 'lucide-react';
 
 export interface JournalEntryCardProps {
   entry: JournalEntry;
   onClick?: (entry: JournalEntry) => void;
   onTogglePin?: (entryId: string) => void;
+  onDelete?: (entryId: string) => void;
   className?: string;
 }
 
@@ -15,6 +16,7 @@ const JournalEntryCard = React.memo<JournalEntryCardProps>(({
   entry,
   onClick,
   onTogglePin,
+  onDelete,
   className,
 }) => {
   const compactMode = useSelector(selectCompactMode);
@@ -78,20 +80,36 @@ const JournalEntryCard = React.memo<JournalEntryCardProps>(({
           {entryData.formattedDate}
         </div>
 
-        <button
-          className={cn(
-            'opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700',
-            {
-              'opacity-100 text-blue-500': entry.pinned,
-            }
+        <div className="flex items-center gap-1">
+          <button
+            className={cn(
+              'opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700',
+              {
+                'opacity-100 text-blue-500': entry.pinned,
+              }
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePin?.(entry.id);
+            }}
+            title="Pin entry"
+          >
+            <Pin className="w-4 h-4" />
+          </button>
+
+          {onDelete && (
+            <button
+              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(entry.id);
+              }}
+              title="Delete entry"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           )}
-          onClick={(e) => {
-            e.stopPropagation();
-            onTogglePin?.(entry.id);
-          }}
-        >
-          <Pin className="w-4 h-4" />
-        </button>
+        </div>
       </div>
 
       {entry.title && (

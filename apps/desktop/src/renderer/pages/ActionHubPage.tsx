@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, selectCompactMode } from '@serenity/core';
 import { addTask, toggleTask, deleteTask, updateTask, addProject, updateGoalsProgress, selectAllEntries, selectAllProjects } from '@serenity/core';
-import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, TagInput, DatePicker, Textarea, cn, DraggableTaskCard, SelectableItem, BulkOperationsToolbar, BulkActionsButton } from '@serenity/ui';
+import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, ProjectComboBox, TagInput, DatePicker, Textarea, cn, DraggableTaskCard, SelectableItem, BulkOperationsToolbar, BulkActionsButton } from '@serenity/ui';
 import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List } from 'lucide-react';
 
 export const ActionHubPage: React.FC = () => {
@@ -84,6 +84,17 @@ export const ActionHubPage: React.FC = () => {
       setNewProjectColor('#8B5CF6');
       setShowCreateProjectForm(false);
     }
+  };
+
+  const handleCreateProjectFromCombo = (projectName: string) => {
+    const projectData = {
+      name: projectName,
+      color: '#8B5CF6', // Default purple color
+      description: '',
+      archived: false
+    };
+    
+    dispatch(addProject(projectData));
   };
 
   const handleCreateTask = () => {
@@ -341,13 +352,12 @@ export const ActionHubPage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Folder className="w-4 h-4 text-gray-400" />
                         <div className="flex-1 min-w-0">
-                          <CustomSelect
-                            options={[
-                              { value: '', label: 'Select project' },
-                              ...projectOptions
-                            ]}
+                          <ProjectComboBox
+                            projects={projects}
                             value={newTaskProject}
-                            onChange={(value) => setNewTaskProject(value)}
+                            onChange={(projectId) => setNewTaskProject(projectId)}
+                            onCreateProject={handleCreateProjectFromCombo}
+                            placeholder={projects.length === 0 ? "Type new project name..." : "Select or create project"}
                           />
                         </div>
                       </div>

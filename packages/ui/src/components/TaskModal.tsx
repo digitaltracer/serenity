@@ -5,9 +5,10 @@ import { Button } from './Button';
 import { Input } from './Input';
 import { Textarea } from './Textarea';
 import { CustomSelect } from './CustomSelect';
+import { ProjectComboBox } from './ProjectComboBox';
 import { TagInput } from './TagInput';
 import { DatePicker } from './DatePicker';
-import { Calendar, Flag, Folder } from 'lucide-react';
+import { Calendar, Flag, Folder, Trash2, Archive } from 'lucide-react';
 
 export interface TaskModalProps {
   isOpen: boolean;
@@ -15,6 +16,9 @@ export interface TaskModalProps {
   onSave: (task: Partial<Task>) => void;
   task?: Task | null;
   projects?: Array<{ id: string; name: string; color: string }>;
+  onCreateProject?: (projectName: string) => void;
+  onDelete?: (taskId: string) => void;
+  onArchive?: (taskId: string) => void;
 }
 
 const TaskModal: React.FC<TaskModalProps> = ({
@@ -23,6 +27,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
   onSave,
   task,
   projects = [],
+  onCreateProject,
+  onDelete,
+  onArchive,
 }) => {
   const [formData, setFormData] = useState({
     title: '',
@@ -150,11 +157,13 @@ const TaskModal: React.FC<TaskModalProps> = ({
         </div>
 
         {/* Project */}
-        <CustomSelect
+        <ProjectComboBox
           label="Project"
+          projects={projects}
           value={formData.projectId}
-          onChange={(value) => setFormData(prev => ({ ...prev, projectId: value }))}
-          options={projectOptions}
+          onChange={(projectId) => setFormData(prev => ({ ...prev, projectId }))}
+          onCreateProject={onCreateProject}
+          placeholder={projects.length === 0 ? "Type new project name..." : "Select or create project"}
         />
 
         {/* Recurring */}
@@ -185,13 +194,49 @@ const TaskModal: React.FC<TaskModalProps> = ({
         />
 
         {/* Actions */}
-        <div className="flex gap-3 pt-4">
-          <Button type="submit" className="flex-1">
-            {task ? 'Update Task' : 'Create Task'}
-          </Button>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
+        <div className="space-y-3 pt-4">
+          <div className="flex gap-3">
+            <Button type="submit" className="flex-1">
+              {task ? 'Update Task' : 'Create Task'}
+            </Button>
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+          </div>
+          
+          {/* Delete and Archive Actions - Only for existing tasks */}
+          {task && (onDelete || onArchive) && (
+            <div className="flex gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
+              {onDelete && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    onDelete(task.id);
+                    onClose();
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Task
+                </Button>
+              )}
+              {onArchive && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    onArchive(task.id);
+                    onClose();
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Archive className="w-4 h-4" />
+                  Archive Task
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </form>
     </Modal>

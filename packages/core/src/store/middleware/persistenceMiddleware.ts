@@ -41,9 +41,15 @@ export const persistenceMiddleware: Middleware = (store) => (next) => (action) =
   // Check if we need to persist based on the action type
   if (TASKS_ACTIONS.includes(action.type)) {
     console.log('📄 Persisting tasks to localStorage');
+    console.log('📊 Action:', action.type, action.payload);
+    console.log('📊 State tasks count:', state.tasks?.tasks?.length || 0);
+    console.log('📊 Tasks array:', state.tasks?.tasks);
+    
     // Import dynamically to avoid circular dependencies
     import('../../utils/persistence').then(({ saveTasks }) => {
-      saveTasks(state.tasks.tasks);
+      const tasksToSave = state.tasks.tasks;
+      console.log('📊 About to save tasks:', tasksToSave?.length || 0);
+      saveTasks(tasksToSave);
     });
   }
   

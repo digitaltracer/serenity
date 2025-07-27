@@ -11,7 +11,7 @@ import shortcutsReducer from './slices/shortcutsSlice';
 import searchReducer from './slices/searchSlice';
 import dragDropReducer from './slices/dragDropSlice';
 import goalsReducer from './slices/goalsSlice';
-import { persistenceMiddleware } from './middleware/persistenceMiddleware';
+import { hybridPersistenceMiddleware } from './middleware/hybridPersistenceMiddleware';
 
 export const store = configureStore({
   reducer: {
@@ -34,7 +34,7 @@ export const store = configureStore({
         ignoredActions: ['persist/PERSIST'],
         ignoredActionsPaths: ['payload.date', 'payload.createdAt', 'payload.updatedAt', 'payload.dueDate', 'payload.lastConnected', 'payload.lastBackup', 'payload.lastOptimized', 'payload.startDate', 'payload.endDate', 'payload.reminderDate'],
       },
-    }).concat(persistenceMiddleware),
+    }).concat(hybridPersistenceMiddleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

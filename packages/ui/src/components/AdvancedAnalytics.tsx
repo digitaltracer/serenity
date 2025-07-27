@@ -234,6 +234,12 @@ const calculateBasicAnalytics = (tasks: Task[], journalEntries: JournalEntry[]) 
     return completedDate >= thisWeek;
   });
 
+  // Calculate tasks created this week
+  const tasksCreatedThisWeek = tasks.filter(task => {
+    const createdDate = new Date(task.createdAt);
+    return createdDate >= thisWeek;
+  });
+
   const journalThisWeek = journalEntries.filter(entry => {
     const entryDate = new Date(entry.date);
     return entryDate >= thisWeek;
@@ -267,8 +273,10 @@ const calculateBasicAnalytics = (tasks: Task[], journalEntries: JournalEntry[]) 
   return {
     totalTasks: tasks.length,
     completedTasks: completedTasks.length,
+    createdTasks: tasks.length, // Total tasks created
     completionRate,
     tasksThisWeek: tasksThisWeek.length,
+    tasksCreatedThisWeek: tasksCreatedThisWeek.length,
     journalThisWeek: journalThisWeek.length,
     streak,
     avgTasksPerDay: tasksThisWeek.length / 7,
@@ -322,6 +330,33 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
         value: dayTasks,
         date: new Date(date),
         metadata: { dateKey, dayTasks }
+      });
+    }
+    
+    return last30Days;
+  }, [tasks]);
+
+  // Generate chart data for tasks created
+  const createdChartData = useMemo(() => {
+    const last30Days = [];
+    const today = new Date();
+    
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateKey = date.toISOString().split('T')[0];
+      
+      const dayTasksCreated = tasks.filter(task => {
+        const taskDate = new Date(task.createdAt);
+        return taskDate.toISOString().split('T')[0] === dateKey;
+      }).length;
+      
+      last30Days.push({
+        id: `created-day-${i}`,
+        label: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        value: dayTasksCreated,
+        date: new Date(date),
+        metadata: { dateKey, dayTasksCreated }
       });
     }
     
@@ -411,16 +446,24 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
                   <TrendingUp className="w-4 h-4" />
-                  Weekly Progress
+                  Weekly Activity
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {analytics.tasksThisWeek}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold text-green-600 dark:text-green-400">
+                      {analytics.tasksThisWeek}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">completed</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                      {analytics.tasksCreatedThisWeek}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">created</span>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  tasks completed this week
-                </p>
               </CardContent>
             </Card>
 
@@ -459,28 +502,52 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
             </Card>
           </div>
 
-          {/* Quick Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                30-Day Task Completion
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <SafeInteractiveChart
-                data={chartData}
-                type="area"
-                width={800}
-                height={300}
-                colors={['#3B82F6']}
-                formatTooltip={(point) => ({
-                  title: point.label,
-                  content: `${point.value} tasks completed`
-                })}
-              />
-            </CardContent>
-          </Card>
+          {/* Task Activity Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5" />
+                  30-Day Task Completion
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SafeInteractiveChart
+                  data={chartData}
+                  type="area"
+                  width={400}
+                  height={250}
+                  colors={['#10B981']}
+                  formatTooltip={(point) => ({
+                    title: point.label,
+                    content: `${point.value} tasks completed`
+                  })}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  30-Day Task Creation
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SafeInteractiveChart
+                  data={createdChartData}
+                  type="area"
+                  width={400}
+                  height={250}
+                  colors={['#3B82F6']}
+                  formatTooltip={(point) => ({
+                    title: point.label,
+                    content: `${point.value} tasks created`
+                  })}
+                />
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Project Distribution */}
           {projects.length > 0 && (

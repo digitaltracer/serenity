@@ -55,7 +55,7 @@ export function createEnhancedStore() {
             'payload.reminderDate'
           ],
         },
-      }).concat(persistenceMiddleware), // Start with simple localStorage first
+      }).concat(hybridPersistenceMiddleware), // Use hybrid persistence with SQLite support
   });
 }
 

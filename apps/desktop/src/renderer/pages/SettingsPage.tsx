@@ -23,7 +23,7 @@ import {
   setMasterPassword,
   initializeAuth
 } from '@serenity/core';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, DatabaseConfigurationModal, PrivacySecurityModal, useToast, Toggle } from '@serenity/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, DatabaseConfigurationModal, PrivacySecurityModal, TagsManager, useToast, Toggle } from '@serenity/ui';
 import { 
   Settings, 
   Palette, 
@@ -36,7 +36,8 @@ import {
   Moon,
   Monitor,
   Download,
-  Lock
+  Lock,
+  Tag
 } from 'lucide-react';
 
 
@@ -55,6 +56,7 @@ export const SettingsPage: React.FC = () => {
   const [sounds, setSounds] = React.useState(true);
   const [isDatabaseModalOpen, setIsDatabaseModalOpen] = React.useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = React.useState(false);
+  const [isTagsManagerOpen, setIsTagsManagerOpen] = React.useState(false);
   
   // Database connection state - lazy loaded to prevent blocking startup
   const [dbConnection, setDbConnection] = React.useState<any>(null);
@@ -487,6 +489,30 @@ export const SettingsPage: React.FC = () => {
                 </Button>
               </div>
             </div>
+
+            {/* Tags Management */}
+            <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                  <Tag className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                    Tags Management
+                  </h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Organize, rename, merge, and delete tags system-wide
+                  </p>
+                </div>
+              </div>
+              <Button 
+                variant="secondary"
+                onClick={() => setIsTagsManagerOpen(true)}
+                className="w-24 rounded-xl"
+              >
+                Manage
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -505,6 +531,12 @@ export const SettingsPage: React.FC = () => {
         onClose={() => setIsPrivacyModalOpen(false)}
         onSave={handlePrivacySave}
         initialSettings={privacySettings}
+      />
+
+      {/* Tags Manager Modal */}
+      <TagsManager
+        isOpen={isTagsManagerOpen}
+        onClose={() => setIsTagsManagerOpen(false)}
       />
     </div>
   );

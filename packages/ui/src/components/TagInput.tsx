@@ -179,10 +179,11 @@ const TagInput: React.FC<TagInputProps> = ({
             {value.map((tag, index) => (
               <span
                 key={index}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 max-w-32"
+                title={tag}
               >
-                <Tag className="w-3 h-3" />
-                {tag}
+                <Tag className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{tag}</span>
                 <button
                   type="button"
                   onClick={() => removeTag(tag)}
@@ -235,7 +236,7 @@ const TagInput: React.FC<TagInputProps> = ({
                 )}
               >
                 <Tag className="w-3 h-3 text-gray-400" />
-                <span className="text-gray-900 dark:text-gray-100">{suggestion}</span>
+                <span className="text-gray-900 dark:text-gray-100 truncate" title={suggestion}>{suggestion}</span>
               </button>
             ))}
             </div>

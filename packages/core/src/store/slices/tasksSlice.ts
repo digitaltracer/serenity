@@ -41,14 +41,19 @@ const tasksSlice = createSlice({
   name: 'tasks',
   initialState,
   reducers: {
-    addTask: (state, action: PayloadAction<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>) => {
-      const newTask: Task = {
-        ...action.payload,
-        id: generateId(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      state.tasks.push(newTask);
+    addTask: {
+      reducer: (state, action: PayloadAction<Task>) => {
+        state.tasks.push(action.payload);
+      },
+      prepare: (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
+        const newTask: Task = {
+          ...taskData,
+          id: generateId(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        return { payload: newTask };
+      }
     },
     updateTask: (state, action: PayloadAction<Partial<Task> & { id: string }>) => {
       const index = state.tasks.findIndex(task => task.id === action.payload.id);
@@ -204,6 +209,10 @@ const tasksSlice = createSlice({
       const taskIds = action.payload;
       state.tasks = state.tasks.filter(task => !taskIds.includes(task.id));
     },
+    
+    updateAllTasks: (state, action: PayloadAction<Task[]>) => {
+      state.tasks = action.payload;
+    },
   },
 });
 
@@ -229,6 +238,7 @@ export const {
   // Bulk operations
   bulkUpdateTasks,
   bulkDeleteTasks,
+  updateAllTasks,
 } = tasksSlice.actions;
 
 // Selectors

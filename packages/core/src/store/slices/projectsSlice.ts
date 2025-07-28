@@ -29,14 +29,19 @@ const projectsSlice = createSlice({
   name: 'projects',
   initialState,
   reducers: {
-    addProject: (state, action: PayloadAction<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>) => {
-      const newProject: Project = {
-        ...action.payload,
-        id: generateId(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      state.projects.push(newProject);
+    addProject: {
+      reducer: (state, action: PayloadAction<Project>) => {
+        state.projects.push(action.payload);
+      },
+      prepare: (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
+        const newProject: Project = {
+          ...projectData,
+          id: generateId(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        return { payload: newProject };
+      }
     },
     updateProject: (state, action: PayloadAction<Partial<Project> & { id: string }>) => {
       const index = state.projects.findIndex(project => project.id === action.payload.id);

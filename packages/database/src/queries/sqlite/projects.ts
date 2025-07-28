@@ -76,6 +76,36 @@ export class SQLiteProjectQueries {
   }
 
   /**
+   * Create a project with a specific ID (used by middleware to preserve Redux IDs)
+   */
+  createProjectWithId(project: Project): Project {
+    console.log('📁 SQLite: Creating project with existing ID:', project.id);
+    
+    const stmt = this.db.prepare(`
+      INSERT INTO projects (
+        id, name, description, color, archived, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const insertResult = stmt.run(
+      project.id,
+      project.name,
+      project.description || null,
+      project.color,
+      project.archived ? 1 : 0,
+      project.createdAt.toISOString(),
+      project.updatedAt.toISOString()
+    );
+    
+    console.log(`✅ SQLite: Project inserted with existing ID ${project.id}, changes: ${insertResult.changes}`);
+
+    const savedProject = this.getProjectById(project.id)!;
+    console.log('📤 SQLite: Returning saved project:', { id: savedProject.id, name: savedProject.name });
+    
+    return savedProject;
+  }
+
+  /**
    * Update a project
    */
   updateProject(id: string, updates: Partial<Project>): Project | null {

@@ -153,7 +153,7 @@ export class EncryptionService {
         salt: btoa(String.fromCharCode(...salt)),
       };
     } catch (error) {
-      console.error('Encryption failed:', error);
+      console.error('Encryption failed:', error instanceof Error ? error.message : 'Unknown error');
       throw new Error('Failed to encrypt data');
     }
   }
@@ -195,7 +195,7 @@ export class EncryptionService {
       const decoder = new TextDecoder();
       return decoder.decode(decryptedBuffer);
     } catch (error) {
-      console.error('Decryption failed:', error);
+      console.error('Decryption failed:', error instanceof Error ? error.message : 'Unknown error');
       throw new Error('Failed to decrypt data');
     }
   }

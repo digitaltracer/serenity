@@ -77,22 +77,27 @@ export async function initializeSQLitePersistence(): Promise<boolean> {
 /**
  * Hybrid middleware that uses localStorage by default and SQLite when available
  */
-export const hybridPersistenceMiddleware: Middleware = (store) => (next) => (action) => {
+export const hybridPersistenceMiddleware: Middleware = (store) => (next) => async (action) => {
   // Let the action go through first
   const result = next(action);
   
   // Get the current state after the action
   const state = store.getState() as any;
   
-  // Handle persistence based on action type
+  // Handle persistence based on action type - AWAIT for critical actions to ensure data integrity
   if (TASKS_ACTIONS.includes(action.type)) {
     console.log('🔍 Task action detected:', action.type);
     console.log('🔍 SQLite available:', sqliteAvailable);
     console.log('🔍 SQLite API:', !!sqliteAPI);
     
     if (sqliteAvailable && sqliteAPI) {
-      console.log('📄 Persisting task to SQLite');
-      handleTaskPersistence(action, state.tasks, sqliteAPI);
+      console.log('📄 Persisting task to SQLite (synchronously to prevent data loss)');
+      try {
+        await handleTaskPersistence(action, state.tasks, sqliteAPI);
+        console.log('✅ Task persistence completed successfully');
+      } catch (error) {
+        console.error('❌ Task persistence failed:', error);
+      }
     } else {
       console.log('📄 Persisting tasks to localStorage (SQLite not available)');
       import('../../utils/persistence').then(({ saveTasks }) => {
@@ -141,27 +146,32 @@ async function handleTaskPersistence(action: any, tasksState: any, sqliteAPI: an
   try {
     switch (action.type) {
       case 'tasks/addTask':
-        // Find the newly created task in the state (it was added by the reducer)
-        const newTask = tasksState.tasks[tasksState.tasks.length - 1];
-        if (newTask) {
-          console.log('📝 Creating task in SQLite:', newTask.title, 'with ID:', newTask.id);
-          console.log('🏷️ Task tags to store:', newTask.tags);
-          console.log('🔍 Task tags type:', typeof newTask.tags, 'Array?', Array.isArray(newTask.tags));
-          console.log('🔍 Full task object:', JSON.stringify(newTask, null, 2));
-          
-          // Use the special createTaskWithId method to preserve the Redux-generated ID
-          await sqliteAPI.createTaskWithId({
-            id: newTask.id,
-            title: newTask.title,
-            description: newTask.description,
-            completed: newTask.completed,
-            priority: newTask.priority,
-            projectId: newTask.projectId,
-            dueDate: newTask.dueDate,
-            tags: newTask.tags || [],
-            createdAt: newTask.createdAt,
-            updatedAt: newTask.updatedAt
-          });
+        // The action payload now contains the complete task with generated ID, createdAt, updatedAt
+        const newTask = action.payload;
+        
+        console.log('📝 Creating task in SQLite:', newTask.title, 'with ID:', newTask.id);
+        
+        // Persist the complete task object to SQLite
+        const savedTask = await sqliteAPI.createTaskWithId({
+          id: newTask.id,
+          title: newTask.title,
+          description: newTask.description || '',
+          completed: newTask.completed || false,
+          priority: newTask.priority || 'medium',
+          projectId: newTask.projectId || null,
+          dueDate: newTask.dueDate || null,
+          tags: Array.isArray(newTask.tags) ? newTask.tags : [],
+          createdAt: newTask.createdAt,
+          updatedAt: newTask.updatedAt,
+          recurring: newTask.recurring || null,
+          subtasks: newTask.subtasks || []
+        });
+        
+        if (savedTask.success) {
+          console.log('✅ Task persisted to SQLite successfully');
+          // No need to reload - task is already in Redux state from the reducer
+        } else {
+          console.error('❌ Task persistence failed:', savedTask.error);
         }
         break;
       case 'tasks/updateTask':
@@ -200,19 +210,21 @@ async function handleJournalPersistence(action: any, journalState: any, sqliteAP
   try {
     switch (action.type) {
       case 'journal/addEntry':
-        // Find the newly created entry in the state (it was added by the reducer)
-        const newEntry = journalState.entries[journalState.entries.length - 1];
-        if (newEntry) {
-          console.log('📖 Creating journal entry in SQLite:', newEntry.title || 'Untitled');
-          await sqliteAPI.createJournalEntry({
-            title: newEntry.title,
-            content: newEntry.content,
-            mood: newEntry.mood,
-            date: newEntry.date,
-            pinned: newEntry.pinned || false,
-            tags: newEntry.tags || []
-          });
-        }
+        // The action payload now contains the complete entry with generated ID, createdAt, updatedAt
+        const newEntry = action.payload;
+        
+        console.log('📖 Creating journal entry in SQLite:', newEntry.title || 'Untitled');
+        await sqliteAPI.createJournalEntryWithId({
+          id: newEntry.id,
+          title: newEntry.title || '',
+          content: newEntry.content,
+          mood: newEntry.mood || null,
+          date: newEntry.date,
+          pinned: newEntry.pinned || false,
+          tags: Array.isArray(newEntry.tags) ? newEntry.tags : [],
+          createdAt: newEntry.createdAt,
+          updatedAt: newEntry.updatedAt
+        });
         break;
       case 'journal/updateEntry':
         const { id, ...updates } = action.payload;
@@ -250,17 +262,19 @@ async function handleProjectPersistence(action: any, projectsState: any, sqliteA
   try {
     switch (action.type) {
       case 'projects/addProject':
-        // Find the newly created project in the state (it was added by the reducer)
-        const newProject = projectsState.projects[projectsState.projects.length - 1];
-        if (newProject) {
-          console.log('📁 Creating project in SQLite:', newProject.name);
-          await sqliteAPI.createProject({
-            name: newProject.name,
-            description: newProject.description,
-            color: newProject.color,
-            archived: newProject.archived || false
-          });
-        }
+        // The action payload now contains the complete project with generated ID, createdAt, updatedAt
+        const newProject = action.payload;
+        
+        console.log('📁 Creating project in SQLite:', newProject.name);
+        await sqliteAPI.createProjectWithId({
+          id: newProject.id,
+          name: newProject.name,
+          description: newProject.description || '',
+          color: newProject.color,
+          archived: newProject.archived || false,
+          createdAt: newProject.createdAt,
+          updatedAt: newProject.updatedAt
+        });
         break;
       case 'projects/updateProject':
         const { id, ...updates } = action.payload;

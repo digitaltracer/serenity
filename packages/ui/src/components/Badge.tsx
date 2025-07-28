@@ -18,7 +18,7 @@ export const Badge: React.FC<BadgeProps> = ({
   size = 'md',
   className = '',
 }) => {
-  const baseClasses = 'inline-flex items-center font-medium rounded-full';
+  const baseClasses = 'inline-flex items-center font-medium rounded-full max-w-full';
   
   const sizeClasses = {
     sm: 'px-2 py-0.5 text-xs',
@@ -43,8 +43,11 @@ export const Badge: React.FC<BadgeProps> = ({
         ${variantClasses[variant]}
         ${className}
       `}
+      title={typeof children === 'string' ? children : undefined}
     >
-      {children}
+      <span className="truncate">
+        {children}
+      </span>
     </span>
   );
 };

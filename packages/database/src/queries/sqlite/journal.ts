@@ -144,6 +144,46 @@ export class SQLiteJournalQueries {
   }
 
   /**
+   * Create a journal entry with a specific ID (used by middleware to preserve Redux IDs)
+   */
+  createJournalEntryWithId(entry: JournalEntry): JournalEntry {
+    console.log('📖 SQLite: Creating journal entry with existing ID:', entry.id);
+    console.log('🏷️ SQLite: Entry tags:', entry.tags);
+    
+    const dateStr = entry.date.toISOString().split('T')[0];
+
+    const stmt = this.db.prepare(`
+      INSERT INTO journal_entries (
+        id, title, content, mood, date, pinned, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const insertResult = stmt.run(
+      entry.id,
+      entry.title || null,
+      entry.content,
+      entry.mood || null,
+      dateStr,
+      entry.pinned ? 1 : 0,
+      entry.createdAt.toISOString(),
+      entry.updatedAt.toISOString()
+    );
+    
+    console.log(`✅ SQLite: Journal entry inserted with existing ID ${entry.id}, changes: ${insertResult.changes}`);
+
+    // Insert tags if provided
+    if (entry.tags && entry.tags.length > 0) {
+      console.log(`🏷️ SQLite: Inserting ${entry.tags.length} tags for entry ${entry.id}`);
+      this.updateEntryTags(entry.id, entry.tags);
+    }
+
+    const savedEntry = this.getEntryById(entry.id)!;
+    console.log('📤 SQLite: Returning saved entry:', { id: savedEntry.id, title: savedEntry.title });
+    
+    return savedEntry;
+  }
+
+  /**
    * Update a journal entry
    */
   updateEntry(id: string, updates: Partial<JournalEntry>): JournalEntry | null {

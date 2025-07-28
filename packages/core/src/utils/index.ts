@@ -65,6 +65,9 @@ export const sortTasksByPriority = <T extends { priority: 'low' | 'medium' | 'hi
 export * from './storage';
 export * from './persistence';
 
+// Export logging utilities
+export * from './logger';
+
 // Export privacy utilities
 export * from './privacy';
 

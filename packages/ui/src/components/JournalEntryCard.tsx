@@ -114,12 +114,13 @@ const JournalEntryCard = React.memo<JournalEntryCardProps>(({
 
       {entry.title && (
         <h3 className={cn(
-          'font-semibold text-gray-900 dark:text-gray-100',
+          'font-semibold text-gray-900 dark:text-gray-100 truncate',
           {
             'mb-2': !compactMode,
             'mb-1.5': compactMode,
           }
-        )}>
+        )}
+        title={entry.title}>
           {entry.title}
         </h3>
       )}
@@ -143,7 +144,8 @@ const JournalEntryCard = React.memo<JournalEntryCardProps>(({
                 {entry.tags.slice(0, 2).map((tag, index) => (
                   <span
                     key={index}
-                    className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                    className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 max-w-20 truncate inline-block"
+                    title={tag}
                   >
                     {tag}
                   </span>

@@ -56,3 +56,4 @@ export * from './AdvancedAnalytics';
 export * from './GoalModal';
 export * from './GoalCard';
 export * from './GoalsPage';
+export * from './TagsManager';

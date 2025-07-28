@@ -105,7 +105,6 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
             placeholder="Give your entry a title..."
             value={formData.title}
             onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-            className="text-sm h-9"
           />
           
           <DatePicker

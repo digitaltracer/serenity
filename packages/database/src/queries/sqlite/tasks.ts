@@ -159,29 +159,40 @@ export class SQLiteTaskQueries {
    * Create a task with a specific ID (used by middleware to preserve Redux IDs)
    */
   createTaskWithId(task: Task): Task {
-    console.log('📝 SQLite: Creating task with existing ID:', task.id);
+    console.log('📝 SQLite: Creating task with ID:', task.id);
     console.log('🏷️ SQLite: Task tags:', task.tags);
+    console.log('📋 SQLite: Full task object:', JSON.stringify(task, null, 2));
     
-    const stmt = this.db.prepare(`
-      INSERT INTO tasks (
-        id, title, description, completed, priority, due_date, project_id, 
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    try {
+      const stmt = this.db.prepare(`
+        INSERT INTO tasks (
+          id, title, description, completed, priority, due_date, project_id, 
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
 
-    const insertResult = stmt.run(
-      task.id,
-      task.title,
-      task.description || null,
-      task.completed ? 1 : 0,
-      task.priority,
-      task.dueDate ? task.dueDate.toISOString() : null,
-      task.projectId || null,
-      task.createdAt.toISOString(),
-      task.updatedAt.toISOString()
-    );
-    
-    console.log(`✅ SQLite: Task inserted with existing ID ${task.id}, changes: ${insertResult.changes}`);
+      const insertResult = stmt.run(
+        task.id,
+        task.title,
+        task.description || null,
+        task.completed ? 1 : 0,
+        task.priority,
+        task.dueDate ? (task.dueDate instanceof Date ? task.dueDate.toISOString() : new Date(task.dueDate).toISOString()) : null,
+        task.projectId || null,
+        task.createdAt instanceof Date ? task.createdAt.toISOString() : new Date(task.createdAt).toISOString(),
+        task.updatedAt instanceof Date ? task.updatedAt.toISOString() : new Date(task.updatedAt).toISOString()
+      );
+      
+      console.log(`✅ SQLite: Task inserted with ID ${task.id}, changes: ${insertResult.changes}`);
+      
+      if (insertResult.changes === 0) {
+        console.error('❌ SQLite: Task insertion failed - no changes made');
+        throw new Error('Task insertion failed - no rows affected');
+      }
+    } catch (error) {
+      console.error('❌ SQLite: Task insertion error:', error);
+      throw error;
+    }
 
     // Insert tags if provided
     if (task.tags && task.tags.length > 0) {

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, selectCompactMode } from '@serenity/core';
 import { addTask, toggleTask, deleteTask, updateTask, addProject, updateGoalsProgress, selectAllEntries, selectAllProjects } from '@serenity/core';
@@ -34,37 +34,58 @@ export const ActionHubPage: React.FC = () => {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectColor, setNewProjectColor] = useState('#8B5CF6');
 
-  const filteredTasks = tasks.filter(task => {
-    const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = 
-      activeFilter === 'all' || 
-      (activeFilter === 'active' && !task.completed) ||
-      (activeFilter === 'completed' && task.completed);
-    return matchesSearch && matchesFilter;
-  });
+  // Memoize expensive calculations to prevent re-computation on every render
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesFilter = 
+        activeFilter === 'all' || 
+        (activeFilter === 'active' && !task.completed) ||
+        (activeFilter === 'completed' && task.completed);
+      return matchesSearch && matchesFilter;
+    });
+  }, [tasks, searchQuery, activeFilter]);
 
-  const completedTasks = tasks.filter(task => task.completed);
-  const totalTasks = tasks.length;
-  const progressPercentage = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
+  const taskStatistics = useMemo(() => {
+    const completedTasks = tasks.filter(task => task.completed);
+    const totalTasks = tasks.length;
+    const progressPercentage = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
+    return { completedTasks, totalTasks, progressPercentage };
+  }, [tasks]);
   
-  // Projects calculations
-  const activeProjects = projects.filter(p => !p.archived);
-  const projectTasks = tasks.filter(t => t.projectId);
-  
-  // Calculate project statuses based on their tasks
-  const getProjectStatus = (project: any) => {
-    const pTasks = tasks.filter(t => t.projectId === project.id);
-    if (pTasks.length === 0) return 'yet-to-start';
-    const completedTasks = pTasks.filter(t => t.completed);
-    if (completedTasks.length === pTasks.length) return 'completed';
-    if (completedTasks.length > 0) return 'in-progress';
-    return 'yet-to-start';
-  };
-  
-  const inProgressProjects = activeProjects.filter(p => getProjectStatus(p) === 'in-progress');
-  const yetToStartProjects = activeProjects.filter(p => getProjectStatus(p) === 'yet-to-start');
-  const completedProjects = activeProjects.filter(p => getProjectStatus(p) === 'completed');
-  const projectsProgressPercentage = activeProjects.length > 0 ? Math.round((completedProjects.length / activeProjects.length) * 100) : 0;
+  // Projects calculations - memoized for performance
+  const projectStatistics = useMemo(() => {
+    const activeProjects = projects.filter(p => !p.archived);
+    const projectTasks = tasks.filter(t => t.projectId);
+    
+    // Calculate project statuses based on their tasks
+    const getProjectStatus = (project: any): 'yet-to-start' | 'in-progress' | 'completed' => {
+      const pTasks = tasks.filter(t => t.projectId === project.id);
+      if (pTasks.length === 0) return 'yet-to-start';
+      const completedTasks = pTasks.filter(t => t.completed);
+      if (completedTasks.length === pTasks.length) return 'completed';
+      if (completedTasks.length > 0) return 'in-progress';
+      return 'yet-to-start';
+    };
+    
+    const inProgressProjects = activeProjects.filter(p => getProjectStatus(p) === 'in-progress');
+    const yetToStartProjects = activeProjects.filter(p => getProjectStatus(p) === 'yet-to-start');
+    const completedProjects = activeProjects.filter(p => getProjectStatus(p) === 'completed');
+    const projectsProgressPercentage = activeProjects.length > 0 ? Math.round((completedProjects.length / activeProjects.length) * 100) : 0;
+    
+    return {
+      activeProjects,
+      projectTasks,
+      inProgressProjects,
+      yetToStartProjects,
+      completedProjects,
+      projectsProgressPercentage,
+      getProjectStatus
+    };
+  }, [projects, tasks]);
+
+  const { completedTasks, totalTasks, progressPercentage } = taskStatistics;
+  const { activeProjects, projectTasks, inProgressProjects, yetToStartProjects, completedProjects, projectsProgressPercentage, getProjectStatus } = projectStatistics;
 
   const handleFilterChange = (filter: 'all' | 'active' | 'completed') => {
     setActiveFilter(filter);
@@ -148,10 +169,12 @@ export const ActionHubPage: React.FC = () => {
     }, 100);
   };
 
-  const projectOptions = projects.map(project => ({
-    value: project.id,
-    label: project.name,
-  }));
+  const projectOptions = useMemo(() => 
+    projects.map(project => ({
+      value: project.id,
+      label: project.name,
+    }))
+  , [projects]);
 
   return (
     <div className="flex-1 h-full bg-gray-50 dark:bg-gray-900">

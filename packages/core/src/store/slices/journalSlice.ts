@@ -45,14 +45,19 @@ const journalSlice = createSlice({
   name: 'journal',
   initialState,
   reducers: {
-    addEntry: (state, action: PayloadAction<Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>>) => {
-      const newEntry: JournalEntry = {
-        ...action.payload,
-        id: generateId(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      state.entries.push(newEntry);
+    addEntry: {
+      reducer: (state, action: PayloadAction<JournalEntry>) => {
+        state.entries.push(action.payload);
+      },
+      prepare: (entryData: Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
+        const newEntry: JournalEntry = {
+          ...entryData,
+          id: generateId(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        return { payload: newEntry };
+      }
     },
     updateEntry: (state, action: PayloadAction<Partial<JournalEntry> & { id: string }>) => {
       const index = state.entries.findIndex(entry => entry.id === action.payload.id);
@@ -89,6 +94,10 @@ const journalSlice = createSlice({
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
     },
+    
+    updateAllEntries: (state, action: PayloadAction<JournalEntry[]>) => {
+      state.entries = action.payload;
+    },
   },
 });
 
@@ -102,6 +111,7 @@ export const {
   setEntries,
   setLoading: setJournalLoading,
   setError: setJournalError,
+  updateAllEntries,
 } = journalSlice.actions;
 
 // Selectors

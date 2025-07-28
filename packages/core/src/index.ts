@@ -6,4 +6,3 @@ export * from './database/DatabaseManager';
 export * from './hooks/useKeyboardShortcuts';
 export * from './hooks/useDragDrop';
 export { initializeStoreData, getDatabaseStats } from './store/enhancedStore';
-export * from './utils/migration';

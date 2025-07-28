@@ -63,10 +63,11 @@ const CardTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTML
       <h3
         ref={ref}
         className={cn(
-          'text-xl font-semibold leading-tight tracking-tight text-gray-900',
+          'text-xl font-semibold leading-tight tracking-tight text-gray-900 truncate',
           'dark:text-white',
           className
         )}
+        title={typeof children === 'string' ? children : undefined}
         {...props}
       >
         {children}
@@ -81,9 +82,10 @@ const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttribu
       <p
         ref={ref}
         className={cn(
-          'text-sm text-gray-600 dark:text-gray-400 leading-relaxed',
+          'text-sm text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-3',
           className
         )}
+        title={typeof children === 'string' ? children : undefined}
         {...props}
       >
         {children}

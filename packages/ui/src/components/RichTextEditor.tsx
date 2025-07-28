@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { cn } from '../utils/cn';
 import { Button } from './Button';
 import { 
@@ -37,10 +38,15 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const [selection, setSelection] = useState<Range | null>(null);
 
   useEffect(() => {
-    if (editorRef.current) {
-      editorRef.current.innerHTML = value;
+    if (editorRef.current && value !== editorRef.current.innerHTML) {
+      // Sanitize HTML content to prevent XSS attacks
+      const sanitized = DOMPurify.sanitize(value, {
+        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'blockquote', 'a', 'h1', 'h2', 'h3', 'code', 'pre'],
+        ALLOWED_ATTR: ['href', 'target']
+      });
+      editorRef.current.innerHTML = sanitized;
     }
-  }, []);
+  }, [value]);
 
   const handleInput = () => {
     if (editorRef.current) {

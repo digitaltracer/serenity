@@ -60,7 +60,9 @@ import {
   Square,
   Search,
   HelpCircle,
-  Target
+  Target,
+  Database,
+  Globe
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -292,7 +294,21 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           )}
         </SidebarContent>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+          <SidebarItem
+            icon={<Globe className="w-5 h-5" />}
+            active={isActive('/integrations')}
+            onClick={() => navigate('/integrations')}
+          >
+            {!sidebarCollapsed && 'Integrations'}
+          </SidebarItem>
+          <SidebarItem
+            icon={<Database className="w-5 h-5" />}
+            active={isActive('/database')}
+            onClick={() => navigate('/database')}
+          >
+            {!sidebarCollapsed && 'Database'}
+          </SidebarItem>
           <SidebarItem
             icon={<Settings className="w-5 h-5" />}
             active={isActive('/settings')}

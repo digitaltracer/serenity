@@ -34,6 +34,20 @@ const USER_ACTIONS = [
   'user/updatePreferences',
 ];
 
+const INTEGRATIONS_ACTIONS = [
+  'integrations/connectGoogleCalendar',
+  'integrations/disconnectGoogleCalendar',
+  'integrations/updateGoogleCalendarTokens',
+  'integrations/setGoogleCalendarSyncEnabled',
+  'integrations/updateGoogleCalendarLastSync',
+  'integrations/saveGoogleCalendarCredentials',
+  'integrations/connectGitHub',
+  'integrations/disconnectGitHub',
+  'integrations/setGitHubSyncEnabled',
+  'integrations/updateGitHubRepositories',
+  'integrations/updateGitHubLastSync',
+];
+
 // Global flag to track if SQLite is available and initialized
 let sqliteAvailable = false;
 let sqliteAPI: any = null;
@@ -120,8 +134,13 @@ export const hybridPersistenceMiddleware: Middleware = (store) => (next) => asyn
   
   if (PROJECTS_ACTIONS.includes(action.type)) {
     if (sqliteAvailable && sqliteAPI) {
-      console.log('📁 Persisting project to SQLite');
-      handleProjectPersistence(action, state.projects, sqliteAPI);
+      console.log('📁 Persisting project to SQLite (synchronously)');
+      try {
+        await handleProjectPersistence(action, state.projects, sqliteAPI);
+        console.log('✅ Project persistence completed');
+      } catch (error) {
+        console.error('❌ Project persistence failed:', error);
+      }
     } else {
       console.log('📁 Persisting projects to localStorage');
       import('../../utils/persistence').then(({ saveProjects }) => {
@@ -134,6 +153,18 @@ export const hybridPersistenceMiddleware: Middleware = (store) => (next) => asyn
     console.log('👤 Persisting user preferences to localStorage');
     // User preferences always go to localStorage for quick access
     localStorage.setItem('serenity_user_preferences', JSON.stringify(state.user));
+  }
+
+  if (INTEGRATIONS_ACTIONS.includes(action.type)) {
+    console.log('🔗 Integration state change detected:', action.type);
+    // Store integrations state to localStorage for persistence
+    // Sensitive tokens are handled by encrypted storage service separately
+    try {
+      localStorage.setItem('serenity_integrations', JSON.stringify(state.integrations));
+      console.log('✅ Integrations state persisted to localStorage');
+    } catch (error) {
+      console.error('❌ Failed to persist integrations state:', error);
+    }
   }
   
   return result;
@@ -150,28 +181,82 @@ async function handleTaskPersistence(action: any, tasksState: any, sqliteAPI: an
         const newTask = action.payload;
         
         console.log('📝 Creating task in SQLite:', newTask.title, 'with ID:', newTask.id);
+        console.log('🔗 Task projectId:', newTask.projectId);
+        
+        // Validate projectId exists in SQLite before creating task
+        let validProjectId = newTask.projectId || null;
+        if (validProjectId) {
+          let retries = 3;
+          let projectFound = false;
+          
+          while (retries > 0 && !projectFound) {
+            try {
+              console.log(`🔍 Checking if project ${validProjectId} exists in SQLite (attempt ${4 - retries}/3)...`);
+              const projectResult = await sqliteAPI.getProject(validProjectId);
+              
+              // Check both the result structure and data existence
+              if (!projectResult || !projectResult.success || !projectResult.data) {
+                console.log(`⚠️ Project ${validProjectId} not found in SQLite (result: ${JSON.stringify(projectResult)})`);
+                retries--;
+                if (retries > 0) {
+                  console.log(`🔄 Retrying in 100ms... (${retries} attempts left)`);
+                  await new Promise(resolve => setTimeout(resolve, 100));
+                }
+              } else {
+                console.log(`✅ Project ${validProjectId} exists in SQLite:`, projectResult.data.name);
+                projectFound = true;
+              }
+            } catch (error) {
+              console.warn(`❌ Error checking project ${validProjectId}:`, error);
+              retries--;
+              if (retries > 0) {
+                console.log(`🔄 Retrying in 100ms... (${retries} attempts left)`);
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+            }
+          }
+          
+          if (!projectFound) {
+            console.warn(`⚠️ Project ${validProjectId} still not found after retries, setting task projectId to null`);
+            validProjectId = null;
+          }
+        } else {
+          console.log('📝 Task has no projectId, proceeding with null');
+        }
         
         // Persist the complete task object to SQLite
-        const savedTask = await sqliteAPI.createTaskWithId({
-          id: newTask.id,
-          title: newTask.title,
-          description: newTask.description || '',
-          completed: newTask.completed || false,
-          priority: newTask.priority || 'medium',
-          projectId: newTask.projectId || null,
-          dueDate: newTask.dueDate || null,
-          tags: Array.isArray(newTask.tags) ? newTask.tags : [],
-          createdAt: newTask.createdAt,
-          updatedAt: newTask.updatedAt,
-          recurring: newTask.recurring || null,
-          subtasks: newTask.subtasks || []
-        });
-        
-        if (savedTask.success) {
-          console.log('✅ Task persisted to SQLite successfully');
-          // No need to reload - task is already in Redux state from the reducer
-        } else {
-          console.error('❌ Task persistence failed:', savedTask.error);
+        try {
+          console.log('💾 Attempting to save task to SQLite...');
+          const savedTask = await sqliteAPI.createTaskWithId({
+            id: newTask.id,
+            title: newTask.title,
+            description: newTask.description || '',
+            completed: newTask.completed || false,
+            priority: newTask.priority || 'medium',
+            projectId: validProjectId,
+            dueDate: newTask.dueDate || null,
+            tags: Array.isArray(newTask.tags) ? newTask.tags : [],
+            createdAt: newTask.createdAt,
+            updatedAt: newTask.updatedAt,
+            recurring: newTask.recurring || null,
+            subtasks: newTask.subtasks || []
+          });
+          
+          if (savedTask && savedTask.success) {
+            console.log('✅ Task persisted to SQLite successfully');
+          } else if (savedTask) {
+            console.error('❌ Task persistence failed:', savedTask.error);
+          } else {
+            console.log('✅ Task saved to SQLite (no response wrapper)');
+          }
+        } catch (error) {
+          console.error('❌ SQLite task creation error:', error);
+          console.error('❌ Error details:', {
+            message: (error as any)?.message || 'Unknown error',
+            code: (error as any)?.code || 'NO_CODE',
+            taskId: newTask.id,
+            projectId: validProjectId
+          });
         }
         break;
       case 'tasks/updateTask':
@@ -265,8 +350,8 @@ async function handleProjectPersistence(action: any, projectsState: any, sqliteA
         // The action payload now contains the complete project with generated ID, createdAt, updatedAt
         const newProject = action.payload;
         
-        console.log('📁 Creating project in SQLite:', newProject.name);
-        await sqliteAPI.createProjectWithId({
+        console.log('📁 Creating project in SQLite:', newProject.name, 'with ID:', newProject.id);
+        const result = await sqliteAPI.createProjectWithId({
           id: newProject.id,
           name: newProject.name,
           description: newProject.description || '',
@@ -275,6 +360,7 @@ async function handleProjectPersistence(action: any, projectsState: any, sqliteA
           createdAt: newProject.createdAt,
           updatedAt: newProject.updatedAt
         });
+        console.log('✅ Project successfully created in SQLite:', newProject.id);
         break;
       case 'projects/updateProject':
         const { id, ...updates } = action.payload;

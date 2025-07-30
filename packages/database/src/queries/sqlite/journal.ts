@@ -146,7 +146,7 @@ export class SQLiteJournalQueries {
   /**
    * Create a journal entry with a specific ID (used by middleware to preserve Redux IDs)
    */
-  createJournalEntryWithId(entry: JournalEntry): JournalEntry {
+  createEntryWithId(entry: JournalEntry): JournalEntry {
     console.log('📖 SQLite: Creating journal entry with existing ID:', entry.id);
     console.log('🏷️ SQLite: Entry tags:', entry.tags);
     

@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     backup: (backupPath?: string) => ipcRenderer.invoke('sqlite:backup', backupPath),
     importFromLocalStorage: (data: any) => ipcRenderer.invoke('sqlite:import-from-localstorage', data),
     exportAllData: () => ipcRenderer.invoke('sqlite:export-all-data'),
+    query: (query: string, params?: any[]) => ipcRenderer.invoke('sqlite:query', query, params),
 
     // Task operations
     getTasks: () => ipcRenderer.invoke('sqlite:get-tasks'),
@@ -29,13 +30,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // Project operations
     getProjects: () => ipcRenderer.invoke('sqlite:get-projects'),
+    getProject: (id: string) => ipcRenderer.invoke('sqlite:get-project', id),
     createProject: (project: any) => ipcRenderer.invoke('sqlite:create-project', project),
+    createProjectWithId: (project: any) => ipcRenderer.invoke('sqlite:create-project-with-id', project),
     updateProject: (id: string, updates: any) => ipcRenderer.invoke('sqlite:update-project', id, updates),
     deleteProject: (id: string) => ipcRenderer.invoke('sqlite:delete-project', id),
 
     // Journal operations
     getJournalEntries: () => ipcRenderer.invoke('sqlite:get-journal-entries'),
     createJournalEntry: (entry: any) => ipcRenderer.invoke('sqlite:create-journal-entry', entry),
+    createJournalEntryWithId: (entry: any) => ipcRenderer.invoke('sqlite:create-journal-entry-with-id', entry),
     updateJournalEntry: (id: string, updates: any) => ipcRenderer.invoke('sqlite:update-journal-entry', id, updates),
     deleteJournalEntry: (id: string) => ipcRenderer.invoke('sqlite:delete-journal-entry', id),
   },
@@ -70,6 +74,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('menu:navigate');
     ipcRenderer.removeAllListeners('menu:lock-app');
   },
+
+  // OAuth operations
+  oauth: {
+    googleStart: (clientId: string, clientSecret: string) => ipcRenderer.invoke('oauth:google:start', clientId, clientSecret),
+    onGoogleSuccess: (callback: (authData: any) => void) => {
+      ipcRenderer.on('oauth:google:success', (_, authData) => callback(authData));
+    },
+    onGoogleError: (callback: (error: string) => void) => {
+      ipcRenderer.on('oauth:google:error', (_, error) => callback(error));
+    },
+    onGoogleCancelled: (callback: () => void) => {
+      ipcRenderer.on('oauth:google:cancelled', () => callback());
+    },
+    removeOAuthListeners: () => {
+      ipcRenderer.removeAllListeners('oauth:google:success');
+      ipcRenderer.removeAllListeners('oauth:google:error');
+      ipcRenderer.removeAllListeners('oauth:google:cancelled');
+    },
+  },
+
+  // Safe storage operations for biometric authentication
+  safeStorage: {
+    encryptString: (plaintext: string) => ipcRenderer.invoke('safeStorage:encryptString', plaintext),
+    decryptString: (encrypted: string) => ipcRenderer.invoke('safeStorage:decryptString', encrypted),
+  },
 });
 
 // Type definitions for the exposed API
@@ -87,6 +116,7 @@ export interface ElectronAPI {
     backup: (backupPath?: string) => Promise<{ success: boolean; path?: string; error?: string }>;
     importFromLocalStorage: (data: any) => Promise<{ success: boolean; result?: any; error?: string }>;
     exportAllData: () => Promise<{ success: boolean; data?: any; error?: string }>;
+    query: (query: string, params?: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
 
     // Task operations
     getTasks: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
@@ -118,6 +148,17 @@ export interface ElectronAPI {
   };
   onMenuAction: (callback: (event: string, data?: any) => void) => void;
   removeMenuListeners: () => void;
+  oauth: {
+    googleStart: (clientId: string, clientSecret: string) => Promise<{ success: boolean; authUrl?: string; error?: string }>;
+    onGoogleSuccess: (callback: (authData: any) => void) => void;
+    onGoogleError: (callback: (error: string) => void) => void;
+    onGoogleCancelled: (callback: () => void) => void;
+    removeOAuthListeners: () => void;
+  };
+  safeStorage: {
+    encryptString: (plaintext: string) => Promise<string>;
+    decryptString: (encrypted: string) => Promise<string>;
+  };
 }
 
 declare global {

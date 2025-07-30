@@ -183,6 +183,23 @@ export class SQLiteAdapter {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
+      -- Secure settings table for encrypted data storage
+      CREATE TABLE IF NOT EXISTS secure_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      -- Encrypted integrations table for storing integration tokens
+      CREATE TABLE IF NOT EXISTS encrypted_integrations (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        encrypted_data TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
       -- Indexes for better performance
       CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks (project_id);
       CREATE INDEX IF NOT EXISTS idx_tasks_parent_task_id ON tasks (parent_task_id);
@@ -366,6 +383,42 @@ export class SQLiteAdapter {
       console.log('🧹 Database vacuumed successfully');
     } catch (error) {
       console.error('Failed to vacuum database:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Execute a raw SQL query with optional parameters
+   */
+  public executeRawQuery(query: string, params?: any[]): any {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      // Determine the type of query
+      const queryType = query.trim().toUpperCase();
+      
+      if (queryType.startsWith('SELECT')) {
+        // For SELECT queries, return all results
+        const stmt = this.db.prepare(query);
+        return params ? stmt.all(...params) : stmt.all();
+      } else if (queryType.startsWith('INSERT') || queryType.startsWith('UPDATE') || queryType.startsWith('DELETE')) {
+        // For modification queries, return run result
+        const stmt = this.db.prepare(query);
+        return params ? stmt.run(...params) : stmt.run();
+      } else {
+        // For DDL and other queries, use exec
+        if (params && params.length > 0) {
+          const stmt = this.db.prepare(query);
+          return params ? stmt.run(...params) : stmt.run();
+        } else {
+          this.db.exec(query);
+          return { changes: 0, lastInsertRowid: 0 };
+        }
+      }
+    } catch (error) {
+      console.error('Raw query execution failed:', error);
       throw error;
     }
   }

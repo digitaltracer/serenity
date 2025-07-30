@@ -11,6 +11,7 @@ import {
   resetPassword,
   factoryReset,
   unlockApp,
+  authenticateWithBiometric,
   selectIsLocked, 
   selectIsInitialized,
   selectHasMasterPassword,
@@ -121,13 +122,23 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
   // Handle password validation
   const handleUnlock = useCallback(async (password: string): Promise<boolean> => {
     try {
-      // If password is empty, it means biometric auth was used - directly unlock
+      // If password is empty, it means biometric auth was used
       if (password === '') {
-        dispatch(unlockApp());
-        return true;
+        console.log('🔓 Touch ID authentication initiated, using biometric service...');
+        
+        // Use the new biometric authentication service
+        const result = await dispatch(authenticateWithBiometric('Unlock Serenity Notes and load integrations') as any);
+        
+        if (result.type === 'auth/authenticateWithBiometric/fulfilled') {
+          console.log('✅ Biometric authentication successful with integrations loaded');
+          return true;
+        } else {
+          console.error('❌ Biometric authentication failed:', result.payload);
+          return false;
+        }
       }
       
-      // Otherwise validate password normally
+      // Otherwise validate password normally (this also loads encrypted integrations)
       const result = await dispatch(validatePassword(password) as any);
       if (result.type === 'auth/validatePassword/fulfilled') {
         return true;

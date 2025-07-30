@@ -5,6 +5,35 @@
 
 import { SECURE_KEYS } from './secureStorage';
 
+/**
+ * Safely parse JSON data that might be Base64 encoded
+ */
+export const safeJsonParse = (data: string): any => {
+  if (!data) return null;
+  
+  let jsonData = data;
+  
+  // Check if the data is Base64 encoded (basic check)
+  if (/^[A-Za-z0-9+/=]+$/.test(data) && data.length % 4 === 0) {
+    try {
+      // Try to decode as Base64
+      const decodedData = atob(data);
+      // Check if decoded data is URL encoded
+      if (decodedData.includes('%')) {
+        jsonData = decodeURIComponent(decodedData);
+      } else {
+        jsonData = decodedData;
+      }
+      console.log('🔓 Successfully decoded Base64 data');
+    } catch (decodeError) {
+      console.warn('⚠️ Base64 decode failed, treating as regular JSON:', decodeError);
+      // Fall back to using original data
+    }
+  }
+  
+  return JSON.parse(jsonData);
+};
+
 export interface CryptoSettings {
   encryptionEnabled: boolean;
   hasEncryptedData: boolean;
@@ -27,7 +56,7 @@ export const checkCryptoSettings = (): CryptoSettings => {
   try {
     const regularSettings = localStorage.getItem('serenity_privacy_settings');
     if (regularSettings) {
-      const settings = JSON.parse(regularSettings);
+      const settings = safeJsonParse(regularSettings);
       hasMasterPassword = settings.masterPasswordEnabled || false;
     }
   } catch (error) {

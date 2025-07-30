@@ -19,6 +19,8 @@ import {
   getPrivacySettings,
   savePrivacySettingsSecure,
   getPrivacySettingsSecure,
+  saveDatabaseConnectionSecure,
+  getDatabaseConnectionSecure,
   PrivacySecuritySettings,
   setMasterPassword,
   initializeAuth
@@ -83,11 +85,18 @@ export const SettingsPage: React.FC = () => {
   React.useEffect(() => {
     const loadSettings = async () => {
       try {
-        // Load database connection state
-        const connection = getDatabaseConnection();
-        const connected = isDatabaseConnected();
-        setDbConnection(connection);
-        setDbConnected(connected);
+        // Load database connection state from secure storage
+        const secureConnection = await getDatabaseConnectionSecure();
+        if (secureConnection) {
+          setDbConnection(secureConnection);
+          setDbConnected(secureConnection.connected);
+        } else {
+          // Fallback to regular storage for backward compatibility
+          const connection = getDatabaseConnection();
+          const connected = isDatabaseConnected();
+          setDbConnection(connection);
+          setDbConnected(connected);
+        }
         
         // Load secure privacy settings
         const secureSettings = await getPrivacySettingsSecure();
@@ -152,10 +161,24 @@ export const SettingsPage: React.FC = () => {
 
   const handleDatabaseSave = async (config: any) => {
     try {
-      // For now, just close the modal - real implementation would save the config
       console.log('Database configuration saved:', config);
+      
+      // Save to secure storage
+      if (config.url) {
+        await saveDatabaseConnectionSecure(config.url);
+        
+        // Update local state
+        const updatedConnection = {
+          url: config.url,
+          connected: true,
+          lastConnected: new Date().toISOString(),
+          encryptionEnabled: false
+        };
+        setDbConnection(updatedConnection);
+        setDbConnected(true);
+      }
+      
       showSuccess('Database Configuration', 'Database configuration saved successfully');
-      // TODO: Integrate with actual database manager
     } catch (error) {
       console.error('Database save failed:', error);
       showError('Configuration Error', 'Failed to save database configuration');

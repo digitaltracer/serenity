@@ -106,6 +106,15 @@ CREATE TABLE IF NOT EXISTS daily_stats (
     UNIQUE(user_id, date)
 );
 
+-- Encrypted integrations table for secure token storage
+CREATE TABLE IF NOT EXISTS encrypted_integrations (
+    id VARCHAR(255) PRIMARY KEY,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('google_calendar', 'github')),
+    encrypted_data TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
@@ -131,6 +140,8 @@ CREATE INDEX IF NOT EXISTS idx_goals_user_id ON goals(user_id);
 CREATE INDEX IF NOT EXISTS idx_goals_type ON goals(type);
 CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
 CREATE INDEX IF NOT EXISTS idx_goals_priority ON goals(priority);
+
+CREATE INDEX IF NOT EXISTS idx_encrypted_integrations_type ON encrypted_integrations(type);
 
 -- Triggers for updated_at timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -160,6 +171,9 @@ CREATE TRIGGER update_daily_stats_updated_at BEFORE UPDATE ON daily_stats
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_goals_updated_at BEFORE UPDATE ON goals
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_encrypted_integrations_updated_at BEFORE UPDATE ON encrypted_integrations
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Function to update word count for journal entries

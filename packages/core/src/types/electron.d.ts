@@ -13,6 +13,7 @@ declare global {
         backup: (backupPath?: string) => Promise<{ success: boolean; path?: string; error?: string }>;
         importFromLocalStorage: (data: any) => Promise<{ success: boolean; result?: any; error?: string }>;
         exportAllData: () => Promise<{ success: boolean; data?: any; error?: string }>;
+        query: (query: string, params?: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
 
         // Task operations
         getTasks: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
@@ -44,6 +45,13 @@ declare global {
       safeStorage?: {
         encryptString: (plaintext: string) => Promise<string>;
         decryptString: (encrypted: string) => Promise<string>;
+      };
+      oauth?: {
+        googleStart: (clientId: string, clientSecret: string) => Promise<{ success: boolean; authUrl?: string; error?: string }>;
+        onGoogleSuccess: (callback: (authData: any) => void) => void;
+        onGoogleError: (callback: (error: string) => void) => void;
+        onGoogleCancelled: (callback: () => void) => void;
+        removeOAuthListeners: () => void;
       };
       onMenuAction: (callback: (event: string, data?: any) => void) => void;
       removeMenuListeners: () => void;

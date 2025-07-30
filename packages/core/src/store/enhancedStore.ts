@@ -15,6 +15,7 @@ import shortcutsReducer from './slices/shortcutsSlice';
 import searchReducer from './slices/searchSlice';
 import dragDropReducer from './slices/dragDropSlice';
 import goalsReducer from './slices/goalsSlice';
+import integrationsReducer from './slices/integrationsSlice';
 import { persistenceMiddleware } from './middleware/persistenceMiddleware';
 import { hybridPersistenceMiddleware, initializeSQLitePersistence } from './middleware/hybridPersistenceMiddleware';
 
@@ -37,6 +38,7 @@ export function createEnhancedStore() {
       search: searchReducer,
       dragDrop: dragDropReducer,
       goals: goalsReducer,
+      integrations: integrationsReducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
@@ -110,6 +112,15 @@ export async function initializeStoreData() {
           if (sqliteData.tasks.length > 0) {
             store.dispatch({ type: 'tasks/setTasks', payload: sqliteData.tasks });
             console.log(`✅ Loaded ${sqliteData.tasks.length} tasks from SQLite`);
+            
+            // Extract and set used tags from tasks
+            const taskTags = sqliteData.tasks
+              .flatMap((task: any) => task.tags || [])
+              .filter((tag: string) => tag && tag.trim());
+            if (taskTags.length > 0) {
+              store.dispatch({ type: 'tags/addUsedTags', payload: taskTags });
+              console.log(`✅ Loaded ${taskTags.length} tags from tasks`);
+            }
           }
           
           if (sqliteData.projects.length > 0) {
@@ -120,6 +131,15 @@ export async function initializeStoreData() {
           if (sqliteData.journalEntries.length > 0) {
             store.dispatch({ type: 'journal/setEntries', payload: sqliteData.journalEntries });
             console.log(`✅ Loaded ${sqliteData.journalEntries.length} journal entries from SQLite`);
+            
+            // Extract and set used tags from journal entries
+            const journalTags = sqliteData.journalEntries
+              .flatMap((entry: any) => entry.tags || [])
+              .filter((tag: string) => tag && tag.trim());
+            if (journalTags.length > 0) {
+              store.dispatch({ type: 'tags/addUsedTags', payload: journalTags });
+              console.log(`✅ Loaded ${journalTags.length} tags from journal entries`);
+            }
           }
           
           console.log('✅ SQLite data initialization completed successfully');
@@ -147,6 +167,15 @@ export async function initializeStoreData() {
       if (localData.tasks.length > 0) {
         store.dispatch({ type: 'tasks/setTasks', payload: localData.tasks });
         console.log(`✅ Loaded ${localData.tasks.length} tasks from localStorage`);
+        
+        // Extract and set used tags from tasks
+        const taskTags = localData.tasks
+          .flatMap((task: any) => task.tags || [])
+          .filter((tag: string) => tag && tag.trim());
+        if (taskTags.length > 0) {
+          store.dispatch({ type: 'tags/addUsedTags', payload: taskTags });
+          console.log(`✅ Loaded ${taskTags.length} tags from tasks`);
+        }
       }
       
       if (localData.projects.length > 0) {
@@ -157,11 +186,23 @@ export async function initializeStoreData() {
       if (localData.journalEntries.length > 0) {
         store.dispatch({ type: 'journal/setEntries', payload: localData.journalEntries });
         console.log(`✅ Loaded ${localData.journalEntries.length} journal entries from localStorage`);
+        
+        // Extract and set used tags from journal entries
+        const journalTags = localData.journalEntries
+          .flatMap((entry: any) => entry.tags || [])
+          .filter((tag: string) => tag && tag.trim());
+        if (journalTags.length > 0) {
+          store.dispatch({ type: 'tags/addUsedTags', payload: journalTags });
+          console.log(`✅ Loaded ${journalTags.length} tags from journal entries`);
+        }
       }
       
       console.log('✅ LocalStorage data initialization completed');
       return true;
     }
+    
+    // Always try to load integrations state from localStorage (regardless of SQLite)
+    loadIntegrationsState();
     
     console.log('📭 No existing data found - starting with empty store');
     return true;
@@ -202,4 +243,27 @@ export async function getDatabaseStats() {
     }
   }
   return null;
+}
+
+/**
+ * Load integrations state from localStorage
+ */
+function loadIntegrationsState() {
+  try {
+    console.log('🔗 Loading integrations state from localStorage...');
+    const integrationsData = localStorage.getItem('serenity_integrations');
+    
+    if (integrationsData) {
+      const parsedData = require('../utils/cryptoUtils').safeJsonParse(integrationsData);
+      console.log('✅ Found integrations data:', parsedData);
+      
+      // Dispatch action to restore integrations state
+      store.dispatch({ type: 'integrations/restoreState', payload: parsedData });
+      console.log('✅ Integrations state restored successfully');
+    } else {
+      console.log('📭 No integrations data found in localStorage');
+    }
+  } catch (error) {
+    console.error('❌ Failed to load integrations state:', error);
+  }
 }

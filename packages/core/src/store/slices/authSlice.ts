@@ -36,12 +36,9 @@ export const initializeAuth = createAsyncThunk(
     const startTime = performance.now();
     
     try {
-      // First, do a quick check if we even need expensive crypto operations
-      const hasEncryptedData = localStorage.getItem('encrypted_privacy_settings') !== null;
-      
-      if (!hasEncryptedData) {
-        console.log('⚡ No encrypted data found, using fast initialization');
-        console.log(`✅ Auth initialization completed in ${(performance.now() - startTime).toFixed(2)}ms`);
+      // Check if database API is available
+      if (!window.electronAPI?.sqlite) {
+        console.log('⚡ Database API not available, using default settings');
         return {
           hasMasterPassword: false,
           autoLockTimeout: 15,
@@ -49,8 +46,8 @@ export const initializeAuth = createAsyncThunk(
         };
       }
       
-      // Only do expensive crypto operations if we have encrypted data
-      console.log('🔐 Encrypted data found, loading securely...');
+      // Load privacy settings from database
+      console.log('🔐 Loading settings from database...');
       const settingsStart = performance.now();
       const privacySettings = await getPrivacySettingsSecure();
       console.log(`✅ Privacy settings loaded in ${(performance.now() - settingsStart).toFixed(2)}ms`);
@@ -80,7 +77,7 @@ export const initializeAuth = createAsyncThunk(
 
 export const validatePassword = createAsyncThunk(
   'auth/validatePassword',
-  async (password: string, { getState, rejectWithValue }) => {
+  async (password: string, { getState, rejectWithValue, dispatch }) => {
     try {
       const state = getState() as { auth: AuthState };
       
@@ -95,7 +92,38 @@ export const validatePassword = createAsyncThunk(
         return rejectWithValue('Invalid password');
       }
 
-      return { success: true };
+      // Password is valid - load encrypted integrations
+      try {
+        console.log('🔓 Master password validated, loading encrypted integrations...');
+        const { initializeIntegrations } = await import('./integrationsSlice');
+        await dispatch(initializeIntegrations(password));
+        console.log('✅ Encrypted integrations loaded successfully');
+      } catch (error) {
+        console.error('⚠️ Failed to load encrypted integrations after authentication:', error);
+        // Don't fail the password validation if integrations fail to load
+      }
+
+      // Store password for biometric authentication if available and not already stored
+      try {
+        const { BiometricAuthService } = await import('../../services/biometricAuthService');
+        const biometricAvailable = await BiometricAuthService.isAvailable();
+        const hasStoredPassword = await BiometricAuthService.hasStoredMasterPassword();
+        
+        if (biometricAvailable.available && !hasStoredPassword) {
+          console.log('🔒 Storing master password for future biometric authentication...');
+          const stored = await BiometricAuthService.storeMasterPasswordForBiometric(password);
+          if (stored) {
+            console.log('✅ Master password stored for biometric authentication');
+          } else {
+            console.warn('⚠️ Failed to store master password for biometric authentication');
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not store master password for biometric auth:', error);
+        // Don't fail the password validation if biometric storage fails
+      }
+
+      return { success: true, password };
     } catch (error) {
       console.error('Password validation failed:', error);
       return rejectWithValue('Failed to validate password');
@@ -117,6 +145,25 @@ export const setMasterPassword = createAsyncThunk(
       };
       await savePrivacySettingsSecure(updatedSettings);
       
+      // Store master password for biometric authentication if available
+      try {
+        const { BiometricAuthService } = await import('../../services/biometricAuthService');
+        const biometricAvailable = await BiometricAuthService.isAvailable();
+        
+        if (biometricAvailable.available) {
+          console.log('🔒 Storing master password for biometric authentication...');
+          const stored = await BiometricAuthService.storeMasterPasswordForBiometric(password);
+          if (stored) {
+            console.log('✅ Master password stored for biometric authentication');
+          } else {
+            console.warn('⚠️ Failed to store master password for biometric authentication');
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not store master password for biometric auth:', error);
+        // Don't fail the entire operation if biometric storage fails
+      }
+      
       return { success: true };
     } catch (error) {
       console.error('Failed to set master password:', error);
@@ -125,14 +172,58 @@ export const setMasterPassword = createAsyncThunk(
   }
 );
 
+export const authenticateWithBiometric = createAsyncThunk(
+  'auth/authenticateWithBiometric',
+  async (reason: string | undefined, { dispatch, rejectWithValue }) => {
+    try {
+      console.log('🔒 Starting biometric authentication...');
+      
+      const { BiometricAuthService } = await import('../../services/biometricAuthService');
+      const result = await BiometricAuthService.authenticateAndRetrieveMasterPassword(reason);
+      
+      if (!result.success) {
+        if (result.cancelled) {
+          return rejectWithValue('Authentication cancelled by user');
+        }
+        return rejectWithValue(result.error || 'Biometric authentication failed');
+      }
+      
+      if (!result.masterPassword) {
+        return rejectWithValue('Failed to retrieve master password');
+      }
+      
+      console.log('✅ Biometric authentication successful, loading encrypted integrations...');
+      
+      // Load encrypted integrations with the retrieved master password
+      try {
+        const { initializeIntegrations } = await import('./integrationsSlice');
+        await dispatch(initializeIntegrations(result.masterPassword));
+        console.log('✅ Encrypted integrations loaded successfully after biometric auth');
+      } catch (error) {
+        console.error('⚠️ Failed to load encrypted integrations after biometric auth:', error);
+        // Don't fail the biometric auth if integrations fail to load
+      }
+      
+      return { success: true, masterPassword: result.masterPassword };
+    } catch (error) {
+      console.error('Biometric authentication failed:', error);
+      return rejectWithValue(`Biometric authentication failed: ${error}`);
+    }
+  }
+);
+
 export const resetPassword = createAsyncThunk(
   'auth/resetPassword',
   async (_, { rejectWithValue }) => {
     try {
-      const storage = getSecureStorage();
-      
-      // Remove master password hash
-      await storage.removeItem(SECURE_KEYS.MASTER_PASSWORD_HASH);
+      // Remove master password hash from database
+      if (window.electronAPI?.sqlite) {
+        await window.electronAPI.sqlite.query(
+          'DELETE FROM secure_settings WHERE key = ?',
+          ['master_password_hash']
+        );
+        console.log('✅ Removed master password hash from database');
+      }
       
       // Update privacy settings to disable master password
       const currentSettings = await getPrivacySettingsSecure();
@@ -156,10 +247,11 @@ export const factoryReset = createAsyncThunk(
   'auth/factoryReset',
   async (_, { rejectWithValue }) => {
     try {
-      const storage = getSecureStorage();
-      
-      // Clear all secure storage
-      await storage.clear();
+      // Clear database secure settings
+      if (window.electronAPI?.sqlite) {
+        await window.electronAPI.sqlite.query('DELETE FROM secure_settings');
+        console.log('✅ Cleared all secure settings from database');
+      }
       
       // Clear regular localStorage
       localStorage.clear();
@@ -305,6 +397,25 @@ const authSlice = createSlice({
       })
       .addCase(factoryReset.rejected, (state, action) => {
         state.isValidating = false;
+        state.error = action.payload as string;
+      })
+      
+      // Biometric authentication
+      .addCase(authenticateWithBiometric.pending, (state) => {
+        state.isValidating = true;
+        state.error = null;
+      })
+      .addCase(authenticateWithBiometric.fulfilled, (state) => {
+        state.isValidating = false;
+        state.isLocked = false;
+        state.failedAttempts = 0;
+        state.lockoutUntil = null;
+        state.error = null;
+        state.lastActivity = Date.now();
+      })
+      .addCase(authenticateWithBiometric.rejected, (state, action) => {
+        state.isValidating = false;
+        // Don't increment failed attempts for biometric auth failures
         state.error = action.payload as string;
       });
   },

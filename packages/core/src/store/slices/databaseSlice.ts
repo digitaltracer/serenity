@@ -11,6 +11,7 @@ import {
   DatabasePreferences 
 } from '../../types/database';
 import { databaseManager } from '../../database/DatabaseManager';
+import { getDatabaseConnectionSecure, saveDatabaseConnectionSecure } from '../../utils/secureStorage';
 
 export interface DatabaseState {
   config: DatabaseConfig | null;
@@ -46,6 +47,80 @@ const initialState: DatabaseState = {
 };
 
 // Async thunks for database operations
+
+// Initialize database configuration from saved settings
+export const initializeDatabaseConfig = createAsyncThunk(
+  'database/initialize',
+  async (_, { rejectWithValue }) => {
+    try {
+      console.log('🔄 Initializing database configuration...');
+      
+      // Load saved database connection from secure storage
+      const savedConnection = await getDatabaseConnectionSecure();
+      
+      if (!savedConnection) {
+        console.log('📝 No saved database configuration found');
+        return { config: null, status: { connected: false, type: 'sqlite' as const } };
+      }
+      
+      console.log('🔍 Found saved database configuration:', savedConnection.url);
+      
+      // Parse the connection URL to create DatabaseConfig
+      let config: DatabaseConfig;
+      
+      if (savedConnection.url.startsWith('sqlite:') || savedConnection.url.includes('.db')) {
+        // SQLite configuration
+        const dbPath = savedConnection.url.replace('sqlite:', '');
+        config = {
+          type: 'sqlite',
+          path: dbPath,
+          memory: false,
+          readonly: false
+        };
+      } else if (savedConnection.url.startsWith('postgresql:') || savedConnection.url.startsWith('postgres:')) {
+        // PostgreSQL configuration - parse connection URL
+        const url = new URL(savedConnection.url);
+        config = {
+          type: 'postgresql',
+          host: url.hostname,
+          port: parseInt(url.port) || 5432,
+          database: url.pathname.slice(1), // Remove leading slash
+          username: url.username,
+          password: url.password,
+          ssl: url.searchParams.get('sslmode') === 'require'
+        };
+      } else {
+        console.warn('⚠️ Unknown database connection format:', savedConnection.url);
+        return { config: null, status: { connected: false, type: 'sqlite' as const } };
+      }
+      
+      // Attempt to connect to the saved configuration
+      console.log(`🔌 Attempting to restore connection to ${config.type} database...`);
+      const success = await databaseManager.connect(config);
+      
+      if (success) {
+        const status = databaseManager.getConnectionStatus();
+        const stats = await databaseManager.getStats();
+        console.log(`✅ Successfully restored ${config.type} database connection`);
+        return { config, status, stats };
+      } else {
+        console.warn(`⚠️ Failed to restore ${config.type} database connection`);
+        return { 
+          config, 
+          status: { 
+            connected: false, 
+            type: config.type,
+            error: 'Failed to restore connection' 
+          } 
+        };
+      }
+    } catch (error) {
+      console.error('❌ Failed to initialize database configuration:', error);
+      return rejectWithValue(error instanceof Error ? error.message : 'Initialization failed');
+    }
+  }
+);
+
 export const connectToDatabase = createAsyncThunk(
   'database/connect',
   async (config: DatabaseConfig, { rejectWithValue }) => {
@@ -57,6 +132,26 @@ export const connectToDatabase = createAsyncThunk(
       
       const status = databaseManager.getConnectionStatus();
       const stats = await databaseManager.getStats();
+      
+      // Save the database configuration to secure storage for persistence
+      try {
+        let connectionUrl: string;
+        
+        if (config.type === 'sqlite') {
+          connectionUrl = config.path ? `sqlite:${config.path}` : 'sqlite::memory:';
+        } else if (config.type === 'postgresql') {
+          const sslParam = config.ssl ? '?sslmode=require' : '';
+          connectionUrl = `postgresql://${config.username}:${config.password}@${config.host}:${config.port}/${config.database}${sslParam}`;
+        } else {
+          throw new Error(`Unsupported database type: ${(config as any).type}`);
+        }
+        
+        await saveDatabaseConnectionSecure(connectionUrl);
+        console.log('💾 Database configuration saved to secure storage');
+      } catch (saveError) {
+        console.error('⚠️ Failed to save database configuration:', saveError);
+        // Don't fail the connection if save fails, just log the warning
+      }
       
       return { config, status, stats };
     } catch (error) {
@@ -187,6 +282,27 @@ const databaseSlice = createSlice({
   },
   
   extraReducers: (builder) => {
+    // Initialize database configuration
+    builder
+      .addCase(initializeDatabaseConfig.pending, (state) => {
+        state.isConnecting = true;
+        state.error = null;
+      })
+      .addCase(initializeDatabaseConfig.fulfilled, (state, action) => {
+        state.isConnecting = false;
+        state.config = action.payload.config;
+        state.connectionStatus = action.payload.status;
+        if (action.payload.stats) {
+          state.stats = action.payload.stats;
+        }
+        state.error = null;
+      })
+      .addCase(initializeDatabaseConfig.rejected, (state, action) => {
+        state.isConnecting = false;
+        state.error = action.payload as string;
+        state.connectionStatus.connected = false;
+      });
+    
     // Connect to database
     builder
       .addCase(connectToDatabase.pending, (state) => {

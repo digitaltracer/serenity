@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, shell, ipcMain, systemPreferences } from 'electron';
+import { app, BrowserWindow, Menu, shell, ipcMain, systemPreferences, safeStorage } from 'electron';
 import { join } from 'path';
 import { isDev } from './utils';
 
@@ -475,6 +475,17 @@ class AppManager {
       }
     });
 
+    ipcMain.handle('sqlite:get-project', async (_, id) => {
+      try {
+        if (!sqliteService) throw new Error('Database not initialized');
+        const project = await sqliteService.getProject(id);
+        return { success: true, data: project, error: null };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to get project';
+        return { success: false, data: null, error: errorMessage };
+      }
+    });
+
     ipcMain.handle('sqlite:create-project', async (_, project) => {
       try {
         if (!sqliteService) throw new Error('Database not initialized');
@@ -482,6 +493,34 @@ class AppManager {
         return { success: true, data: newProject, error: null };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to create project';
+        return { success: false, data: null, error: errorMessage };
+      }
+    });
+
+    ipcMain.handle('sqlite:create-project-with-id', async (_, project) => {
+      try {
+        if (!sqliteService) throw new Error('Database not initialized');
+        console.log('📁 Main: Creating project with ID via IPC:', project.name, project.id);
+        const newProject = await sqliteService.createProjectWithId(project);
+        console.log('✅ Main: Project created successfully:', newProject.id);
+        return { success: true, data: newProject, error: null };
+      } catch (error) {
+        console.error('❌ Main: Project creation failed:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to create project with ID';
+        return { success: false, data: null, error: errorMessage };
+      }
+    });
+
+    ipcMain.handle('sqlite:create-journal-entry-with-id', async (_, entry) => {
+      try {
+        if (!sqliteService) throw new Error('Database not initialized');
+        console.log('📝 Main: Creating journal entry with ID via IPC:', entry.title, entry.id);
+        const newEntry = await sqliteService.createJournalEntryWithId(entry);
+        console.log('✅ Main: Journal entry created successfully:', newEntry.id);
+        return { success: true, data: newEntry, error: null };
+      } catch (error) {
+        console.error('❌ Main: Journal entry creation failed:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to create journal entry with ID';
         return { success: false, data: null, error: errorMessage };
       }
     });
@@ -605,6 +644,215 @@ class AppManager {
     ipcMain.handle('window:close', () => {
       this.mainWindow?.close();
     });
+
+    // Handle raw SQL query execution for encrypted integrations
+    ipcMain.handle('sqlite:query', async (_, query: string, params?: any[]) => {
+      try {
+        if (!sqliteService) {
+          const { sqliteService: service } = await import('@serenity/database');
+          sqliteService = service;
+          await sqliteService.initialize();
+        }
+        
+        // Execute raw SQL query
+        const result = await sqliteService.executeRawQuery(query, params);
+        return { success: true, data: result, error: null };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Query execution failed';
+        return { success: false, data: null, error: errorMessage };
+      }
+    });
+
+    // Handle Google OAuth flow
+    ipcMain.handle('oauth:google:start', async (_, clientId: string, clientSecret: string) => {
+      try {
+        const authUrl = this.startGoogleOAuth(clientId, clientSecret);
+        return { success: true, authUrl, error: null };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to start OAuth';
+        return { success: false, authUrl: null, error: errorMessage };
+      }
+    });
+
+    // Handle safeStorage operations
+    ipcMain.handle('safeStorage:encryptString', async (_, plaintext: string) => {
+      try {
+        if (!safeStorage.isEncryptionAvailable()) {
+          throw new Error('Encryption is not available on this system');
+        }
+        const encrypted = safeStorage.encryptString(plaintext);
+        return encrypted.toString('base64'); // Convert to base64 for safe transport
+      } catch (error) {
+        console.error('Failed to encrypt string:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('safeStorage:decryptString', async (_, encryptedBase64: string) => {
+      try {
+        if (!safeStorage.isEncryptionAvailable()) {
+          throw new Error('Encryption is not available on this system');
+        }
+        const encrypted = Buffer.from(encryptedBase64, 'base64');
+        const decrypted = safeStorage.decryptString(encrypted);
+        return decrypted;
+      } catch (error) {
+        console.error('Failed to decrypt string:', error);
+        throw error;
+      }
+    });
+
+  }
+
+  private currentOAuthWindow: BrowserWindow | null = null;
+
+  private startGoogleOAuth(clientId: string, clientSecret: string): string {
+    const REDIRECT_URI = 'http://localhost:8080/oauth/callback';
+    const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email';
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: REDIRECT_URI,
+      scope: SCOPES,
+      response_type: 'code',
+      access_type: 'offline',
+      prompt: 'consent',
+    });
+
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    
+    // Close any existing OAuth window
+    if (this.currentOAuthWindow && !this.currentOAuthWindow.isDestroyed()) {
+      this.currentOAuthWindow.close();
+    }
+    
+    // Create OAuth window
+    this.currentOAuthWindow = new BrowserWindow({
+      width: 500,
+      height: 600,
+      show: true,
+      modal: true,
+      parent: this.mainWindow || undefined,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+      // Ensure window is always closable
+      titleBarStyle: 'default',
+      minimizable: false,
+      maximizable: false,
+      resizable: false,
+      closable: true, // Explicitly allow closing
+      alwaysOnTop: false,
+      skipTaskbar: false,
+      title: 'Google Calendar Authentication',
+    });
+
+    this.currentOAuthWindow.loadURL(authUrl);
+    
+    // Store client credentials for token exchange
+    (this.currentOAuthWindow as any).clientCredentials = { clientId, clientSecret };
+    
+    // Note: Custom close button temporarily disabled to prevent OAuth issues
+    // The window already has native close controls via titleBarStyle: 'default'
+
+    // Handle OAuth callback
+    this.currentOAuthWindow.webContents.on('will-redirect', (event, navigationUrl) => {
+      const parsedUrl = new URL(navigationUrl);
+      
+      if (parsedUrl.origin === 'http://localhost:8080' && parsedUrl.pathname === '/oauth/callback') {
+        const code = parsedUrl.searchParams.get('code');
+        const error = parsedUrl.searchParams.get('error');
+        
+        if (code && this.currentOAuthWindow) {
+          // Exchange code for tokens using stored credentials
+          const credentials = (this.currentOAuthWindow as any).clientCredentials;
+          if (credentials && credentials.clientId && credentials.clientSecret) {
+            this.exchangeGoogleOAuthCode(code, credentials.clientId, credentials.clientSecret);
+          } else {
+            console.error('OAuth credentials missing during token exchange');
+            this.mainWindow?.webContents.send('oauth:google:error', 'Missing client credentials');
+          }
+        } else if (error) {
+          console.error('OAuth error:', error);
+          this.mainWindow?.webContents.send('oauth:google:error', error);
+        }
+        
+        if (this.currentOAuthWindow && !this.currentOAuthWindow.isDestroyed()) {
+          this.currentOAuthWindow.close();
+        }
+      }
+    });
+
+    this.currentOAuthWindow.on('closed', () => {
+      // Handle window closed without completion
+      this.mainWindow?.webContents.send('oauth:google:cancelled');
+      this.currentOAuthWindow = null;
+    });
+
+    return authUrl;
+  }
+
+  private async exchangeGoogleOAuthCode(code: string, clientId: string, clientSecret: string): Promise<void> {
+    try {
+      console.log('🔄 Starting token exchange with Google...');
+      const REDIRECT_URI = 'http://localhost:8080/oauth/callback';
+
+      console.log('📤 Sending token request to Google...');
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: REDIRECT_URI,
+          grant_type: 'authorization_code',
+          code: code,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Token exchange failed:', response.status, response.statusText, errorText);
+        throw new Error(`Token exchange failed: ${response.statusText} - ${errorText}`);
+      }
+
+      console.log('✅ Token exchange successful, parsing response...');
+      const tokens: any = await response.json();
+      console.log('📋 Received tokens from Google (access token length:', tokens.access_token?.length, ')');
+      
+      // Get user info
+      console.log('👤 Fetching user info from Google...');
+      const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          'Authorization': `Bearer ${tokens.access_token}`,
+        },
+      });
+
+      if (!userResponse.ok) {
+        console.error('❌ User info fetch failed:', userResponse.status, userResponse.statusText);
+        throw new Error(`User info fetch failed: ${userResponse.statusText}`);
+      }
+
+      const userInfo: any = await userResponse.json();
+      console.log('✅ User info received for:', userInfo.email);
+
+      const authData = {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiresAt: Date.now() + (tokens.expires_in * 1000),
+        userEmail: userInfo.email,
+      };
+
+      console.log('📤 Sending OAuth success to renderer...');
+      // Send tokens back to renderer
+      this.mainWindow?.webContents.send('oauth:google:success', authData);
+    } catch (error) {
+      console.error('Token exchange failed:', error);
+      this.mainWindow?.webContents.send('oauth:google:error', error instanceof Error ? error.message : 'Token exchange failed');
+    }
   }
 
   private sendToRenderer(channel: string, ...args: any[]): void {

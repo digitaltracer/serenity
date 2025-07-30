@@ -33,7 +33,13 @@ const projectsSlice = createSlice({
       reducer: (state, action: PayloadAction<Project>) => {
         state.projects.push(action.payload);
       },
-      prepare: (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
+      prepare: (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'> | Project) => {
+        // If the project already has an ID (pre-generated), use it as-is
+        if ('id' in projectData && projectData.id) {
+          return { payload: projectData as Project };
+        }
+        
+        // Otherwise, generate ID and timestamps
         const newProject: Project = {
           ...projectData,
           id: generateId(),

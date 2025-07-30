@@ -13,7 +13,7 @@ export interface ProjectComboBoxProps {
   projects: ProjectOption[];
   value?: string;
   onChange?: (projectId: string, projectName?: string) => void;
-  onCreateProject?: (projectName: string) => void;
+  onCreateProject?: (projectName: string) => string | void; // Return project ID for auto-selection
   placeholder?: string;
   label?: string;
   error?: string;
@@ -134,7 +134,20 @@ const ProjectComboBox: React.FC<ProjectComboBoxProps> = ({
 
   const handleCreateProject = () => {
     if (inputValue.trim() && onCreateProject) {
-      onCreateProject(inputValue.trim());
+      const projectName = inputValue.trim();
+      console.log('📝 ProjectComboBox: Creating project:', projectName);
+      
+      const newProjectId = onCreateProject(projectName);
+      console.log('🆔 ProjectComboBox: Received project ID:', newProjectId);
+      
+      // If the onCreateProject callback returns a project ID, auto-select it
+      if (newProjectId && onChange) {
+        console.log('✅ ProjectComboBox: Auto-selecting project:', newProjectId, projectName);
+        onChange(newProjectId, projectName);
+      } else {
+        console.warn('❌ ProjectComboBox: No project ID returned or no onChange callback');
+      }
+      
       setInputValue('');
       setIsOpen(false);
       setHighlightedIndex(-1);

@@ -9,10 +9,13 @@ import {
   selectHasMasterPassword, 
   resetShortcuts,
   initializeSQLitePersistence,
+  initializeStoreData,
   setTasks,
   setProjects,
   setEntries,
-  addUsedTags
+  addUsedTags,
+  initializeDatabaseConfig,
+  initializeIntegrations
 } from '@serenity/core';
 import { AuthenticatedApp, ToastProvider, useToast, LoadingScreen } from '@serenity/ui';
 import { Layout } from './components/Layout';
@@ -26,6 +29,7 @@ import { GoalsPage } from './pages/GoalsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { DatabasePage } from './pages/DatabasePage';
+import { IntegrationsPage } from './pages/IntegrationsPage';
 
 // Component for handling menu events - must be inside ToastProvider
 function MenuEventHandler() {
@@ -136,110 +140,56 @@ function AppContent() {
           console.log('💾 Using localStorage persistence');
         }
         
+        setInitializationStatus('Restoring database configuration...');
+        
+        // Initialize database configuration from saved settings
+        console.log('🗄️ Initializing saved database configuration...');
+        try {
+          await dispatch(initializeDatabaseConfig());
+          console.log('✅ Database configuration initialization completed');
+        } catch (error) {
+          console.error('❌ Failed to initialize database configuration:', error);
+          // Continue with app initialization even if database config fails
+        }
+        
+        // Initialize integrations (will load encrypted data if master password is available)
+        console.log('🔗 Initializing integrations...');
+        try {
+          // Pass null for master password initially - integrations will load when user unlocks
+          await dispatch(initializeIntegrations(null));
+          console.log('✅ Integrations initialization completed');
+          
+          // After initialization, check if we need to prompt for master password to load encrypted integrations
+          setTimeout(async () => {
+            try {
+              const hasEncrypted = await window.electronAPI?.sqlite?.query?.('SELECT COUNT(*) as count FROM encrypted_integrations');
+              if (hasEncrypted?.success && hasEncrypted.data?.[0]?.count > 0) {
+                console.log('🔐 Found encrypted integrations in database, but they require master password to load');
+                console.log('ℹ️ Integrations will be loaded when user authenticates in the Integrations page');
+              }
+            } catch (error) {
+              // Ignore errors - this is just informational
+            }
+          }, 1000);
+        } catch (error) {
+          console.error('❌ Failed to initialize integrations:', error);
+          // Continue with app initialization even if integrations fail
+        }
+        
         setInitializationStatus('Loading existing data...');
         
-        if (sqliteInitialized) {
-          // Load data from SQLite
-          console.log('📂 Starting to load data from SQLite...');
-          try {
-            console.log('🔄 Calling SQLite getTasks, getProjects, getJournalEntries...');
-            
-            const [tasksResult, projectsResult, journalResult] = await Promise.all([
-              window.electronAPI.sqlite.getTasks(),
-              window.electronAPI.sqlite.getProjects(), 
-              window.electronAPI.sqlite.getJournalEntries()
-            ]);
-            
-            console.log('🔍 SQLite Results:');
-            console.log('  - Tasks result:', tasksResult);
-            console.log('  - Projects result:', projectsResult);
-            console.log('  - Journal result:', journalResult);
-            
-            // Dispatch data to Redux store if loaded successfully
-            if (tasksResult.success) {
-              if (tasksResult.data?.length > 0) {
-                console.log(`✅ LOADING ${tasksResult.data.length} TASKS FROM SQLITE INTO REDUX:`);
-                tasksResult.data.forEach((task: any, i: number) => {
-                  console.log(`  ${i+1}. ${task.title} (${task.id}) - Tags: ${task.tags?.join(', ') || 'none'}`);
-                });
-                dispatch(setTasks(tasksResult.data));
-                console.log('✅ Tasks dispatched to Redux store');
-                
-                // Extract all tags from loaded tasks and populate usedTags collection
-                const allTags: string[] = [];
-                tasksResult.data.forEach((task: any) => {
-                  if (task.tags && Array.isArray(task.tags)) {
-                    allTags.push(...task.tags);
-                  }
-                });
-                
-                if (allTags.length > 0) {
-                  const uniqueTags = [...new Set(allTags)];
-                  console.log(`🏷️ EXTRACTED ${uniqueTags.length} UNIQUE TAGS FROM LOADED TASKS:`, uniqueTags);
-                  dispatch(addUsedTags(uniqueTags));
-                  console.log('✅ Tags added to usedTags collection for autocomplete');
-                } else {
-                  console.log('⚠️ No tags found in loaded tasks');
-                }
-              } else {
-                console.log('⚠️ No tasks found in SQLite database');
-              }
-            } else {
-              console.error('❌ Failed to get tasks from SQLite:', tasksResult.error);
-            }
-            
-            if (projectsResult.success) {
-              if (projectsResult.data?.length > 0) {
-                console.log(`✅ LOADING ${projectsResult.data.length} PROJECTS FROM SQLITE`);
-                dispatch(setProjects(projectsResult.data));
-              } else {
-                console.log('⚠️ No projects found in SQLite database');
-              }
-            } else {
-              console.error('❌ Failed to get projects from SQLite:', projectsResult.error);
-            }
-            
-            if (journalResult.success) {
-              if (journalResult.data?.length > 0) {
-                console.log(`✅ LOADING ${journalResult.data.length} JOURNAL ENTRIES FROM SQLITE`);
-                dispatch(setEntries(journalResult.data));
-                
-                // Extract tags from journal entries as well
-                const journalTags: string[] = [];
-                journalResult.data.forEach((entry: any) => {
-                  if (entry.tags && Array.isArray(entry.tags)) {
-                    journalTags.push(...entry.tags);
-                  }
-                });
-                
-                if (journalTags.length > 0) {
-                  const uniqueJournalTags = [...new Set(journalTags)];
-                  console.log(`🏷️ EXTRACTED ${uniqueJournalTags.length} UNIQUE TAGS FROM JOURNAL ENTRIES:`, uniqueJournalTags);
-                  dispatch(addUsedTags(uniqueJournalTags));
-                  console.log('✅ Journal tags added to usedTags collection');
-                }
-              } else {
-                console.log('⚠️ No journal entries found in SQLite database');
-              }
-            } else {
-              console.error('❌ Failed to get journal entries from SQLite:', journalResult.error);
-            }
-            
-          } catch (error) {
-            console.error('❌ Failed to load data from SQLite:', error);
+        // Use enhanced store initialization which handles both SQLite and localStorage
+        console.log('📂 Initializing store data with enhanced migration support...');
+        try {
+          const initSuccess = await initializeStoreData();
+          if (initSuccess) {
+            console.log('✅ Store data initialization completed successfully');
+          } else {
+            console.warn('⚠️ Store data initialization completed with warnings');
           }
-        } else {
-          // Fallback to localStorage check
-          console.log('🗃️ SQLite not available, checking localStorage data...');
-          const hasData = localStorage.getItem('serenity_tasks') || 
-                          localStorage.getItem('serenity_projects') || 
-                          localStorage.getItem('serenity_journal_entries');
-          
-          console.log('📊 localStorage check result:', {
-            tasks: !!localStorage.getItem('serenity_tasks'),
-            projects: !!localStorage.getItem('serenity_projects'),
-            journal: !!localStorage.getItem('serenity_journal_entries')
-          });
+        } catch (error) {
+          console.error('❌ Store data initialization failed:', error);
+          // Continue with app initialization
         }
         
         setInitializationStatus('Finalizing...');
@@ -304,6 +254,7 @@ function AppContent() {
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/database" element={<DatabasePage />} />
+                    <Route path="/integrations" element={<IntegrationsPage />} />
                   </Routes>
                 </Layout>
               </div>

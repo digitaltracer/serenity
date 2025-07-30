@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, selectCompactMode } from '@serenity/core';
-import { addTask, toggleTask, deleteTask, updateTask, addProject, updateGoalsProgress, selectAllEntries, selectAllProjects } from '@serenity/core';
+import { addTask, toggleTask, deleteTask, updateTask, addProject, deleteProject, updateGoalsProgress, selectAllEntries, selectAllProjects, addUsedTags, generateId } from '@serenity/core';
 import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, ProjectComboBox, TagInput, DatePicker, Textarea, cn, DraggableTaskCard, SelectableItem, BulkOperationsToolbar, BulkActionsButton } from '@serenity/ui';
-import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List } from 'lucide-react';
+import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List, Trash2 } from 'lucide-react';
 
 export const ActionHubPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -107,15 +107,40 @@ export const ActionHubPage: React.FC = () => {
     }
   };
 
-  const handleCreateProjectFromCombo = (projectName: string) => {
+  const handleCreateProjectFromCombo = (projectName: string): string => {
+    console.log('🚀 ActionHub: handleCreateProjectFromCombo called with:', projectName);
+    
+    // Generate the ID ourselves before dispatching
+    const newProjectId = generateId();
+    
     const projectData = {
+      id: newProjectId, // Pre-assign the ID
       name: projectName,
       color: '#8B5CF6', // Default purple color
       description: '',
-      archived: false
+      archived: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
     
+    console.log('🎯 ActionHub: Creating project with pre-generated ID:', newProjectId);
+    
+    // Use the regular addProject action with pre-generated data
     dispatch(addProject(projectData));
+    
+    console.log('✅ ActionHub: Returning project ID for auto-selection:', newProjectId);
+    return newProjectId;
+  };
+
+  const handleDeleteProject = (projectId: string, projectName: string) => {
+    if (window.confirm(`Are you sure you want to delete the project "${projectName}"? This will remove the project but keep all associated tasks.`)) {
+      dispatch(deleteProject(projectId));
+      
+      // If the deleted project was selected in the new task form, clear it
+      if (newTaskProject === projectId) {
+        setNewTaskProject('');
+      }
+    }
   };
 
   const handleCreateTask = () => {
@@ -136,6 +161,11 @@ export const ActionHubPage: React.FC = () => {
         dispatch(updateTask({ ...taskData, id: editingTask }));
       } else {
         dispatch(addTask(taskData));
+      }
+      
+      // Add tags to the used tags collection for autocomplete
+      if (newTaskTags.length > 0) {
+        dispatch(addUsedTags(newTaskTags));
       }
       
       // Reset form
@@ -378,7 +408,10 @@ export const ActionHubPage: React.FC = () => {
                           <ProjectComboBox
                             projects={projects}
                             value={newTaskProject}
-                            onChange={(projectId) => setNewTaskProject(projectId)}
+                            onChange={(projectId) => {
+                              console.log('🔄 ActionHub: ProjectComboBox onChange called with projectId:', projectId);
+                              setNewTaskProject(projectId);
+                            }}
                             onCreateProject={handleCreateProjectFromCombo}
                             placeholder={projects.length === 0 ? "Type new project name..." : "Select or create project"}
                           />
@@ -670,8 +703,17 @@ export const ActionHubPage: React.FC = () => {
                             {project.name}
                           </h3>
                         </div>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                          <MoreHorizontal className="w-4 h-4" />
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0 text-gray-400 hover:text-red-500 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteProject(project.id, project.name);
+                          }}
+                          title={`Delete ${project.name}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                       

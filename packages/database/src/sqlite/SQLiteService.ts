@@ -169,6 +169,14 @@ export class SQLiteService {
   }
 
   /**
+   * Create a project with a specific ID (used by middleware to preserve Redux IDs)
+   */
+  async createProjectWithId(project: Project): Promise<Project> {
+    this.ensureInitialized();
+    return this.projects!.createProjectWithId(project);
+  }
+
+  /**
    * Update a project
    */
   async updateProject(id: string, updates: Partial<Project>): Promise<Project | null> {
@@ -216,6 +224,14 @@ export class SQLiteService {
   async createJournalEntry(entry: Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>): Promise<JournalEntry> {
     this.ensureInitialized();
     return this.journal!.createEntry(entry);
+  }
+
+  /**
+   * Create a journal entry with a specific ID (used by middleware to preserve Redux IDs)
+   */
+  async createJournalEntryWithId(entry: JournalEntry): Promise<JournalEntry> {
+    this.ensureInitialized();
+    return this.journal!.createEntryWithId(entry);
   }
 
   /**
@@ -419,6 +435,14 @@ export class SQLiteService {
     ]);
 
     return { tasks, projects, journalEntries };
+  }
+
+  /**
+   * Execute a raw SQL query
+   */
+  async executeRawQuery(query: string, params?: any[]): Promise<any> {
+    this.ensureInitialized();
+    return this.adapter.executeRawQuery(query, params);
   }
 }
 

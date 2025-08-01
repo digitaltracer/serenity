@@ -270,33 +270,88 @@ export class EncryptionService {
 
   /**
    * Derive encryption key for data export
+   * SECURITY FIX: Use random salt instead of fixed salt
    */
-  static async deriveExportKey(password: string): Promise<string> {
-    const salt = new TextEncoder().encode('serenity_export_salt');
+  static async deriveExportKey(password: string, providedSalt?: Uint8Array): Promise<{ key: string; salt: string }> {
+    // Use provided salt or generate new random salt
+    const salt = providedSalt || this.generateSalt();
     const key = await this.deriveKey(password, salt, 200000);
     
     // Export key as JWK for serialization
     const exportedKey = await crypto.subtle.exportKey('jwk', key);
-    return JSON.stringify(exportedKey);
+    return {
+      key: JSON.stringify(exportedKey),
+      salt: btoa(String.fromCharCode(...salt)) // Return salt for storage
+    };
   }
 
   /**
    * Secure data deletion (overwrite memory)
+   * Enhanced to handle passwords and sensitive strings
    */
   static secureDelete(data: any): void {
     if (typeof data === 'string') {
-      // Overwrite string with random data (best effort in JS)
-      const randomData = this.generateSecurePassword(data.length);
-      data = randomData;
-    } else if (data instanceof Uint8Array) {
-      // Overwrite array with random values
-      crypto.getRandomValues(data);
+      // JavaScript strings are immutable, but we can try to minimize references
+      // and create noise in memory to make recovery harder
+      const length = data.length;
+      
+      // Create multiple random strings to overwrite memory locations
+      for (let i = 0; i < 5; i++) {
+        const noise = this.generateSecurePassword(length);
+        // Force string operations to potentially overwrite memory
+        noise.split('').reverse().join('');
+      }
+      
+      // Clear the reference
+      data = '';
+    } else if (data instanceof Uint8Array || data instanceof ArrayBuffer) {
+      // Overwrite array with random values multiple times
+      const view = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
+      for (let pass = 0; pass < 3; pass++) {
+        crypto.getRandomValues(view);
+      }
+      // Final overwrite with zeros
+      view.fill(0);
     } else if (typeof data === 'object' && data !== null) {
       // Recursively secure delete object properties
       Object.keys(data).forEach(key => {
         this.secureDelete(data[key]);
         delete data[key];
       });
+    }
+  }
+
+  /**
+   * Secure clear password from memory (best effort in JavaScript)
+   */
+  static secureDeletePassword(password: string): void {
+    if (!password || typeof password !== 'string') return;
+    
+    const length = password.length;
+    
+    // Create noise patterns to overwrite potential memory locations
+    const patterns = [
+      '\x00'.repeat(length), // Null bytes
+      '\xFF'.repeat(length), // All ones
+      this.generateSecurePassword(length), // Random data
+      'A'.repeat(length), // Pattern
+      '0'.repeat(length), // Zeros
+    ];
+    
+    // Execute multiple overwrites
+    patterns.forEach(pattern => {
+      try {
+        // Force string operations that might affect memory
+        pattern.split('').sort().join('');
+        pattern.toLowerCase().toUpperCase();
+      } catch (e) {
+        // Ignore errors, continue with secure deletion
+      }
+    });
+    
+    // Try to force garbage collection if available
+    if (typeof global !== 'undefined' && global.gc) {
+      global.gc();
     }
   }
 

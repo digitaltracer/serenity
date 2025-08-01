@@ -233,7 +233,7 @@ class EncryptedLocalStorage implements SecureStorage {
       // Generate a random key
       const array = new Uint8Array(32);
       crypto.getRandomValues(array);
-      key = btoa(String.fromCharCode(...array));
+      key = btoa(String.fromCharCode.apply(null, Array.from(array)));
       localStorage.setItem(EncryptedLocalStorage.MASTER_KEY, key);
     }
     
@@ -690,4 +690,264 @@ export const validateMasterPasswordSecure = async (password: string): Promise<bo
     return false;
   }
 };
+
+/**
+ * Secure PostgreSQL credentials storage
+ * SECURITY FIX: Store PostgreSQL passwords securely instead of plain text
+ */
+export interface SecurePostgreSQLConfig {
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  ssl?: boolean;
+  // Password is stored separately and encrypted
+}
+
+export interface PostgreSQLCredentials {
+  password: string;
+  created: string;
+  lastUsed?: string;
+}
+
+/**
+ * Save PostgreSQL configuration with secure password storage
+ */
+export const savePostgreSQLConfigSecure = async (
+  config: SecurePostgreSQLConfig,
+  password: string
+): Promise<void> => {
+  try {
+    console.log('🗄️ Saving PostgreSQL config to secure storage...');
+    
+    if (!window.electronAPI?.sqlite) {
+      throw new Error('SQLite API not available for secure storage');
+    }
+
+    // Store config (without password) and encrypted credentials separately
+    const configWithoutPassword = { ...config };
+    const credentials: PostgreSQLCredentials = {
+      password,
+      created: new Date().toISOString(),
+      lastUsed: new Date().toISOString(),
+    };
+
+    // Generate encryption key from master password if available, otherwise use random key
+    const encryptionKey = await generateEncryptionKey();
+    const encryptedCredentials = await encryptData(JSON.stringify(credentials), encryptionKey);
+
+    // Save config and encrypted credentials
+    const configResult = await window.electronAPI.sqlite.query(
+      `INSERT OR REPLACE INTO secure_settings (key, value, created_at, updated_at) 
+       VALUES (?, ?, ?, ?)`,
+      [
+        'postgresql_config',
+        JSON.stringify(configWithoutPassword),
+        new Date().toISOString(),
+        new Date().toISOString()
+      ]
+    );
+
+    const credentialsResult = await window.electronAPI.sqlite.query(
+      `INSERT OR REPLACE INTO secure_settings (key, value, created_at, updated_at) 
+       VALUES (?, ?, ?, ?)`,
+      [
+        'postgresql_credentials',
+        encryptedCredentials,
+        new Date().toISOString(),
+        new Date().toISOString()
+      ]
+    );
+
+    if (configResult.success && credentialsResult.success) {
+      console.log('✅ PostgreSQL config and credentials saved securely');
+    } else {
+      throw new Error('Failed to save PostgreSQL configuration');
+    }
+  } catch (error) {
+    console.error('Failed to save PostgreSQL config securely:', error);
+    throw new Error('Failed to save database configuration securely');
+  }
+};
+
+/**
+ * Retrieve PostgreSQL configuration with decrypted password
+ */
+export const getPostgreSQLConfigSecure = async (): Promise<{
+  config: SecurePostgreSQLConfig;
+  password: string;
+} | null> => {
+  try {
+    console.log('🔒 Loading PostgreSQL config from secure storage...');
+    
+    if (!window.electronAPI?.sqlite) {
+      console.log('❌ SQLite API not available');
+      return null;
+    }
+
+    // Get config and encrypted credentials
+    const [configResult, credentialsResult] = await Promise.all([
+      window.electronAPI.sqlite.query(
+        `SELECT value FROM secure_settings WHERE key = ?`,
+        ['postgresql_config']
+      ),
+      window.electronAPI.sqlite.query(
+        `SELECT value FROM secure_settings WHERE key = ?`,
+        ['postgresql_credentials']
+      )
+    ]);
+
+    if (
+      !configResult.success || !configResult.data || configResult.data.length === 0 ||
+      !credentialsResult.success || !credentialsResult.data || credentialsResult.data.length === 0
+    ) {
+      console.log('📝 No PostgreSQL configuration found');
+      return null;
+    }
+
+    const config = JSON.parse(configResult.data[0].value) as SecurePostgreSQLConfig;
+    const encryptedCredentials = credentialsResult.data[0].value;
+
+    // Decrypt credentials
+    const encryptionKey = await generateEncryptionKey();
+    const decryptedCredentialsJson = await decryptData(encryptedCredentials, encryptionKey);
+    const credentials = JSON.parse(decryptedCredentialsJson) as PostgreSQLCredentials;
+
+    console.log('✅ PostgreSQL config loaded and decrypted successfully');
+    
+    return {
+      config,
+      password: credentials.password,
+    };
+  } catch (error) {
+    console.error('Failed to retrieve PostgreSQL config securely:', error);
+    return null;
+  }
+};
+
+/**
+ * Remove PostgreSQL configuration and credentials
+ */
+export const removePostgreSQLConfigSecure = async (): Promise<void> => {
+  try {
+    console.log('🗑️ Removing PostgreSQL config from secure storage...');
+    
+    if (!window.electronAPI?.sqlite) {
+      console.log('❌ SQLite API not available');
+      return;
+    }
+
+    await Promise.all([
+      window.electronAPI.sqlite.query(
+        `DELETE FROM secure_settings WHERE key = ?`,
+        ['postgresql_config']
+      ),
+      window.electronAPI.sqlite.query(
+        `DELETE FROM secure_settings WHERE key = ?`,
+        ['postgresql_credentials']
+      )
+    ]);
+
+    console.log('✅ PostgreSQL config removed successfully');
+  } catch (error) {
+    console.error('Failed to remove PostgreSQL config:', error);
+  }
+};
+
+/**
+ * Generate encryption key for credential storage
+ * Uses master password if available, otherwise generates random key
+ */
+async function generateEncryptionKey(): Promise<string> {
+  try {
+    // Try to use master password for key derivation
+    if (window.electronAPI?.sqlite) {
+      const result = await window.electronAPI.sqlite.query(
+        `SELECT value FROM secure_settings WHERE key = ?`,
+        ['master_password_hash']
+      );
+      
+      if (result.success && result.data && result.data.length > 0) {
+        // Use master password hash as basis for encryption key
+        const passwordData = JSON.parse(result.data[0].value);
+        return passwordData.hash.substring(0, 32); // Use first 32 chars as key
+      }
+    }
+  } catch (error) {
+    console.log('Master password not available, using random key');
+  }
+
+  // Fallback: generate or retrieve random encryption key
+  const storage = getSecureStorage();
+  let key = await storage.getItem('credential_encryption_key');
+  
+  if (!key) {
+    // Generate new random key
+    const keyArray = new Uint8Array(32);
+    crypto.getRandomValues(keyArray);
+    key = btoa(String.fromCharCode.apply(null, Array.from(keyArray)));
+    await storage.setItem('credential_encryption_key', key);
+  }
+  
+  return key;
+}
+
+/**
+ * Encrypt data using AES-GCM
+ */
+async function encryptData(data: string, keyString: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  
+  // Import key
+  const keyData = new Uint8Array(atob(keyString).split('').map(c => c.charCodeAt(0)));
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt']
+  );
+
+  const encryptedData = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encoder.encode(data)
+  );
+
+  // Combine iv + encrypted data
+  const combined = new Uint8Array(iv.length + encryptedData.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(encryptedData), iv.length);
+
+  return btoa(String.fromCharCode.apply(null, Array.from(combined)));
+}
+
+/**
+ * Decrypt data using AES-GCM
+ */
+async function decryptData(encryptedData: string, keyString: string): Promise<string> {
+  const combined = new Uint8Array(atob(encryptedData).split('').map(c => c.charCodeAt(0)));
+  const iv = combined.slice(0, 12);
+  const data = combined.slice(12);
+
+  // Import key
+  const keyData = new Uint8Array(atob(keyString).split('').map(c => c.charCodeAt(0)));
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'AES-GCM' },
+    false,
+    ['decrypt']
+  );
+
+  const decryptedData = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    data
+  );
+
+  const decoder = new TextDecoder();
+  return decoder.decode(decryptedData);
+}
 

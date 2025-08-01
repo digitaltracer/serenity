@@ -27,8 +27,5 @@
   "workspaces": [
     "apps/desktop",
     "packages/*"
-  ],
-  "dependencies": {
-    "better-sqlite3": "^12.2.0"
-  }
+  ]
 }

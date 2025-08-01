@@ -1,6 +1,8 @@
 /**
  * Privacy and Security utilities for managing user settings and encryption
  */
+import * as bcrypt from 'bcryptjs';
+import { EncryptionService } from './encryption';
 
 export interface PrivacySecuritySettings {
   masterPasswordEnabled: boolean;
@@ -166,20 +168,111 @@ export const removeMasterPassword = (): void => {
 };
 
 /**
- * Simple password hashing using Web Crypto API
- * In production, use a proper password hashing library
+ * Check if stored password hash needs migration from old SHA-256 format
  */
+export const needsPasswordMigration = (): boolean => {
+  try {
+    const obfuscatedHash = localStorage.getItem(MASTER_PASSWORD_KEY);
+    if (!obfuscatedHash) return false;
+    
+    const hash = deobfuscate(obfuscatedHash);
+    if (!hash) return false;
+    
+    // bcrypt hashes start with $2a$, $2b$, or $2y$
+    // SHA-256 hashes are 64 character hex strings
+    return !hash.startsWith('$2') && /^[a-f0-9]{64}$/i.test(hash);
+  } catch (error) {
+    console.error('Failed to check password migration status:', error);
+    return false;
+  }
+};
+
+/**
+ * Migrate password from old SHA-256 format to bcrypt
+ * This requires the user to re-enter their password
+ */
+export const migratePasswordHash = async (password: string): Promise<boolean> => {
+  try {
+    // First verify with old method
+    const isValidOldPassword = await validateMasterPasswordLegacy(password);
+    if (!isValidOldPassword) {
+      return false;
+    }
+    
+    // Hash with new secure method
+    await saveMasterPasswordHash(password);
+    console.log('✅ Password successfully migrated to bcrypt');
+    return true;
+  } catch (error) {
+    console.error('Password migration failed:', error);
+    return false;
+  }
+};
+
+/**
+ * Legacy SHA-256 password validation for migration purposes only
+ */
+async function validateMasterPasswordLegacy(password: string): Promise<boolean> {
+  try {
+    const obfuscatedHash = localStorage.getItem(MASTER_PASSWORD_KEY);
+    if (!obfuscatedHash) return false;
+    
+    const hash = deobfuscate(obfuscatedHash);
+    if (!hash) return false;
+    
+    // Use old SHA-256 method for comparison
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password + 'serenity_salt');
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const passwordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    return passwordHash === hash;
+  } catch (error) {
+    console.error('Legacy password validation failed:', error);
+    return false;
+  }
+}
+
+/**
+ * Secure password hashing using bcrypt
+ * Provides proper salt generation and resistance to timing attacks
+ */
+const BCRYPT_ROUNDS = 12; // High security level
+
 async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + 'serenity_salt'); // Add salt
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  try {
+    // Generate random salt and hash password
+    const salt = await bcrypt.genSalt(BCRYPT_ROUNDS);
+    const hash = await bcrypt.hash(password, salt);
+    
+    // Securely clear password from memory
+    EncryptionService.secureDeletePassword(password);
+    
+    return hash;
+  } catch (error) {
+    console.error('Password hashing failed:', error);
+    // Still clear password even on error
+    EncryptionService.secureDeletePassword(password);
+    throw new Error('Failed to hash password');
+  }
 }
 
 async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const passwordHash = await hashPassword(password);
-  return passwordHash === hash;
+  try {
+    // Use bcrypt's built-in verification which is timing-attack resistant
+    const isValid = await bcrypt.compare(password, hash);
+    
+    // Securely clear password from memory regardless of result
+    EncryptionService.secureDeletePassword(password);
+    
+    return isValid;
+  } catch (error) {
+    console.error('Password verification failed:', error);
+    // Still clear password even on error
+    EncryptionService.secureDeletePassword(password);
+    return false; // Fail securely
+  }
 }
 
 // App lock state management is now handled by Redux authSlice

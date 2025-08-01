@@ -33,7 +33,7 @@ export class EncryptedIntegrationService {
         googleCalendarConnected: integrationsState.googleCalendar.connected,
         githubConnected: integrationsState.github.connected,
         hasGoogleToken: !!integrationsState.googleCalendar.accessToken,
-        hasGithubToken: !!integrationsState.github.accessToken,
+        hasGithubTokens: integrationsState.github.tokens?.length || 0,
         masterPasswordLength: masterPassword?.length || 0
       });
       
@@ -74,15 +74,14 @@ export class EncryptedIntegrationService {
       }
 
       // Encrypt GitHub tokens if connected
-      if (integrationsState.github.connected && integrationsState.github.accessToken) {
+      if (integrationsState.github.connected && integrationsState.github.tokens && integrationsState.github.tokens.length > 0) {
         console.log('🐙 Processing GitHub integration for encryption...');
         
         const githubData = {
-          accessToken: integrationsState.github.accessToken,
-          username: integrationsState.github.username,
-          repositories: integrationsState.github.repositories,
+          tokens: integrationsState.github.tokens,
           syncEnabled: integrationsState.github.syncEnabled,
           lastSync: integrationsState.github.lastSync,
+          totalRepositories: integrationsState.github.totalRepositories,
         };
 
         console.log('🔒 Encrypting GitHub data...');
@@ -101,7 +100,7 @@ export class EncryptedIntegrationService {
         });
         console.log('✅ GitHub data encrypted successfully');
       } else {
-        console.log('ℹ️ Skipping GitHub - not connected or no access token');
+        console.log('ℹ️ Skipping GitHub - not connected or no tokens');
       }
 
       // Store encrypted data in database
@@ -216,7 +215,7 @@ export class EncryptedIntegrationService {
         github: {
           connected: false,
           syncEnabled: false,
-          repositories: [],
+          tokens: [],
         },
         syncing: false,
       };
@@ -242,7 +241,11 @@ export class EncryptedIntegrationService {
               connected: true,
               ...decryptedData,
             };
-            console.log('🔓 Decrypted GitHub integration for:', decryptedData.username);
+            const tokenCount = decryptedData.tokens?.length || 0;
+            console.log(`🔓 Decrypted GitHub integration with ${tokenCount} token${tokenCount !== 1 ? 's' : ''}`);
+            if (tokenCount > 0) {
+              console.log('   Tokens:', decryptedData.tokens.map((t: any) => `${t.username} (${t.displayName || 'no name'})`).join(', '));
+            }
           }
         } catch (decryptError) {
           console.error(`❌ Failed to decrypt ${integration.type} integration:`, decryptError);

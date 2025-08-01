@@ -163,13 +163,39 @@ export const SettingsPage: React.FC = () => {
     try {
       console.log('Database configuration saved:', config);
       
-      // Save to secure storage
-      if (config.url) {
-        await saveDatabaseConnectionSecure(config.url);
+      // Handle different database types securely
+      if (config.type === 'sqlite') {
+        // For SQLite, save connection URL
+        const sqliteUrl = config.path || 'default';
+        await saveDatabaseConnectionSecure(sqliteUrl);
         
         // Update local state
         const updatedConnection = {
-          url: config.url,
+          url: sqliteUrl,
+          connected: true,
+          lastConnected: new Date().toISOString(),
+          encryptionEnabled: config.encryption || false
+        };
+        setDbConnection(updatedConnection);
+        setDbConnected(true);
+      } else if (config.type === 'postgresql') {
+        // For PostgreSQL, use secure storage for credentials
+        const { savePostgreSQLConfigSecure } = await import('@serenity/core');
+        
+        const secureConfig = {
+          host: config.host,
+          port: config.port,
+          database: config.database,
+          username: config.username,
+          ssl: config.ssl || false,
+        };
+        
+        // Save config and password securely
+        await savePostgreSQLConfigSecure(secureConfig, config.password || '');
+        
+        // Update local state (without password)
+        const updatedConnection = {
+          url: `postgresql://${config.username}@${config.host}:${config.port}/${config.database}`,
           connected: true,
           lastConnected: new Date().toISOString(),
           encryptionEnabled: false
@@ -178,10 +204,10 @@ export const SettingsPage: React.FC = () => {
         setDbConnected(true);
       }
       
-      showSuccess('Database Configuration', 'Database configuration saved successfully');
+      showSuccess('Database Configuration', 'Database configuration saved securely');
     } catch (error) {
       console.error('Database save failed:', error);
-      showError('Configuration Error', 'Failed to save database configuration');
+      showError('Configuration Error', 'Failed to save database configuration securely');
     }
   };
 

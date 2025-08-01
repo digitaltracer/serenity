@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   Card, 
+  CardHeader,
+  CardTitle,
+  CardContent,
   Button, 
   Input, 
   Toggle,
@@ -19,9 +22,18 @@ import {
   connectGoogleCalendar,
   disconnectGoogleCalendar,
   connectGitHub,
+  addGitHubToken,
+  removeGitHubToken,
+  updateGitHubToken,
+  toggleGitHubTokenActive,
   disconnectGitHub,
   setGoogleCalendarSyncEnabled,
   setGitHubSyncEnabled,
+  updateGoogleCalendarSyncEnabled,
+  updateGitHubSyncEnabled,
+  updateGoogleCalendarLastSync,
+  updateGitHubLastSync,
+  persistIntegrationsState,
   setSyncing,
   setSyncError,
   clearSyncError,
@@ -34,11 +46,13 @@ import {
   RootState,
   selectHasMasterPassword,
   selectIsLocked,
+  selectSessionMasterPassword,
   validatePassword,
   store,
   savePrivacySettingsSecure,
   setMasterPassword,
-  initializeAuth
+  initializeAuth,
+  GitHubToken
 } from '@serenity/core';
 import { Calendar, Github, RotateCw, AlertTriangle, CheckCircle, ExternalLink, Lock, Shield } from 'lucide-react';
 
@@ -52,6 +66,7 @@ export const IntegrationsPage: React.FC = () => {
   const tasks = useSelector((state: RootState) => state.tasks.tasks);
   const hasMasterPassword = useSelector(selectHasMasterPassword);
   const isLocked = useSelector(selectIsLocked);
+  const sessionMasterPassword = useSelector(selectSessionMasterPassword);
   
   // Check if we need to load encrypted integrations on mount
   useEffect(() => {
@@ -88,9 +103,14 @@ export const IntegrationsPage: React.FC = () => {
     setTimeout(checkAndLoadEncryptedIntegrations, 500);
   }, [hasMasterPassword, isLocked, googleCalendar.connected, github.connected, showError]);
   
-  const [githubToken, setGithubToken] = useState('');
+  // GitHub token management states
+  const [githubTokens, setGithubTokens] = useState<GitHubToken[]>(github.tokens || []);
+  const [newGithubToken, setNewGithubToken] = useState('');
+  const [newTokenDisplayName, setNewTokenDisplayName] = useState('');
   const [selectedRepos, setSelectedRepos] = useState<string[]>([]);
   const [availableRepos, setAvailableRepos] = useState<Array<{name: string, full_name: string}>>([]);
+  const [showTokenManagement, setShowTokenManagement] = useState(false);
+  const [editingToken, setEditingToken] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [googleClientId, setGoogleClientId] = useState(googleCalendar.clientId || '');
   const [googleClientSecret, setGoogleClientSecret] = useState(googleCalendar.clientSecret || '');
@@ -110,6 +130,14 @@ export const IntegrationsPage: React.FC = () => {
   
   // State for encrypted integrations check
   const [hasEncryptedIntegrations, setHasEncryptedIntegrations] = useState(false);
+  
+  // State for pending sync toggle changes
+  const [pendingSyncToggle, setPendingSyncToggle] = useState<{ integration: 'google' | 'github', enabled: boolean } | null>(null);
+  
+  // Keep local GitHub tokens in sync with Redux state
+  useEffect(() => {
+    setGithubTokens(github.tokens || []);
+  }, [github.tokens]);
 
   // Handle privacy settings save
   const handlePrivacySettingsSave = async (settings: PrivacySecuritySettings) => {
@@ -183,42 +211,27 @@ export const IntegrationsPage: React.FC = () => {
         clientSecret: googleClientSecret.trim()
       }));
       
-      // Use whichever master password is available (prioritize sessionStorage as it's most persistent)
-      const passwordToUse = sessionStoragePassword || masterPasswordRef.current || currentMasterPassword || validatedMasterPassword;
-      console.log('🔑 Password to use for encryption (length:', passwordToUse?.length || 0, ')');
-      console.log('🔍 Password source:', sessionStoragePassword ? 'sessionStorage' : masterPasswordRef.current ? 'ref' : currentMasterPassword ? 'currentState' : validatedMasterPassword ? 'validatedState' : 'none');
+      // Get the current session master password from Redux
+      const currentState = store.getState() as any;
+      const sessionPassword = currentState.auth.sessionMasterPassword;
+      console.log('🔑 Session master password available:', !!sessionPassword);
       
       // Encrypt and store the integration data
-      if (passwordToUse) {
+      if (sessionPassword) {
         try {
-          console.log('🔐 Using master password for Google Calendar encryption (length:', passwordToUse.length, ')');
-          const currentState = store.getState() as any;
+          console.log('🔐 Using session master password for Google Calendar encryption (length:', sessionPassword.length, ')');
           await EncryptedIntegrationService.saveEncryptedIntegrations(
             currentState.integrations,
-            passwordToUse
+            sessionPassword
           );
           console.log('✅ Google Calendar tokens encrypted and stored successfully');
-          
-          // Clear the stored password for security from all sources
-          setCurrentMasterPassword('');
-          masterPasswordRef.current = '';
-          if (tempKeyFromStorage) {
-            sessionStorage.removeItem(tempKeyFromStorage);
-            sessionStorage.removeItem('serenity_oauth_temp_key');
-          }
         } catch (error) {
           console.error('❌ Failed to encrypt Google Calendar tokens:', error);
           alert('Warning: Failed to encrypt integration tokens. Please try reconnecting.');
         }
       } else {
-        console.warn('⚠️ No master password available for Google Calendar encryption (none of the four sources)');
-        console.warn('🔍 State check:', {
-          currentMasterPassword: currentMasterPassword ? `[${currentMasterPassword.length} chars]` : 'null',
-          validatedMasterPassword: validatedMasterPassword ? `[${validatedMasterPassword.length} chars]` : 'null',
-          masterPasswordRef: masterPasswordRef.current ? `[${masterPasswordRef.current.length} chars]` : 'null',
-          sessionStoragePassword: sessionStoragePassword ? `[${sessionStoragePassword.length} chars]` : 'null'
-        });
-        alert('Warning: Master password not available. Integration tokens were not encrypted.');
+        console.warn('⚠️ No session master password available for Google Calendar encryption');
+        alert('Warning: Session master password not available. Integration tokens were not encrypted. Please unlock the app first.');
       }
       
       setIsConnecting(false);
@@ -228,29 +241,11 @@ export const IntegrationsPage: React.FC = () => {
       console.error('OAuth error:', error);
       alert(`Google Calendar connection failed: ${error}`);
       setIsConnecting(false);
-      
-      // Clear stored password for security from all sources
-      setCurrentMasterPassword('');
-      masterPasswordRef.current = '';
-      const tempKey = sessionStorage.getItem('serenity_oauth_temp_key');
-      if (tempKey) {
-        sessionStorage.removeItem(tempKey);
-        sessionStorage.removeItem('serenity_oauth_temp_key');
-      }
     };
 
     const handleOAuthCancelled = () => {
       console.log('OAuth cancelled by user');
       setIsConnecting(false);
-      
-      // Clear stored password for security from all sources
-      setCurrentMasterPassword('');
-      masterPasswordRef.current = '';
-      const tempKey = sessionStorage.getItem('serenity_oauth_temp_key');
-      if (tempKey) {
-        sessionStorage.removeItem(tempKey);
-        sessionStorage.removeItem('serenity_oauth_temp_key');
-      }
     };
 
     window.electronAPI.oauth.onGoogleSuccess(handleOAuthSuccess);
@@ -312,9 +307,13 @@ export const IntegrationsPage: React.FC = () => {
         } else if (pendingAction === 'load') {
           console.log('🔑 Proceeding to load saved integrations with validated password');
           await performLoadSavedIntegrations(password.trim());
+        } else if (pendingAction === 'persist_sync' && pendingSyncToggle) {
+          console.log('🔑 Proceeding to persist sync toggle change with validated password');
+          await performSyncTogglePersistence(password.trim(), pendingSyncToggle);
         }
         
         setPendingAction(null);
+        setPendingSyncToggle(null);
       } else {
         console.error('❌ Password validation failed:', result.payload);
         console.error('❌ Full result object:', result);
@@ -359,6 +358,19 @@ export const IntegrationsPage: React.FC = () => {
     }
   };
 
+  const performSyncTogglePersistence = async (masterPassword: string, toggleData: { integration: 'google' | 'github', enabled: boolean }) => {
+    try {
+      console.log(`💾 Persisting ${toggleData.integration} sync toggle (${toggleData.enabled}) with master password...`);
+      await dispatch(persistIntegrationsState(masterPassword));
+      
+      console.log(`✅ ${toggleData.integration} sync state persisted successfully`);
+      showSuccess('Sync Settings', `${toggleData.integration === 'google' ? 'Google Calendar' : 'GitHub'} sync ${toggleData.enabled ? 'enabled' : 'disabled'} and saved permanently.`);
+    } catch (error) {
+      console.error(`❌ Failed to persist ${toggleData.integration} sync state:`, error);
+      showError('Sync Settings', 'Sync preference could not be saved permanently. Changes may be lost on restart.');
+    }
+  };
+
   const handleGoogleCalendarConnect = async () => {
     requireMasterPassword('google');
   };
@@ -382,27 +394,7 @@ export const IntegrationsPage: React.FC = () => {
     try {
       setIsConnecting(true);
       
-      // Store the master password for the OAuth callback to use
-      console.log('🔑 About to store master password for OAuth callback (length:', masterPassword.length, ')');
-      setCurrentMasterPassword(masterPassword);
-      masterPasswordRef.current = masterPassword; // Store in ref for persistence across re-renders
-      
-      // Also store in sessionStorage as a final fallback (this survives component unmount/remount)
-      const tempKey = `serenity_oauth_temp_password_${Date.now()}`;
-      sessionStorage.setItem(tempKey, masterPassword);
-      sessionStorage.setItem('serenity_oauth_temp_key', tempKey); // Store the key to retrieve it later
-      
-      console.log('🔑 Master password stored in state, ref, and sessionStorage');
-      
-      // Verify all storage methods
-      setTimeout(() => {
-        console.log('🔍 Storage verification after password set:', {
-          currentMasterPasswordStateLength: currentMasterPassword?.length || 0,
-          masterPasswordRefLength: masterPasswordRef.current?.length || 0,
-          sessionStorageLength: sessionStorage.getItem(tempKey)?.length || 0,
-          passedPasswordLength: masterPassword.length
-        });
-      }, 100);
+      console.log('📅 Starting Google Calendar OAuth flow (session master password available:', !!sessionMasterPassword, ')');
       
       const result = await window.electronAPI.oauth.googleStart(googleClientId.trim(), googleClientSecret.trim());
       
@@ -416,15 +408,6 @@ export const IntegrationsPage: React.FC = () => {
       console.error('Google Calendar connection failed:', error);
       alert(`Failed to start Google Calendar connection: ${error}`);
       setIsConnecting(false);
-      
-      // Clear stored password for security from all sources
-      setCurrentMasterPassword('');
-      masterPasswordRef.current = '';
-      const tempKey = sessionStorage.getItem('serenity_oauth_temp_key');
-      if (tempKey) {
-        sessionStorage.removeItem(tempKey);
-        sessionStorage.removeItem('serenity_oauth_temp_key');
-      }
     }
   };
 
@@ -441,7 +424,7 @@ export const IntegrationsPage: React.FC = () => {
   };
 
   const handleGitHubConnect = async () => {
-    requireMasterPassword('github', performGitHubConnect);
+    requireMasterPassword('github');
   };
 
   const performGitHubConnect = async () => {
@@ -452,73 +435,116 @@ export const IntegrationsPage: React.FC = () => {
   const performGitHubConnectWithPassword = async (masterPassword: string) => {
     console.log('🐙 performGitHubConnectWithPassword called with password length:', masterPassword?.length || 0);
     
-    if (!githubToken.trim()) {
+    if (!newGithubToken.trim()) {
       alert('Please enter a GitHub personal access token');
       return;
     }
 
     try {
       // Validate token and get user info
-      const userInfo = await GitHubService.validateToken(githubToken);
+      const userInfo = await GitHubService.validateToken(newGithubToken);
       
-      // Get user repositories
-      const repos = await GitHubService.getUserRepositories(githubToken);
-      setAvailableRepos(repos);
-      
-      dispatch(connectGitHub({
-        accessToken: githubToken,
+      // Create new token object
+      const newToken: GitHubToken = {
+        id: `github_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        token: newGithubToken,
         username: userInfo.login,
-        repositories: repos.slice(0, 5).map(repo => repo.full_name), // Default to first 5 repos
-      }));
+        displayName: newTokenDisplayName.trim() || `${userInfo.login} Token`,
+        organizations: [],
+        repositories: [],
+        lastSync: undefined,
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
       
-      // Encrypt and store the integration data
-      console.log('🔍 Checking master password availability:', {
-        hasDirectPassword: !!masterPassword,
-        directPasswordLength: masterPassword?.length || 0,
-        hasValidatedPassword: !!validatedMasterPassword,
-        validatedPasswordLength: validatedMasterPassword?.length || 0
+      console.log('🔍 Adding new GitHub token:', {
+        id: newToken.id,
+        username: newToken.username,
+        displayName: newToken.displayName
       });
       
-      const passwordToUse = masterPassword || validatedMasterPassword;
+      // Add token to Redux state
+      dispatch(addGitHubToken(newToken));
       
-      if (passwordToUse) {
+      // Encrypt and store the integration data using session master password
+      if (sessionMasterPassword) {
         try {
-          console.log('🔐 Starting GitHub token encryption process with password length:', passwordToUse.length);
+          console.log('🔐 Starting GitHub tokens encryption process with session master password (length:', sessionMasterPassword.length, ')');
           
           // Get updated state after dispatch (synchronous action updates state immediately)
           const currentState = store.getState() as any;
           
           console.log('📊 Current integration state:', {
             githubConnected: currentState.integrations?.github?.connected,
-            hasGithubToken: !!currentState.integrations?.github?.accessToken,
-            githubUsername: currentState.integrations?.github?.username
+            tokenCount: currentState.integrations?.github?.tokens?.length
           });
           
           await EncryptedIntegrationService.saveEncryptedIntegrations(
             currentState.integrations,
-            passwordToUse
+            sessionMasterPassword
           );
           console.log('✅ GitHub tokens encrypted and stored successfully');
-          showSuccess('GitHub Connected', 'Your GitHub integration has been connected and encrypted successfully.');
+          showSuccess('GitHub Token Added', `GitHub token for ${userInfo.login} has been added and encrypted successfully.`);
         } catch (error) {
           console.error('❌ Failed to encrypt GitHub tokens:', error);
           showError('Encryption Failed', `Failed to encrypt integration tokens: ${error}. Please try reconnecting.`);
         }
       } else {
-        console.warn('⚠️ No master password available for GitHub encryption');
-        console.warn('🔍 Debug info:', {
-          masterPassword,
-          validatedMasterPassword,
-          pendingAction,
-          hasMasterPassword
-        });
-        showError('Authentication Error', 'Master password validation failed. Please try again.');
+        console.warn('⚠️ No session master password available for GitHub encryption');
+        showError('Authentication Error', 'Session master password not available. Please unlock the app first.');
       }
       
-      setSelectedRepos(repos.slice(0, 5).map(repo => repo.full_name));
-      setGithubToken('');
+      // Clear form
+      setNewGithubToken('');
+      setNewTokenDisplayName('');
+      
     } catch (error) {
-      alert(`GitHub connection failed: ${error}`);
+      alert(`GitHub token validation failed: ${error}`);
+    }
+  };
+  
+  // Handle removing a GitHub token
+  const handleRemoveGitHubToken = async (tokenId: string) => {
+    const token = githubTokens.find(t => t.id === tokenId);
+    if (!token) return;
+    
+    const confirmed = confirm(`Are you sure you want to remove the GitHub token for ${token.username}?`);
+    if (!confirmed) return;
+    
+    dispatch(removeGitHubToken(tokenId));
+    
+    // Persist changes if session master password is available
+    if (sessionMasterPassword) {
+      try {
+        await dispatch(persistIntegrationsState(sessionMasterPassword));
+        showSuccess('Token Removed', `GitHub token for ${token.username} has been removed successfully.`);
+      } catch (error) {
+        console.error('❌ Failed to persist token removal:', error);
+        showError('Persistence Failed', 'Token removed locally but could not be saved permanently.');
+      }
+    } else {
+      showError('Save Required', 'Token removed locally. Please unlock the app to save changes permanently.');
+    }
+  };
+  
+  // Handle toggling token active status
+  const handleToggleTokenActive = async (tokenId: string) => {
+    dispatch(toggleGitHubTokenActive(tokenId));
+    
+    // Persist changes if session master password is available
+    if (sessionMasterPassword) {
+      try {
+        await dispatch(persistIntegrationsState(sessionMasterPassword));
+        const token = githubTokens.find(t => t.id === tokenId);
+        if (token) {
+          showSuccess('Token Updated', `GitHub token for ${token.username} ${token.isActive ? 'disabled' : 'enabled'} successfully.`);
+        }
+      } catch (error) {
+        console.error('❌ Failed to persist token status change:', error);
+        showError('Persistence Failed', 'Token status changed locally but could not be saved permanently.');
+      }
+    } else {
+      showError('Save Required', 'Token status changed locally. Please unlock the app to save changes permanently.');
     }
   };
 
@@ -550,7 +576,8 @@ export const IntegrationsPage: React.FC = () => {
           const { tasks: calendarTasks } = await IntegrationSyncService.syncGoogleCalendarEvents(
             googleCalendar.accessToken,
             tasks,
-            dateRange
+            dateRange,
+            googleCalendar.connectionDate // Pass connection date to filter historic events
           );
           
           // Add calendar tasks to store
@@ -558,35 +585,91 @@ export const IntegrationsPage: React.FC = () => {
             dispatch(addTask(task));
             totalTasksCreated++;
           });
+          
+          // Update last sync timestamp
+          dispatch(updateGoogleCalendarLastSync(new Date().toISOString()));
+          console.log('✅ Google Calendar sync completed successfully');
         } catch (error) {
           console.error('Google Calendar sync failed:', error);
         }
       }
 
-      // Sync GitHub if connected and enabled
-      if (github.connected && github.syncEnabled && github.accessToken && github.repositories) {
+      // Sync GitHub if connected and enabled with active tokens
+      if (github.connected && github.syncEnabled && github.tokens.length > 0) {
         try {
-          const since = new Date();
-          since.setDate(since.getDate() - 7); // Last 7 days
+          const activeTokens = github.tokens.filter(token => token.isActive);
           
-          const { tasks: githubTasks } = await IntegrationSyncService.syncGitHubActivity(
-            github.accessToken,
-            github.repositories,
-            tasks,
-            since
-          );
-          
-          // Add GitHub tasks to store
-          githubTasks.forEach(task => {
-            dispatch(addTask(task));
-            totalTasksCreated++;
-          });
+          if (activeTokens.length > 0) {
+            console.log(`🔄 Syncing GitHub with ${activeTokens.length} active tokens...`);
+            
+            const since = new Date();
+            since.setDate(since.getDate() - 7); // Last 7 days
+            
+            // Use multi-token approach for comprehensive PR fetching
+            const startOfDay = new Date(since);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date();
+            endOfDay.setHours(23, 59, 59, 999);
+            
+            const pullRequests = await GitHubService.getTodaysPullRequestsMultiToken(
+              activeTokens.map(token => ({
+                id: token.id,
+                token: token.token,
+                username: token.username,
+                isActive: token.isActive
+              })),
+              startOfDay,
+              endOfDay
+            );
+            
+            console.log(`📊 Found ${pullRequests.length} PRs from multi-token sync`);
+            
+            // Convert PRs to tasks (simplified conversion for now)
+            pullRequests.forEach(pr => {
+              const task = {
+                id: `github_pr_${pr.id}`,
+                title: `PR #${pr.number}: ${pr.title}`,
+                description: `GitHub PR in ${pr.repository.full_name}\n\n${pr.body || 'No description'}`,
+                completed: pr.state === 'closed' || pr.state === 'merged',
+                priority: 'medium' as const,
+                tags: ['github', 'pull-request', pr.repository.name],
+                projectId: null,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                dueDate: null,
+                subtasks: []
+              };
+              
+              dispatch(addTask(task));
+              totalTasksCreated++;
+            });
+            
+            // Update last sync timestamp
+            dispatch(updateGitHubLastSync(new Date().toISOString()));
+            console.log('✅ GitHub multi-token sync completed successfully');
+          } else {
+            console.log('⚠️ No active GitHub tokens found for sync');
+          }
         } catch (error) {
-          console.error('GitHub sync failed:', error);
+          console.error('GitHub multi-token sync failed:', error);
         }
       }
 
       console.log(`Sync completed: ${totalTasksCreated} tasks created`);
+      
+      // Persist the updated lastSync timestamps to encrypted storage
+      if (sessionMasterPassword && (
+        (googleCalendar.connected && googleCalendar.syncEnabled) || 
+        (github.connected && github.syncEnabled)
+      )) {
+        try {
+          await dispatch(persistIntegrationsState(sessionMasterPassword));
+          console.log('✅ Integration timestamps persisted to encrypted storage');
+        } catch (error) {
+          console.warn('⚠️ Failed to persist integration timestamps:', error);
+        }
+      }
+      
     } catch (error) {
       dispatch(setSyncError(String(error)));
     } finally {
@@ -594,185 +677,354 @@ export const IntegrationsPage: React.FC = () => {
     }
   };
 
+  // Handle Google Calendar sync toggle with persistence
+  const handleGoogleCalendarSyncToggle = async (enabled: boolean) => {
+    console.log('🔄 Google Calendar sync toggled to:', enabled);
+    
+    // Update Redux state immediately for responsive UI
+    dispatch(setGoogleCalendarSyncEnabled(enabled));
+    
+    // Persist the change using session master password
+    if (sessionMasterPassword) {
+      try {
+        console.log('💾 Persisting Google Calendar sync state change...');
+        await dispatch(persistIntegrationsState(sessionMasterPassword));
+        console.log('✅ Google Calendar sync state persisted successfully');
+        showSuccess('Sync Settings', `Google Calendar sync ${enabled ? 'enabled' : 'disabled'} and saved permanently.`);
+      } catch (error) {
+        console.error('❌ Failed to persist Google Calendar sync state:', error);
+        showError('Sync Settings', 'Sync preference updated locally but could not be saved permanently. Changes may be lost on restart.');
+      }
+    } else {
+      console.log('ℹ️ No session master password available - sync state updated locally only');
+      showError('Sync Settings', 'Sync preference updated locally but could not be saved permanently. Please unlock the app to save changes.');
+    }
+  };
+
+  // Handle GitHub sync toggle with persistence
+  const handleGitHubSyncToggle = async (enabled: boolean) => {
+    console.log('🔄 GitHub sync toggled to:', enabled);
+    
+    // Update Redux state immediately for responsive UI
+    dispatch(setGitHubSyncEnabled(enabled));
+    
+    // Persist the change using session master password
+    if (sessionMasterPassword) {
+      try {
+        console.log('💾 Persisting GitHub sync state change...');
+        await dispatch(persistIntegrationsState(sessionMasterPassword));
+        console.log('✅ GitHub sync state persisted successfully');
+        showSuccess('Sync Settings', `GitHub sync ${enabled ? 'enabled' : 'disabled'} and saved permanently.`);
+      } catch (error) {
+        console.error('❌ Failed to persist GitHub sync state:', error);
+        showError('Sync Settings', 'Sync preference updated locally but could not be saved permanently. Changes may be lost on restart.');
+      }
+    } else {
+      console.log('ℹ️ No session master password available - sync state updated locally only');
+      showError('Sync Settings', 'Sync preference updated locally but could not be saved permanently. Please unlock the app to save changes.');
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Integrations</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Connect external services to automatically sync tasks and activities
-        </p>
+    <div className="max-w-4xl mx-auto p-6">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-200/50 dark:border-blue-700/30">
+            <ExternalLink className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+              Integrations
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              Connect external services to automatically sync tasks and activities
+            </p>
+          </div>
+        </div>
       </div>
+
+      <div className="space-y-6">
 
       {/* Master Password Warning */}
       {!hasMasterPassword && (
-        <Card className="p-4 border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800">
-          <div className="flex items-start gap-3">
-            <Shield className="w-5 h-5 text-amber-600 mt-0.5" />
-            <div>
-              <h3 className="font-medium text-amber-800 dark:text-amber-200">Master Password Required</h3>
-              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                A master password is required to connect integrations for security reasons. 
-                Integration tokens will be encrypted and stored securely.
-              </p>
-              <Button 
-                variant="outline" 
-                className="mt-3 text-amber-700 border-amber-300 hover:bg-amber-100 dark:text-amber-200 dark:border-amber-600 dark:hover:bg-amber-800/30"
-                onClick={() => setShowPrivacyModal(true)}
-              >
-                Set Up Master Password
-              </Button>
+        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800">
+          <CardContent>
+            <div className="flex items-start gap-3">
+              <Shield className="w-5 h-5 text-amber-600 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-amber-800 dark:text-amber-200">Master Password Required</h3>
+                <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                  A master password is required to connect integrations for security reasons. 
+                  Integration tokens will be encrypted and stored securely.
+                </p>
+                <Button 
+                  variant="outline" 
+                  className="mt-3 text-amber-700 border-amber-300 hover:bg-amber-100 dark:text-amber-200 dark:border-amber-600 dark:hover:bg-amber-800/30"
+                  onClick={() => setShowPrivacyModal(true)}
+                >
+                  Set Up Master Password
+                </Button>
+              </div>
             </div>
-          </div>
+          </CardContent>
         </Card>
       )}
 
       {/* Load Saved Integrations */}
       {hasMasterPassword && hasEncryptedIntegrations && !googleCalendar.connected && !github.connected && (
-        <Card className="p-4 border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
-          <div className="flex items-start gap-3">
-            <Lock className="w-5 h-5 text-blue-600 mt-0.5" />
-            <div>
-              <h3 className="font-medium text-blue-800 dark:text-blue-200">Saved Integrations Found</h3>
-              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                You have encrypted integrations saved in the database. 
-                Enter your master password to load them.
-              </p>
-              <Button 
-                variant="outline" 
-                className="mt-3 text-blue-700 border-blue-300 hover:bg-blue-100 dark:text-blue-200 dark:border-blue-600 dark:hover:bg-blue-800/30"
-                onClick={handleLoadSavedIntegrations}
-              >
-                <Lock className="w-4 h-4 mr-2" />
-                Load Saved Integrations
-              </Button>
+        <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
+          <CardContent>
+            <div className="flex items-start gap-3">
+              <Lock className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-blue-800 dark:text-blue-200">Saved Integrations Found</h3>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                  You have encrypted integrations saved in the database. 
+                  Enter your master password to load them.
+                </p>
+                <Button 
+                  variant="outline" 
+                  className="mt-3 text-blue-700 border-blue-300 hover:bg-blue-100 dark:text-blue-200 dark:border-blue-600 dark:hover:bg-blue-800/30"
+                  onClick={handleLoadSavedIntegrations}
+                >
+                  <Lock className="w-4 h-4 mr-2" />
+                  Load Saved Integrations
+                </Button>
+              </div>
             </div>
-          </div>
+          </CardContent>
         </Card>
       )}
 
       {/* Sync Status */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <RotateCw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
-            <div>
-              <h3 className="font-medium">Sync Status</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {isSyncing ? 'Syncing...' : 'Ready to sync'}
-              </p>
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-xl ${isSyncing 
+                ? 'bg-blue-100 dark:bg-blue-900/30' 
+                : 'bg-gray-100 dark:bg-gray-800'}`}>
+                <RotateCw className={`w-6 h-6 ${isSyncing 
+                  ? 'animate-spin text-blue-600 dark:text-blue-400' 
+                  : 'text-gray-500 dark:text-gray-400'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2">
+                  <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    Sync Status
+                  </CardTitle>
+                  {isSyncing ? (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-lg border border-blue-200 dark:border-blue-700/50">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-medium">Syncing</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <span className="text-xs font-medium">Ready</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                  {isSyncing ? 'Synchronizing data from connected integrations...' : 'All integrations ready for synchronization'}
+                </p>
+              </div>
             </div>
           </div>
-          <Button 
-            onClick={handleSyncNow} 
-            disabled={isSyncing || (!googleCalendar.connected && !github.connected)}
-            className="flex items-center gap-2"
-          >
-            <RotateCw className="w-4 h-4" />
-            Sync Now
-          </Button>
-        </div>
-        
-        {lastSyncError && (
-          <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5" />
-            <div>
-              <p className="text-sm text-red-700 dark:text-red-400">Sync Error</p>
-              <p className="text-xs text-red-600 dark:text-red-500">{lastSyncError}</p>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="space-y-4">
+            {/* Sync Action */}
+            <div className="bg-gradient-to-r from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-800/20 rounded-xl p-6 border border-green-200/50 dark:border-green-700/30">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-green-900 dark:text-green-100 mb-1">
+                    {isSyncing ? 'Synchronization in Progress' : 'Manual Sync Available'}
+                  </p>
+                  <p className="text-xs text-green-700 dark:text-green-300">
+                    {isSyncing 
+                      ? 'Please wait while we sync your data...' 
+                      : 'Sync all connected integrations to get the latest updates'
+                    }
+                  </p>
+                </div>
+                <Button 
+                  onClick={handleSyncNow} 
+                  disabled={isSyncing || (!googleCalendar.connected && !github.connected)}
+                  className="ml-6 min-w-[120px] bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2.5 transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  <RotateCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? 'Syncing...' : 'Sync Now'}
+                </Button>
+              </div>
             </div>
+            
+            {/* Sync Error */}
+            {lastSyncError && (
+              <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border border-red-200/50 dark:border-red-700/30">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-red-100 dark:bg-red-800/30 rounded-lg">
+                    <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">
+                      Sync Error
+                    </p>
+                    <p className="text-xs text-red-700 dark:text-red-300">
+                      {lastSyncError}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </CardContent>
       </Card>
 
       {/* Google Calendar Integration */}
-      <Card className="p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Calendar className="w-6 h-6 text-blue-600" />
-          <div>
-            <h2 className="text-xl font-semibold">Google Calendar</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Sync calendar events as tasks
-            </p>
-          </div>
-          <div className="ml-auto">
-            {googleCalendar.connected ? (
-              <Badge variant="success" className="flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" />
-                Connected
-              </Badge>
-            ) : (
-              <Badge variant="secondary">Not Connected</Badge>
-            )}
-          </div>
-        </div>
-
-        {googleCalendar.connected ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Connected as: {googleCalendar.userEmail}</p>
-                <p className="text-xs text-gray-500">
-                  Last sync: {googleCalendar.lastSync ? new Date(googleCalendar.lastSync).toLocaleString() : 'Never'}
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-xl ${googleCalendar.connected 
+                ? 'bg-blue-100 dark:bg-blue-900/30' 
+                : 'bg-gray-100 dark:bg-gray-800'}`}>
+                <Calendar className={`w-6 h-6 ${googleCalendar.connected 
+                  ? 'text-blue-600 dark:text-blue-400' 
+                  : 'text-gray-500 dark:text-gray-400'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2">
+                  <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    Google Calendar
+                  </CardTitle>
+                  {googleCalendar.connected ? (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-lg border border-green-200 dark:border-green-700/50">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-medium">Connected</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <span className="text-xs font-medium">Not Connected</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                  Automatically sync your calendar events as actionable tasks with smart scheduling
                 </p>
               </div>
-              <div className="flex items-center gap-3">
-                <Toggle
-                  checked={googleCalendar.syncEnabled}
-                  onChange={(enabled) => dispatch(setGoogleCalendarSyncEnabled(enabled))}
-                />
-                <Button variant="secondary" onClick={handleGoogleCalendarDisconnect}>
-                  Disconnect
-                </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+
+        {googleCalendar.connected ? (
+          <div className="space-y-6">
+            {/* Connection Status */}
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-6 border border-blue-200/50 dark:border-blue-700/30">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                      Connected as: {googleCalendar.userEmail}
+                    </p>
+                  </div>
+                  <p className="text-sm text-blue-700 dark:text-blue-300 pl-4">
+                    Last sync: {googleCalendar.lastSync ? new Date(googleCalendar.lastSync).toLocaleString() : 'Never'}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-3 ml-6">
+                  <div className="flex flex-col items-center gap-2">
+                    <Toggle
+                      checked={googleCalendar.syncEnabled}
+                      onChange={handleGoogleCalendarSyncToggle}
+                    />
+                    <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                      {googleCalendar.syncEnabled ? 'Sync Enabled' : 'Sync Disabled'}
+                    </span>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleGoogleCalendarDisconnect}
+                    className="min-w-[100px] text-blue-700 border-blue-300 hover:bg-blue-200 dark:text-blue-300 dark:border-blue-600 dark:hover:bg-blue-800/50 font-medium"
+                  >
+                    Disconnect
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Connect your Google Calendar to automatically create tasks from your calendar events.
-            </p>
-            <div className="space-y-3">
-              <Input
-                label="Google Client ID"
-                placeholder={hasMasterPassword ? "Enter your Google OAuth Client ID" : "Set master password first to enter credentials"}
-                value={googleClientId}
-                onChange={(e) => setGoogleClientId(e.target.value)}
-                disabled={isConnecting || !hasMasterPassword}
-              />
-              <Input
-                label="Google Client Secret"
-                placeholder={hasMasterPassword ? "Enter your Google OAuth Client Secret" : "Set master password first to enter credentials"}
-                value={googleClientSecret}
-                onChange={(e) => setGoogleClientSecret(e.target.value)}
-                type="password"
-                disabled={isConnecting || !hasMasterPassword}
-              />
-              <p className="text-xs text-gray-500">
-                Get these credentials from the{' '}
-                <a 
-                  href="https://console.developers.google.com/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  Google Cloud Console
-                </a>
-                . See{' '}
-                <a 
-                  href="#" 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Refer to GOOGLE_OAUTH_SETUP.md in the project root for detailed setup instructions.');
-                  }}
-                  className="text-blue-600 hover:underline"
-                >
-                  setup guide
-                </a>{' '}
-                for detailed instructions.
-              </p>
+          <div className="space-y-6">
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200/50 dark:border-blue-700/30">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-800/30 rounded-lg">
+                  <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                    Connect Your Calendar
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    Automatically create tasks from your calendar events with smart scheduling and deadlines.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="grid gap-4">
+                <Input
+                  label="Google Client ID"
+                  placeholder={hasMasterPassword ? "Enter your Google OAuth Client ID" : "Set master password first to enter credentials"}
+                  value={googleClientId}
+                  onChange={(e) => setGoogleClientId(e.target.value)}
+                  disabled={isConnecting || !hasMasterPassword}
+                  className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                />
+                <Input
+                  label="Google Client Secret"
+                  placeholder={hasMasterPassword ? "Enter your Google OAuth Client Secret" : "Set master password first to enter credentials"}
+                  value={googleClientSecret}
+                  onChange={(e) => setGoogleClientSecret(e.target.value)}
+                  type="password"
+                  disabled={isConnecting || !hasMasterPassword}
+                  className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 border border-amber-200/50 dark:border-amber-700/30">
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  <strong>Setup Required:</strong> Get these credentials from the{' '}
+                  <a 
+                    href="https://console.developers.google.com/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-amber-700 dark:text-amber-200 underline hover:no-underline"
+                  >
+                    Google Cloud Console
+                  </a>
+                  . See{' '}
+                  <a 
+                    href="#" 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      alert('Refer to GOOGLE_OAUTH_SETUP.md in the project root for detailed setup instructions.');
+                    }}
+                    className="text-amber-700 dark:text-amber-200 underline hover:no-underline"
+                  >
+                    setup guide
+                  </a>{' '}
+                  for detailed instructions.
+                </p>
+              </div>
+              
               <Button 
                 onClick={handleGoogleCalendarConnect} 
                 disabled={isConnecting || !googleClientId.trim() || !googleClientSecret.trim() || !hasMasterPassword}
-                className="flex items-center gap-2"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 transition-all duration-200 flex items-center justify-center gap-2"
               >
                 <ExternalLink className="w-4 h-4" />
                 {isConnecting ? 'Connecting...' : 'Connect Google Calendar'}
@@ -780,103 +1032,285 @@ export const IntegrationsPage: React.FC = () => {
             </div>
           </div>
         )}
+        </CardContent>
       </Card>
 
       {/* GitHub Integration */}
-      <Card className="p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Github className="w-6 h-6" />
-          <div>
-            <h2 className="text-xl font-semibold">GitHub</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Sync commits and pull requests as completed tasks
-            </p>
-          </div>
-          <div className="ml-auto">
-            {github.connected ? (
-              <Badge variant="success" className="flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" />
-                Connected
-              </Badge>
-            ) : (
-              <Badge variant="secondary">Not Connected</Badge>
-            )}
-          </div>
-        </div>
-
-        {github.connected ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Connected as: @{github.username}</p>
-                <p className="text-xs text-gray-500">
-                  Syncing {github.repositories?.length || 0} repositories
-                </p>
-                <p className="text-xs text-gray-500">
-                  Last sync: {github.lastSync ? new Date(github.lastSync).toLocaleString() : 'Never'}
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-4">  
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-xl ${github.connected 
+                ? 'bg-gray-100 dark:bg-gray-700' 
+                : 'bg-gray-100 dark:bg-gray-800'}`}>
+                <Github className={`w-6 h-6 ${github.connected 
+                  ? 'text-gray-900 dark:text-gray-100' 
+                  : 'text-gray-500 dark:text-gray-400'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2">
+                  <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    GitHub
+                  </CardTitle>
+                  {github.connected ? (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-lg border border-green-200 dark:border-green-700/50">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-medium">Connected</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <span className="text-xs font-medium">Not Connected</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                  Sync pull requests from all accessible repositories as actionable tasks
                 </p>
               </div>
-              <div className="flex items-center gap-3">
-                <Toggle
-                  checked={github.syncEnabled}
-                  onChange={(enabled) => dispatch(setGitHubSyncEnabled(enabled))}
-                />
-                <Button variant="secondary" onClick={handleGitHubDisconnect}>
-                  Disconnect
-                </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+
+        {github.connected ? (
+          <div className="space-y-6">
+            {/* Connection Status */}
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 rounded-xl p-6 border border-gray-200/50 dark:border-gray-600/30">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      Connected as: @{github.username}
+                    </p>
+                  </div>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 pl-4">
+                    Last sync: {github.lastSync ? new Date(github.lastSync).toLocaleString() : 'Never'}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 pl-4">
+                    {github.tokens.length} token{github.tokens.length !== 1 ? 's' : ''} configured, {github.tokens.filter(t => t.isActive).length} active
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-3 ml-6">
+                  <div className="flex flex-col items-center gap-2">
+                    <Toggle
+                      checked={github.syncEnabled}
+                      onChange={handleGitHubSyncToggle}
+                    />
+                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                      {github.syncEnabled ? 'Sync Enabled' : 'Sync Disabled'}
+                    </span>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleGitHubDisconnect}
+                    className="min-w-[100px] text-gray-700 border-gray-300 hover:bg-gray-200 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700/50 font-medium"
+                  >
+                    Disconnect
+                  </Button>
+                </div>
               </div>
             </div>
             
-            {github.repositories && github.repositories.length > 0 && (
-              <div>
-                <p className="text-sm font-medium mb-2">Synced Repositories:</p>
-                <div className="flex flex-wrap gap-2">
-                  {github.repositories.map(repo => (
-                    <Badge key={repo} variant="outline" className="text-xs">
-                      {repo}
-                    </Badge>
-                  ))}
+            {/* Token Management */}
+            {github.tokens && github.tokens.length > 0 && (
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200/50 dark:border-blue-700/30">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-blue-100 dark:bg-blue-800/30 rounded-lg">
+                        <Github className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                          GitHub Tokens
+                        </p>
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          Managing {github.tokens.length} token{github.tokens.length !== 1 ? 's' : ''} for comprehensive repository access
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowTokenManagement(!showTokenManagement)}
+                      className="text-blue-700 border-blue-300 hover:bg-blue-100 dark:text-blue-300 dark:border-blue-600 dark:hover:bg-blue-800/50"
+                    >
+                      {showTokenManagement ? 'Hide' : 'Manage'} Tokens
+                    </Button>
+                  </div>
+                  
+                  {/* Token List */}
+                  <div className="space-y-3">
+                    {github.tokens.map(token => (
+                      <div key={token.id} className="flex items-center justify-between p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-blue-200/50 dark:border-blue-700/30">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full ${token.isActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {token.displayName || `${token.username} Token`}
+                            </p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              @{token.username} • {token.isActive ? 'Active' : 'Inactive'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleTokenActive(token.id)}
+                            className={`text-xs ${token.isActive 
+                              ? 'text-orange-700 border-orange-300 hover:bg-orange-100 dark:text-orange-300 dark:border-orange-600 dark:hover:bg-orange-800/30'
+                              : 'text-green-700 border-green-300 hover:bg-green-100 dark:text-green-300 dark:border-green-600 dark:hover:bg-green-800/30'
+                            }`}
+                          >
+                            {token.isActive ? 'Disable' : 'Enable'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRemoveGitHubToken(token.id)}
+                            className="text-xs text-red-700 border-red-300 hover:bg-red-100 dark:text-red-300 dark:border-red-600 dark:hover:bg-red-800/30"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+                
+                {/* Add Token Form */}
+                {showTokenManagement && (
+                  <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200/50 dark:border-gray-600/30">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-gray-100 dark:bg-gray-700/50 rounded-lg">
+                        <Github className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          Add New GitHub Token
+                        </p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          Add additional tokens to access more repositories and organizations
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <Input
+                        label="Token Display Name (Optional)"
+                        placeholder="e.g., Work Account, Personal, Organization"
+                        value={newTokenDisplayName}
+                        onChange={(e) => setNewTokenDisplayName(e.target.value)}
+                        disabled={!hasMasterPassword}
+                        className="transition-all duration-200 focus:ring-2 focus:ring-gray-500"
+                      />
+                      <Input
+                        label="GitHub Personal Access Token"
+                        placeholder={hasMasterPassword ? "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" : "Set master password first to enter token"}
+                        value={newGithubToken}
+                        onChange={(e) => setNewGithubToken(e.target.value)}
+                        type="password"
+                        disabled={!hasMasterPassword}
+                        className="transition-all duration-200 focus:ring-2 focus:ring-gray-500"
+                      />
+                      
+                      <div className="flex gap-3">
+                        <Button 
+                          onClick={handleGitHubConnect} 
+                          disabled={!hasMasterPassword || !newGithubToken.trim()}
+                          className="bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white font-medium py-2 transition-all duration-200 flex items-center justify-center gap-2"
+                        >
+                          <Github className="w-4 h-4" />
+                          Add Token
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          onClick={() => {
+                            setShowTokenManagement(false);
+                            setNewGithubToken('');
+                            setNewTokenDisplayName('');
+                          }}
+                          className="text-gray-700 border-gray-300 hover:bg-gray-100 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700/50"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
         ) : (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Connect your GitHub account to automatically create completed tasks from your commits and merged pull requests.
-            </p>
-            <div className="space-y-3">
+          <div className="space-y-6">
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200/50 dark:border-gray-600/30">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-gray-100 dark:bg-gray-700/50 rounded-lg">
+                  <Github className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    Connect Your GitHub
+                  </p>
+                  <p className="text-xs text-gray-700 dark:text-gray-300">
+                    Add multiple GitHub tokens to sync pull requests from all accessible repositories (owned, collaborator, and organization repos) as actionable tasks.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <Input
+                label="Token Display Name (Optional)"
+                placeholder="e.g., Work Account, Personal, Organization"
+                value={newTokenDisplayName}
+                onChange={(e) => setNewTokenDisplayName(e.target.value)}
+                disabled={!hasMasterPassword}
+                className="transition-all duration-200 focus:ring-2 focus:ring-gray-500"
+              />
               <Input
                 label="GitHub Personal Access Token"
                 placeholder={hasMasterPassword ? "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" : "Set master password first to enter token"}
-                value={githubToken}
-                onChange={(e) => setGithubToken(e.target.value)}
+                value={newGithubToken}
+                onChange={(e) => setNewGithubToken(e.target.value)}
                 type="password"
                 disabled={!hasMasterPassword}
+                className="transition-all duration-200 focus:ring-2 focus:ring-gray-500"
               />
-              <p className="text-xs text-gray-500">
-                Create a personal access token at{' '}
-                <a 
-                  href="https://github.com/settings/tokens" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  GitHub Settings → Developer settings → Personal access tokens
-                </a>
-              </p>
+              
+              <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 border border-amber-200/50 dark:border-amber-700/30">
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  <strong>Multi-Token Support:</strong> You can add multiple GitHub tokens to access repositories from different accounts or organizations. Create tokens at{' '}
+                  <a 
+                    href="https://github.com/settings/tokens" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-amber-700 dark:text-amber-200 underline hover:no-underline"
+                  >
+                    GitHub Settings → Developer settings → Personal access tokens
+                  </a>
+                  . Make sure to grant appropriate repository access permissions.
+                </p>
+              </div>
+              
               <Button 
                 onClick={handleGitHubConnect} 
-                disabled={!hasMasterPassword}
-                className="flex items-center gap-2"
+                disabled={!hasMasterPassword || !newGithubToken.trim()}
+                className="w-full bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white font-medium py-2.5 transition-all duration-200 flex items-center justify-center gap-2"
               >
                 <Github className="w-4 h-4" />
-                Connect GitHub
+                Add GitHub Token
               </Button>
             </div>
           </div>
         )}
+        </CardContent>
       </Card>
+      </div>
 
       {/* Master Password Authentication Modal */}
       <Modal
@@ -886,6 +1320,7 @@ export const IntegrationsPage: React.FC = () => {
           setPassword('');
           setPasswordError('');
           setPendingAction(null);
+          setPendingSyncToggle(null);
         }}
         title="Authentication Required"
       >
@@ -928,6 +1363,7 @@ export const IntegrationsPage: React.FC = () => {
                 setPassword('');
                 setPasswordError('');
                 setPendingAction(null);
+                setPendingSyncToggle(null);
               }}
               disabled={isValidatingPassword}
             >

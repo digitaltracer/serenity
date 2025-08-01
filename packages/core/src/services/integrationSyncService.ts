@@ -22,7 +22,8 @@ export class IntegrationSyncService {
   static async syncGoogleCalendarEvents(
     accessToken: string,
     existingTasks: Task[],
-    dateRange: { start: Date; end: Date }
+    dateRange: { start: Date; end: Date },
+    connectionDate?: string
   ): Promise<{ tasks: Task[]; result: SyncResult }> {
     const result: SyncResult = {
       success: true,
@@ -32,10 +33,19 @@ export class IntegrationSyncService {
     };
 
     try {
-      // Fetch calendar events
+      // Use connection date as minimum start date if provided
+      let effectiveStartDate = dateRange.start;
+      if (connectionDate) {
+        const connectionDateTime = new Date(connectionDate);
+        if (connectionDateTime > dateRange.start) {
+          effectiveStartDate = connectionDateTime;
+        }
+      }
+
+      // Fetch calendar events from connection date forward only
       const events = await GoogleCalendarService.getCalendarEvents(
         accessToken,
-        dateRange.start,
+        effectiveStartDate,
         dateRange.end
       );
 
@@ -87,11 +97,11 @@ export class IntegrationSyncService {
   }
 
   /**
-   * Sync GitHub commits and PRs to completed tasks
+   * Sync GitHub Pull Requests from today only (across ALL user repositories)
    */
   static async syncGitHubActivity(
     accessToken: string,
-    repositories: string[],
+    repositories: string[], // This is now only used for display purposes
     existingTasks: Task[],
     since?: Date
   ): Promise<{ tasks: Task[]; result: SyncResult }> {
@@ -103,11 +113,21 @@ export class IntegrationSyncService {
     };
 
     try {
-      // Fetch GitHub activity
-      const activity = await GitHubService.getActivitySummary(
+      // Get today's date range in user's local timezone (start of day to end of day)
+      const today = new Date();
+      const localStartOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const localEndOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+
+      console.log(`🕒 Using local timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
+      console.log(`📅 Local "today" range: ${localStartOfDay.toLocaleString()} to ${localEndOfDay.toLocaleString()}`);
+
+      // Fetch pull requests from today across ALL accessible repositories (owned + collaborator + org)
+      console.log('🔍 Syncing GitHub PRs from ALL accessible repositories (owned + collaborator + org)...');
+      const pullRequests = await GitHubService.getTodaysPullRequests(
         accessToken,
-        repositories,
-        since
+        null, // null = fetch from all repositories, not just displayed ones
+        localStartOfDay,
+        localEndOfDay
       );
 
       const syncedTasks: Task[] = [];
@@ -115,31 +135,8 @@ export class IntegrationSyncService {
         task.tags?.includes('github')
       );
 
-      // Process commits
-      for (const commit of activity.commits) {
-        try {
-          const task = this.convertCommitToTask(commit);
-          
-          // Check if task already exists
-          const existingTask = existingGitHubTasks.find(existing => 
-            existing.tags?.includes(`commit-${commit.sha}`)
-          );
-
-          if (!existingTask) {
-            syncedTasks.push(task);
-            result.tasksCreated++;
-          }
-        } catch (error) {
-          result.errors.push(`Failed to process commit ${commit.sha}: ${error}`);
-        }
-      }
-
-      // Process pull requests
-      for (const pr of activity.pullRequests) {
-        if (pr.state !== 'closed' && pr.merged_at === null) {
-          continue; // Only sync closed/merged PRs as completed tasks
-        }
-
+      // Process only pull requests (no commits)
+      for (const pr of pullRequests) {
         try {
           const task = this.convertPullRequestToTask(pr);
           
@@ -196,40 +193,31 @@ export class IntegrationSyncService {
     };
   }
 
-  /**
-   * Convert GitHub commit to completed task
-   */
-  private static convertCommitToTask(commit: GitHubCommit): Task {
-    const commitMessage = commit.commit.message.split('\n')[0]; // First line only
-    const description = `${commit.commit.message}\n\nRepository: ${commit.repository.full_name}\nCommit: ${commit.html_url}`;
-
-    return {
-      id: generateId(),
-      title: `Commit: ${commitMessage}`,
-      description,
-      completed: true, // Commits are always completed
-      priority: 'low',
-      dueDate: new Date(commit.commit.author.date),
-      tags: ['github', 'commit', commit.repository.name, `commit-${commit.sha}`],
-      createdAt: new Date(commit.commit.author.date),
-      updatedAt: new Date(),
-    };
-  }
 
   /**
-   * Convert GitHub pull request to completed task
+   * Convert GitHub pull request to task
    */
   private static convertPullRequestToTask(pr: GitHubPullRequest): Task {
-    const description = `${pr.body || ''}\n\nRepository: ${pr.repository.full_name}\nPull Request: ${pr.html_url}`;
-    const completedDate = pr.merged_at || pr.closed_at || pr.updated_at;
+    // Use PR description as task description, add repository and link info
+    let description = pr.body || '';
+    if (description) {
+      description += '\n\n';
+    }
+    description += `Repository: ${pr.repository.full_name}\nPull Request: ${pr.html_url}`;
+
+    // Determine completion status based on PR state
+    const isCompleted = pr.state === 'closed' || pr.merged_at !== null;
+    
+    // Use appropriate date based on PR state
+    const relevantDate = pr.merged_at || pr.closed_at || pr.updated_at || pr.created_at;
 
     return {
       id: generateId(),
-      title: `PR #${pr.number}: ${pr.title}`,
+      title: pr.title, // Use PR title directly, no prefix
       description,
-      completed: true, // PRs are marked as completed when closed/merged
+      completed: isCompleted, // Open PRs are incomplete, closed/merged are complete
       priority: 'medium',
-      dueDate: new Date(completedDate),
+      dueDate: new Date(relevantDate),
       tags: ['github', 'pull-request', pr.repository.name, `pr-${pr.id}`],
       createdAt: new Date(pr.created_at),
       updatedAt: new Date(),

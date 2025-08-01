@@ -21,6 +21,8 @@
   },
   "dependencies": {
     "@reduxjs/toolkit": "^1.9.5",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.2",
     "date-fns": "^2.30.0",
     "uuid": "^9.0.0",
     "zod": "^3.22.2"

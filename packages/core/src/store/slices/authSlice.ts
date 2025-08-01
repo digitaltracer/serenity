@@ -13,6 +13,8 @@ export interface AuthState {
   autoLockTimeout: number; // minutes
   lastActivity: number; // timestamp
   error: string | null;
+  // Secure session storage for master password (cleared on lock/logout)
+  sessionMasterPassword: string | null;
 }
 
 const initialState: AuthState = {
@@ -26,6 +28,7 @@ const initialState: AuthState = {
   autoLockTimeout: 15,
   lastActivity: Date.now(),
   error: null,
+  sessionMasterPassword: null,
 };
 
 // Async thunks
@@ -274,6 +277,8 @@ const authSlice = createSlice({
     lockApp: (state) => {
       state.isLocked = true;
       state.error = null;
+      // Clear session master password for security
+      state.sessionMasterPassword = null;
     },
     unlockApp: (state) => {
       state.isLocked = false;
@@ -328,13 +333,15 @@ const authSlice = createSlice({
         state.isValidating = true;
         state.error = null;
       })
-      .addCase(validatePassword.fulfilled, (state) => {
+      .addCase(validatePassword.fulfilled, (state, action) => {
         state.isValidating = false;
         state.isLocked = false;
         state.failedAttempts = 0;
         state.lockoutUntil = null;
         state.error = null;
         state.lastActivity = Date.now();
+        // Store master password in session for integration operations
+        state.sessionMasterPassword = (action.payload as any).password;
       })
       .addCase(validatePassword.rejected, (state, action) => {
         state.isValidating = false;
@@ -378,6 +385,8 @@ const authSlice = createSlice({
         state.failedAttempts = 0;
         state.lockoutUntil = null;
         state.error = null;
+        // Clear session master password
+        state.sessionMasterPassword = null;
       })
       .addCase(resetPassword.rejected, (state, action) => {
         state.isValidating = false;
@@ -405,13 +414,15 @@ const authSlice = createSlice({
         state.isValidating = true;
         state.error = null;
       })
-      .addCase(authenticateWithBiometric.fulfilled, (state) => {
+      .addCase(authenticateWithBiometric.fulfilled, (state, action) => {
         state.isValidating = false;
         state.isLocked = false;
         state.failedAttempts = 0;
         state.lockoutUntil = null;
         state.error = null;
         state.lastActivity = Date.now();
+        // Store master password in session for integration operations
+        state.sessionMasterPassword = (action.payload as any).masterPassword;
       })
       .addCase(authenticateWithBiometric.rejected, (state, action) => {
         state.isValidating = false;
@@ -443,5 +454,8 @@ export const selectLockoutTime = (state: { auth: AuthState }) => {
   if (!lockoutUntil || Date.now() >= lockoutUntil) return 0;
   return Math.ceil((lockoutUntil - Date.now()) / 1000);
 };
+
+// Selector for session master password (available when user is authenticated)
+export const selectSessionMasterPassword = (state: { auth: AuthState }) => state.auth.sessionMasterPassword;
 
 export default authSlice.reducer;

@@ -119,18 +119,13 @@ export class EncryptedIntegrationService {
         for (const integration of encryptedData) {
           console.log(`💾 Storing ${integration.type} integration...`);
           
-          const result = await window.electronAPI.sqlite.query(
-            `INSERT OR REPLACE INTO encrypted_integrations 
-             (id, type, encrypted_data, created_at, updated_at) 
-             VALUES (?, ?, ?, ?, ?)`,
-            [
-              integration.id,
-              integration.type,
-              integration.encrypted_data,
-              integration.created_at,
-              integration.updated_at,
-            ]
-          );
+          const result = await window.electronAPI.integrations!.saveEncrypted({
+            id: integration.id,
+            type: integration.type,
+            encrypted_data: integration.encrypted_data,
+            created_at: integration.created_at,
+            updated_at: integration.updated_at
+          });
           
           if (!result.success) {
             console.error(`❌ Failed to store ${integration.type} integration:`, result.error);
@@ -141,9 +136,7 @@ export class EncryptedIntegrationService {
         }
         
         // Verify data was stored
-        const verificationResult = await window.electronAPI.sqlite.query(
-          'SELECT id, type FROM encrypted_integrations'
-        );
+        const verificationResult = await window.electronAPI.integrations!.getVerification();
         
         if (verificationResult.success && verificationResult.data) {
           console.log(`✅ Verification: ${verificationResult.data.length} integrations found in database:`, 
@@ -181,10 +174,8 @@ export class EncryptedIntegrationService {
       let encryptedData: EncryptedIntegrationData[] = [];
 
       // Try to load from database first
-      if (window.electronAPI?.sqlite) {
-        const result = await window.electronAPI.sqlite.query(
-          'SELECT id, type, encrypted_data, created_at, updated_at FROM encrypted_integrations'
-        );
+      if (window.electronAPI?.integrations) {
+        const result = await window.electronAPI.integrations.loadEncrypted();
         
         if (result.success && result.data) {
           encryptedData = result.data;
@@ -268,10 +259,8 @@ export class EncryptedIntegrationService {
   static async clearStoredIntegrations(): Promise<void> {
     try {
       // Clear from database
-      if (window.electronAPI?.sqlite) {
-        const result = await window.electronAPI.sqlite.query(
-          'DELETE FROM encrypted_integrations'
-        );
+      if (window.electronAPI?.integrations) {
+        const result = await window.electronAPI.integrations.clearEncrypted();
         
         if (result.success) {
           console.log('🧹 Cleared encrypted integrations from database');
@@ -304,26 +293,16 @@ export class EncryptedIntegrationService {
       console.log('🔧 Initializing encrypted_integrations table...');
 
       // Create the table if it doesn't exist (for compatibility with older databases)
-      const createTableResult = await window.electronAPI.sqlite.query(`
-        CREATE TABLE IF NOT EXISTS encrypted_integrations (
-          id TEXT PRIMARY KEY,
-          type TEXT NOT NULL CHECK (type IN ('google_calendar', 'github')),
-          encrypted_data TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+      const createTableResult = await window.electronAPI.integrations!.initializeTable();
 
       if (!createTableResult.success) {
         throw new Error(`Failed to create encrypted_integrations table: ${createTableResult.error}`);
       }
 
       // Verify table exists by checking structure
-      const tableCheckResult = await window.electronAPI.sqlite.query(`
-        SELECT name FROM sqlite_master WHERE type='table' AND name='encrypted_integrations'
-      `);
+      const tableCheckResult = await window.electronAPI.integrations!.verifyTable();
 
-      if (!tableCheckResult.success || !tableCheckResult.data || tableCheckResult.data.length === 0) {
+      if (!tableCheckResult.success || !tableCheckResult.data?.exists) {
         throw new Error('encrypted_integrations table was not created successfully');
       }
 
@@ -340,12 +319,10 @@ export class EncryptedIntegrationService {
   static async hasEncryptedIntegrations(): Promise<boolean> {
     try {
       // Check database first
-      if (window.electronAPI?.sqlite) {
-        const result = await window.electronAPI.sqlite.query(
-          'SELECT COUNT(*) as count FROM encrypted_integrations'
-        );
+      if (window.electronAPI?.integrations) {
+        const result = await window.electronAPI.integrations.hasEncrypted();
         
-        if (result.success && result.data && result.data[0]?.count > 0) {
+        if (result.success && result.data?.hasEncrypted) {
           return true;
         }
       }

@@ -43,6 +43,9 @@ import {
   IntegrationSyncService,
   EncryptedIntegrationService,
   addTask,
+  addProject,
+  selectAllTasks,
+  selectAllProjects,
   RootState,
   selectHasMasterPassword,
   selectIsLocked,
@@ -64,6 +67,7 @@ export const IntegrationsPage: React.FC = () => {
   const isSyncing = useSelector(selectIsSyncing);
   const lastSyncError = useSelector(selectLastSyncError);
   const tasks = useSelector((state: RootState) => state.tasks.tasks);
+  const projects = useSelector((state: RootState) => state.projects.projects);
   const hasMasterPassword = useSelector(selectHasMasterPassword);
   const isLocked = useSelector(selectIsLocked);
   const sessionMasterPassword = useSelector(selectSessionMasterPassword);
@@ -624,24 +628,66 @@ export const IntegrationsPage: React.FC = () => {
             
             console.log(`📊 Found ${pullRequests.length} PRs from multi-token sync`);
             
-            // Convert PRs to tasks (simplified conversion for now)
-            pullRequests.forEach(pr => {
-              const task = {
-                id: `github_pr_${pr.id}`,
-                title: `PR #${pr.number}: ${pr.title}`,
-                description: `GitHub PR in ${pr.repository.full_name}\n\n${pr.body || 'No description'}`,
-                completed: pr.state === 'closed' || pr.state === 'merged',
-                priority: 'medium' as const,
-                tags: ['github', 'pull-request', pr.repository.name],
-                projectId: null,
+            // Step 1: Ensure "Github" project exists
+            let githubProject = projects.find(project => 
+              project.name.toLowerCase() === 'github' && !project.archived
+            );
+            
+            if (!githubProject) {
+              // Create Github project
+              const newGithubProject = {
+                id: `github_project_${Date.now()}`,
+                name: 'Github',
+                description: 'Automatically synced GitHub pull requests and issues',
+                color: '#333333', // GitHub's dark color
+                archived: false,
                 createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                dueDate: null,
-                subtasks: []
+                updatedAt: new Date().toISOString()
               };
               
-              dispatch(addTask(task));
-              totalTasksCreated++;
+              dispatch(addProject(newGithubProject));
+              githubProject = newGithubProject;
+              console.log('📁 Created new "Github" project for synced items');
+            }
+
+            // Step 2: Convert PRs to tasks with improved duplicate prevention
+            const existingGithubTasks = tasks.filter(task => 
+              task.tags?.includes('github')
+            );
+            
+            pullRequests.forEach(pr => {
+              // Check if task already exists (improved duplicate prevention)
+              const existingTask = existingGithubTasks.find(existing => 
+                existing.tags?.includes(`pr-${pr.id}`) ||
+                existing.tags?.includes(`github-pr-${pr.id}`) ||
+                existing.id === `github_pr_${pr.id}` // Check old ID format too
+              );
+              
+              if (!existingTask) {
+                // Set due date to today for better organization
+                const today = new Date();
+                today.setHours(23, 59, 59, 999); // End of today
+                
+                const task = {
+                  id: `github_pr_${pr.id}`,
+                  title: pr.title, // Use PR title directly, no prefix
+                  description: `${pr.body || 'No description'}\n\nRepository: ${pr.repository.full_name}\nPull Request: ${pr.html_url}`,
+                  completed: pr.state === 'closed' || pr.state === 'merged',
+                  priority: 'medium' as const,
+                  tags: ['github', 'pull-request', pr.repository.name, `pr-${pr.id}`, `github-pr-${pr.id}`], // Add both old and new format tags
+                  projectId: githubProject.id, // Assign to Github project
+                  createdAt: new Date(pr.created_at).toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  dueDate: today.toISOString(), // Always set to today for GitHub items
+                  subtasks: []
+                };
+                
+                dispatch(addTask(task));
+                totalTasksCreated++;
+                console.log(`📋 Created task for PR: ${pr.title} (${pr.repository.name})`);
+              } else {
+                console.log(`⏭️ Skipped existing PR: ${pr.title} (${pr.repository.name})`);
+              }
             });
             
             // Update last sync timestamp

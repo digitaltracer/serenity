@@ -19,6 +19,7 @@ interface DraggableTaskCardProps {
   containerName?: string;
   showDragHandle?: boolean;
   disabled?: boolean;
+  projects?: Array<{ id: string; name: string; color?: string; archived?: boolean }>;
 }
 
 export const DraggableTaskCard: React.FC<DraggableTaskCardProps> = ({
@@ -31,6 +32,7 @@ export const DraggableTaskCard: React.FC<DraggableTaskCardProps> = ({
   containerName,
   showDragHandle = true,
   disabled = false,
+  projects,
 }) => {
   const { createTaskDragItem } = useTaskDragDrop();
   
@@ -60,6 +62,7 @@ export const DraggableTaskCard: React.FC<DraggableTaskCardProps> = ({
         onToggle={onToggle}
         onClick={onClick}
         onDelete={onDelete}
+        projects={projects}
         className={`
           transition-all duration-200
           ${isDragging ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' : ''}

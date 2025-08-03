@@ -11,15 +11,16 @@ export interface TaskCardProps {
   onClick?: (task: Task) => void;
   onDelete?: (taskId: string) => void;
   className?: string;
+  projects?: Array<{ id: string; name: string; color?: string; archived?: boolean }>;
 }
 
-const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, onClick, onDelete, className }) => {
+const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, onClick, onDelete, className, projects }) => {
   const compactMode = useSelector(selectCompactMode);
   
   const priorityColors = {
-    high: 'text-red-500 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20',
-    medium: 'text-yellow-500 border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20',
-    low: 'text-green-500 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20',
+    high: 'text-green-700 border-green-300 bg-green-100 dark:border-green-600 dark:bg-green-800/30 dark:text-green-200',
+    medium: 'text-green-600 border-green-200 bg-green-50 dark:border-green-700 dark:bg-green-900/20 dark:text-green-300',
+    low: 'text-green-500 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400',
   };
 
   // Memoize expensive date calculations to prevent re-computation on every render
@@ -38,6 +39,13 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
   }, [task.dueDate, task.completed]);
 
   const { isOverdue, isDueToday } = dateInfo;
+
+  // Find project name from projectId
+  const projectName = useMemo(() => {
+    if (!task.projectId || !projects) return null;
+    const project = projects.find(p => p.id === task.projectId && !p.archived);
+    return project?.name || null;
+  }, [task.projectId, projects]);
 
   return (
     <div
@@ -86,11 +94,13 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
         </button>
 
         {/* Task Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between">
+        <div className="flex gap-4 flex-1 min-w-0">
+          {/* Left Side - Main Content */}
+          <div className="flex-1 min-w-0">
+            {/* Title */}
             <h3
               className={cn(
-                'font-medium text-gray-900 dark:text-gray-100 truncate pr-2',
+                'font-medium text-gray-900 dark:text-gray-100 mb-2',
                 {
                   'line-through text-gray-500 dark:text-gray-400': task.completed,
                 }
@@ -100,109 +110,79 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
               {task.title}
             </h3>
 
-            <div className="flex items-center gap-2">
-              {/* Priority Badge */}
-              <div
-                className={cn(
-                  'flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border',
-                  priorityColors[task.priority]
+            {/* Description */}
+            {task.description && (
+              <p className={cn(
+                'text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-2',
+                {
+                  'mt-1': !compactMode,
+                  'mt-0.5': compactMode,
+                }
+              )}>
+                {task.description}
+              </p>
+            )}
+
+            {/* Subtasks */}
+            {task.subtasks && task.subtasks.length > 0 && (
+              <div className={cn(
+                'space-y-1',
+                {
+                  'mt-2': !compactMode,
+                  'mt-1.5': compactMode,
+                }
+              )}>
+                {task.subtasks.slice(0, 3).map((subtask) => (
+                  <div key={subtask.id} className="flex items-center gap-2 text-sm">
+                    <button
+                      className="flex-shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleSubtask?.(task.id, subtask.id);
+                      }}
+                    >
+                      {subtask.completed ? (
+                        <CheckCircle2 className="w-3 h-3 text-green-500" />
+                      ) : (
+                        <Circle className="w-3 h-3 text-gray-400" />
+                      )}
+                    </button>
+                    <span
+                      className={cn(
+                        'text-gray-600 dark:text-gray-400 truncate',
+                        { 'line-through text-gray-400 dark:text-gray-500': subtask.completed }
+                      )}
+                      title={subtask.title}
+                    >
+                      {subtask.title}
+                    </span>
+                  </div>
+                ))}
+                {task.subtasks.length > 3 && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 ml-5">
+                    +{task.subtasks.length - 3} more subtasks
+                  </div>
                 )}
-              >
-                <Flag className="w-3 h-3" />
-                <span className="sr-only">Priority: </span>
-                {task.priority}
               </div>
+            )}
 
-              {/* Delete Button */}
-              {onDelete && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(task.id);
-                  }}
-                  className="p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                  title="Delete task"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Description */}
-          {task.description && (
-            <p className={cn(
-              'text-sm text-gray-600 dark:text-gray-400 line-clamp-2',
-              {
-                'mt-1': !compactMode,
-                'mt-0.5': compactMode,
-              }
-            )}>
-              {task.description}
-            </p>
-          )}
-
-          {/* Subtasks */}
-          {task.subtasks && task.subtasks.length > 0 && (
+            {/* Footer - Due Date and Progress */}
             <div className={cn(
-              'space-y-1',
+              'flex items-center gap-3 flex-wrap',
               {
-                'mt-2': !compactMode,
-                'mt-1.5': compactMode,
+                'mt-3': !compactMode,
+                'mt-2': compactMode,
               }
             )}>
-              {task.subtasks.slice(0, 3).map((subtask) => (
-                <div key={subtask.id} className="flex items-center gap-2 text-sm">
-                  <button
-                    className="flex-shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleSubtask?.(task.id, subtask.id);
-                    }}
-                  >
-                    {subtask.completed ? (
-                      <CheckCircle2 className="w-3 h-3 text-green-500" />
-                    ) : (
-                      <Circle className="w-3 h-3 text-gray-400" />
-                    )}
-                  </button>
-                  <span
-                    className={cn(
-                      'text-gray-600 dark:text-gray-400 truncate',
-                      { 'line-through text-gray-400 dark:text-gray-500': subtask.completed }
-                    )}
-                    title={subtask.title}
-                  >
-                    {subtask.title}
-                  </span>
-                </div>
-              ))}
-              {task.subtasks.length > 3 && (
-                <div className="text-xs text-gray-500 dark:text-gray-400 ml-5">
-                  +{task.subtasks.length - 3} more subtasks
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Footer */}
-          <div className={cn(
-            'flex items-center justify-between',
-            {
-              'mt-3': !compactMode,
-              'mt-2': compactMode,
-            }
-          )}>
-            <div className="flex items-center gap-2">
               {/* Due Date */}
               {task.dueDate && (
                 <div
                   className={cn(
-                    'flex items-center gap-1 text-xs',
+                    'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border',
                     {
-                      'text-red-600 dark:text-red-400': isOverdue,
-                      'text-blue-600 dark:text-blue-400': isDueToday && !isOverdue,
-                      'text-gray-500 dark:text-gray-400': !isOverdue && !isDueToday,
+                      'text-red-700 bg-red-50 border-red-200 dark:text-red-300 dark:bg-red-900/20 dark:border-red-700': isOverdue,
+                      'text-blue-700 bg-blue-50 border-blue-200 dark:text-blue-300 dark:bg-blue-900/20 dark:border-blue-700': isDueToday && !isOverdue,
+                      'text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-800 dark:border-gray-600': !isOverdue && !isDueToday,
                     }
                   )}
                 >
@@ -213,7 +193,7 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
 
               {/* Subtask Progress */}
               {task.subtasks && task.subtasks.length > 0 && (
-                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 dark:text-gray-400 dark:bg-gray-800 dark:border-gray-600">
                   <ListTodo className="w-3 h-3" />
                   {task.subtasks.filter(st => st.completed).length}/{task.subtasks.length}
                 </div>
@@ -221,35 +201,63 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
 
               {/* Recurring */}
               {task.recurring && task.recurring.type && (
-                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 dark:text-gray-400 dark:bg-gray-800 dark:border-gray-600">
                   <RefreshCw className="w-3 h-3" />
                   {task.recurring.type}
                 </div>
               )}
+            </div>
+          </div>
 
-              {/* Project */}
-              {task.projectId && (
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  📁 Project
-                </div>
+          {/* Right Side - Metadata */}
+          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+            {/* Delete Button */}
+            {onDelete && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(task.id);
+                }}
+                className="p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                title="Delete task"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Priority Badge */}
+            <div
+              className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border shadow-sm',
+                priorityColors[task.priority]
               )}
+            >
+              <Flag className="w-3 h-3" />
+              <span className="capitalize">{task.priority}</span>
             </div>
 
-            {/* Tags */}
+            {/* Project */}
+            {projectName && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 dark:text-gray-400 dark:bg-gray-800 dark:border-gray-600">
+                📁 {projectName}
+              </div>
+            )}
+
+            {/* Tags - Arranged horizontally */}
             {task.tags.length > 0 && (
-              <div className="flex gap-1">
-                {task.tags.slice(0, 2).map((tag, index) => (
+              <div className="flex gap-1 flex-wrap justify-end max-w-[200px]">
+                {task.tags.slice(0, 3).map((tag, index) => (
                   <span
                     key={index}
-                    className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 max-w-20 truncate inline-block"
+                    className="px-2 py-0.5 text-xs font-medium rounded-md bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 whitespace-nowrap"
                     title={tag}
                   >
                     {tag}
                   </span>
                 ))}
-                {task.tags.length > 2 && (
-                  <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                    +{task.tags.length - 2}
+                {task.tags.length > 3 && (
+                  <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 border border-gray-200 dark:border-gray-600 whitespace-nowrap">
+                    +{task.tags.length - 3}
                   </span>
                 )}
               </div>

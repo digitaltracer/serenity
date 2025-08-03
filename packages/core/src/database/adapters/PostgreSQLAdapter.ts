@@ -3,6 +3,7 @@
  * Provides PostgreSQL-specific implementation of DatabaseOperations
  */
 
+import { Pool, PoolClient, PoolConfig } from 'pg';
 import { 
   DatabaseConfig, 
   PostgreSQLConfig, 
@@ -13,7 +14,7 @@ import {
 export class PostgreSQLAdapter implements DatabaseOperations {
   private connected: boolean = false;
   private config: PostgreSQLConfig | null = null;
-  private connectionUrl: string | null = null;
+  private pool: Pool | null = null;
 
   /**
    * Connect to PostgreSQL database
@@ -27,22 +28,39 @@ export class PostgreSQLAdapter implements DatabaseOperations {
     this.config = pgConfig;
     
     try {
-      // Build connection URL
-      this.connectionUrl = this.buildConnectionUrl(pgConfig);
-      
       console.log(`🐘 Connecting to PostgreSQL: ${pgConfig.host}:${pgConfig.port}/${pgConfig.database}`);
       
-      // In real implementation, use pg or pg-promise to connect
-      // For now, simulate connection
-      await this.simulateConnection(pgConfig);
+      // Create connection pool with proper configuration
+      const poolConfig: PoolConfig = {
+        user: pgConfig.username,
+        password: pgConfig.password,
+        host: pgConfig.host,
+        port: pgConfig.port,
+        database: pgConfig.database,
+        ssl: pgConfig.ssl ? { rejectUnauthorized: false } : false,
+        max: 10, // Maximum number of clients in the pool
+        idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+        connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+      };
+
+      this.pool = new Pool(poolConfig);
+      
+      // Test the connection
+      const client = await this.pool.connect();
+      await client.query('SELECT NOW()');
+      client.release();
       
       this.connected = true;
-      console.log('✅ PostgreSQL connection established');
+      console.log('✅ PostgreSQL connection pool established');
       
       return true;
     } catch (error) {
       console.error('PostgreSQL connection failed:', error);
       this.connected = false;
+      if (this.pool) {
+        await this.pool.end();
+        this.pool = null;
+      }
       return false;
     }
   }
@@ -51,12 +69,17 @@ export class PostgreSQLAdapter implements DatabaseOperations {
    * Disconnect from PostgreSQL database
    */
   async disconnect(): Promise<void> {
-    if (this.connected) {
-      // In real implementation, close PostgreSQL connection pool
-      this.connected = false;
-      this.connectionUrl = null;
-      this.config = null;
-      console.log('🔌 PostgreSQL database disconnected');
+    if (this.connected && this.pool) {
+      try {
+        await this.pool.end();
+        this.pool = null;
+        this.connected = false;
+        this.config = null;
+        console.log('🔌 PostgreSQL connection pool closed');
+      } catch (error) {
+        console.error('Error closing PostgreSQL connection pool:', error);
+        throw error;
+      }
     }
   }
 
@@ -71,14 +94,15 @@ export class PostgreSQLAdapter implements DatabaseOperations {
    * Test database connection
    */
   async testConnection(): Promise<boolean> {
-    if (!this.connected || !this.config) {
+    if (!this.connected || !this.pool) {
       return false;
     }
     
     try {
-      // In real implementation, execute "SELECT 1" query
-      await this.simulateQuery('SELECT 1');
-      return true;
+      const client = await this.pool.connect();
+      const result = await client.query('SELECT 1 as test');
+      client.release();
+      return result.rows[0]?.test === 1;
     } catch (error) {
       console.error('PostgreSQL connection test failed:', error);
       return false;
@@ -89,32 +113,66 @@ export class PostgreSQLAdapter implements DatabaseOperations {
    * Run database migrations
    */
   async migrate(): Promise<void> {
-    if (!this.connected) {
+    if (!this.connected || !this.pool) {
       throw new Error('Not connected to database');
     }
     
     console.log('📋 Running PostgreSQL migrations...');
     
-    // In real implementation, run PostgreSQL schema migrations
-    // Check existing migrations table, run pending migrations
-    await this.simulateDelay(300);
+    const client = await this.pool.connect();
     
-    console.log('✅ PostgreSQL migrations completed');
+    try {
+      // Begin transaction
+      await client.query('BEGIN');
+      
+      // Create migrations table if it doesn't exist
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+          version VARCHAR(255) PRIMARY KEY,
+          applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+      `);
+      
+      // Create main application schema
+      await this.createApplicationSchema(client);
+      
+      // Record migration
+      await client.query(
+        'INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT (version) DO NOTHING',
+        ['1.0.0']
+      );
+      
+      // Commit transaction
+      await client.query('COMMIT');
+      
+      console.log('✅ PostgreSQL migrations completed');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Migration failed:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   /**
    * Get database version
    */
   async getVersion(): Promise<string | null> {
-    if (!this.connected) {
+    if (!this.connected || !this.pool) {
       return null;
     }
     
     try {
-      // In real implementation, query schema_migrations table
-      return '1.0.0';
+      const client = await this.pool.connect();
+      const result = await client.query(
+        'SELECT version FROM schema_migrations ORDER BY applied_at DESC LIMIT 1'
+      );
+      client.release();
+      
+      return result.rows[0]?.version || null;
     } catch (error) {
-      console.error('Failed to get PostgreSQL version:', error);
+      console.error('Failed to get PostgreSQL schema version:', error);
       return null;
     }
   }
@@ -129,13 +187,46 @@ export class PostgreSQLAdapter implements DatabaseOperations {
     
     console.log(`💾 Creating PostgreSQL backup: ${path}`);
     
-    // In real implementation, use pg_dump command
-    const dumpCommand = this.buildPgDumpCommand(path);
-    console.log(`Executing: ${dumpCommand}`);
-    
-    await this.simulateDelay(2000);
-    
-    console.log('✅ PostgreSQL backup completed');
+    try {
+      const { spawn } = require('child_process');
+      const { host, port, database, username, password } = this.config;
+      
+      return new Promise<void>((resolve, reject) => {
+        const env = { ...process.env, PGPASSWORD: password };
+        const pgDump = spawn('pg_dump', [
+          '-h', host,
+          '-p', port.toString(),
+          '-U', username,
+          '-d', database,
+          '-f', path,
+          '--verbose'
+        ], { env });
+        
+        pgDump.stdout.on('data', (data: Buffer) => {
+          console.log(`pg_dump: ${data.toString()}`);
+        });
+        
+        pgDump.stderr.on('data', (data: Buffer) => {
+          console.log(`pg_dump: ${data.toString()}`);
+        });
+        
+        pgDump.on('close', (code: number | null) => {
+          if (code === 0) {
+            console.log('✅ PostgreSQL backup completed');
+            resolve();
+          } else {
+            reject(new Error(`pg_dump failed with exit code ${code}`));
+          }
+        });
+        
+        pgDump.on('error', (error: Error) => {
+          reject(new Error(`Failed to start pg_dump: ${error.message}`));
+        });
+      });
+    } catch (error) {
+      console.error('Backup failed:', error);
+      throw error;
+    }
   }
 
   /**
@@ -148,82 +239,214 @@ export class PostgreSQLAdapter implements DatabaseOperations {
     
     console.log(`📂 Restoring PostgreSQL database from: ${path}`);
     
-    // In real implementation, use psql to restore from dump
-    const restoreCommand = this.buildPsqlRestoreCommand(path);
-    console.log(`Executing: ${restoreCommand}`);
-    
-    await this.simulateDelay(3000);
-    
-    console.log('✅ PostgreSQL restore completed');
+    try {
+      const { spawn } = require('child_process');
+      const { host, port, database, username, password } = this.config;
+      
+      return new Promise<void>((resolve, reject) => {
+        const env = { ...process.env, PGPASSWORD: password };
+        const psql = spawn('psql', [
+          '-h', host,
+          '-p', port.toString(),
+          '-U', username,
+          '-d', database,
+          '-f', path,
+          '--verbose'
+        ], { env });
+        
+        psql.stdout.on('data', (data: Buffer) => {
+          console.log(`psql: ${data.toString()}`);
+        });
+        
+        psql.stderr.on('data', (data: Buffer) => {
+          console.log(`psql: ${data.toString()}`);
+        });
+        
+        psql.on('close', (code: number | null) => {
+          if (code === 0) {
+            console.log('✅ PostgreSQL restore completed');
+            resolve();
+          } else {
+            reject(new Error(`psql failed with exit code ${code}`));
+          }
+        });
+        
+        psql.on('error', (error: Error) => {
+          reject(new Error(`Failed to start psql: ${error.message}`));
+        });
+      });
+    } catch (error) {
+      console.error('Restore failed:', error);
+      throw error;
+    }
   }
 
   /**
    * Vacuum/optimize database
    */
   async vacuum(): Promise<void> {
-    if (!this.connected) {
+    if (!this.connected || !this.pool) {
       throw new Error('Not connected to database');
     }
     
     console.log('🧹 Running PostgreSQL VACUUM ANALYZE...');
     
-    // In real implementation, execute VACUUM ANALYZE on all tables
-    await this.simulateQuery('VACUUM ANALYZE');
+    const client = await this.pool.connect();
     
-    console.log('✅ PostgreSQL VACUUM completed');
+    try {
+      // Get all user tables
+      const result = await client.query(`
+        SELECT tablename 
+        FROM pg_tables 
+        WHERE schemaname = 'public'
+      `);
+      
+      // Run VACUUM ANALYZE on each table
+      for (const row of result.rows) {
+        console.log(`Vacuuming table: ${row.tablename}`);
+        await client.query(`VACUUM ANALYZE ${row.tablename}`);
+      }
+      
+      console.log('✅ PostgreSQL VACUUM completed');
+    } catch (error) {
+      console.error('VACUUM failed:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   /**
    * Get database statistics
    */
   async getStats(): Promise<DatabaseStats> {
-    if (!this.connected) {
+    if (!this.connected || !this.pool) {
       throw new Error('Not connected to database');
     }
     
-    // In real implementation, query pg_stat_database and related system tables
-    return {
-      type: 'postgresql',
-      size: 10 * 1024 * 1024, // 10MB placeholder
-      tables: 7,
-      records: {
+    const client = await this.pool.connect();
+    
+    try {
+      // Get database size
+      const sizeResult = await client.query(`
+        SELECT pg_database_size(current_database()) as size
+      `);
+      const size = parseInt(sizeResult.rows[0]?.size || '0');
+      
+      // Get table count
+      const tableCountResult = await client.query(`
+        SELECT COUNT(*) as count 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public'
+      `);
+      const tables = parseInt(tableCountResult.rows[0]?.count || '0');
+      
+      // Get record counts for main tables
+      const records = {
         tasks: 0,
         projects: 0,
         journalEntries: 0,
-        users: 1,
-      },
-      performance: {
-        avgQueryTime: 5.2,
-        totalQueries: 0,
-        errorRate: 0,
-      },
-      health: 'healthy',
-      lastOptimized: new Date(),
-    };
+        users: 0,
+      };
+      
+      const tableMapping = {
+        'tasks': 'tasks',
+        'projects': 'projects',
+        'journal_entries': 'journalEntries',
+        'users': 'users',
+      } as const;
+      
+      for (const [table, key] of Object.entries(tableMapping)) {
+        try {
+          const result = await client.query(`SELECT COUNT(*) as count FROM ${table}`);
+          records[key] = parseInt(result.rows[0]?.count || '0');
+        } catch (error) {
+          // Table might not exist yet
+          records[key] = 0;
+        }
+      }
+      
+      // Get basic performance stats from pg_stat_database
+      const perfResult = await client.query(`
+        SELECT 
+          numbackends,
+          xact_commit,
+          xact_rollback,
+          blks_read,
+          blks_hit
+        FROM pg_stat_database 
+        WHERE datname = current_database()
+      `);
+      
+      const perfRow = perfResult.rows[0] || {};
+      const totalQueries = parseInt(perfRow.xact_commit || '0') + parseInt(perfRow.xact_rollback || '0');
+      const errorRate = totalQueries > 0 ? parseInt(perfRow.xact_rollback || '0') / totalQueries : 0;
+      
+      return {
+        type: 'postgresql',
+        size,
+        tables,
+        records,
+        performance: {
+          avgQueryTime: 0, // Would need more complex calculation
+          totalQueries,
+          errorRate,
+        },
+        health: 'healthy',
+        lastOptimized: new Date(),
+      };
+    } catch (error) {
+      console.error('Failed to get PostgreSQL stats:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   /**
    * Get PostgreSQL server version
    */
   async getServerVersion(): Promise<string> {
-    if (!this.connected) {
+    if (!this.connected || !this.pool) {
       throw new Error('Not connected to database');
     }
     
-    // In real implementation, execute "SELECT version()"
-    return 'PostgreSQL 15.4';
+    const client = await this.pool.connect();
+    
+    try {
+      const result = await client.query('SELECT version()');
+      return result.rows[0]?.version || 'Unknown';
+    } catch (error) {
+      console.error('Failed to get server version:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   /**
    * Get active connections count
    */
   async getActiveConnections(): Promise<number> {
-    if (!this.connected) {
+    if (!this.connected || !this.pool) {
       throw new Error('Not connected to database');
     }
     
-    // In real implementation, query pg_stat_activity
-    return 1;
+    const client = await this.pool.connect();
+    
+    try {
+      const result = await client.query(`
+        SELECT COUNT(*) as count 
+        FROM pg_stat_activity 
+        WHERE datname = current_database()
+      `);
+      return parseInt(result.rows[0]?.count || '0');
+    } catch (error) {
+      console.error('Failed to get active connections:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   /**
@@ -234,63 +457,132 @@ export class PostgreSQLAdapter implements DatabaseOperations {
   }
 
   /**
-   * Build PostgreSQL connection URL
+   * Create the application schema with all required tables
    */
-  private buildConnectionUrl(config: PostgreSQLConfig): string {
-    const protocol = config.ssl ? 'postgresql+ssl' : 'postgresql';
-    return `${protocol}://${config.username}:${config.password}@${config.host}:${config.port}/${config.database}`;
-  }
-
-  /**
-   * Build pg_dump command for backup
-   */
-  private buildPgDumpCommand(backupPath: string): string {
-    if (!this.config) {
-      throw new Error('No configuration available');
-    }
+  private async createApplicationSchema(client: PoolClient): Promise<void> {
+    console.log('🏗️ Creating application schema...');
     
-    const { host, port, database, username } = this.config;
-    return `pg_dump -h ${host} -p ${port} -U ${username} -d ${database} -f ${backupPath}`;
-  }
+    // Create main tables
+    const schemaSQL = `
+      -- Users table
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE,
+        avatar_url TEXT,
+        preferences JSONB DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
 
-  /**
-   * Build psql restore command
-   */
-  private buildPsqlRestoreCommand(backupPath: string): string {
-    if (!this.config) {
-      throw new Error('No configuration available');
-    }
-    
-    const { host, port, database, username } = this.config;
-    return `psql -h ${host} -p ${port} -U ${username} -d ${database} -f ${backupPath}`;
-  }
+      -- Projects table
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        color TEXT DEFAULT '#3B82F6',
+        archived BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
 
-  /**
-   * Simulate database connection for demo
-   */
-  private async simulateConnection(config: PostgreSQLConfig): Promise<void> {
-    // Simulate connection delay based on network/host
-    const isLocal = config.host === 'localhost' || config.host === '127.0.0.1';
-    const delay = isLocal ? 100 : 500;
-    
-    await this.simulateDelay(delay);
-    
-    // In real implementation, this would throw if connection fails
-    console.log(`🔗 Connected to PostgreSQL ${config.host}:${config.port}`);
-  }
+      -- Tasks table
+      CREATE TABLE IF NOT EXISTS tasks (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        completed BOOLEAN DEFAULT FALSE,
+        priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
+        project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+        parent_task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
+        "order" INTEGER DEFAULT 0,
+        due_date TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
 
-  /**
-   * Simulate query execution for demo
-   */
-  private async simulateQuery(query: string): Promise<void> {
-    console.log(`🔍 Executing: ${query}`);
-    await this.simulateDelay(50);
-  }
+      -- Task tags table (many-to-many)
+      CREATE TABLE IF NOT EXISTS task_tags (
+        task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
+        tag TEXT,
+        PRIMARY KEY (task_id, tag)
+      );
 
-  /**
-   * Simulate async delay for demo purposes
-   */
-  private async simulateDelay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+      -- Journal entries table
+      CREATE TABLE IF NOT EXISTS journal_entries (
+        id TEXT PRIMARY KEY,
+        title TEXT,
+        content TEXT NOT NULL,
+        mood TEXT,
+        date DATE NOT NULL,
+        pinned BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Journal tags table (many-to-many)
+      CREATE TABLE IF NOT EXISTS journal_tags (
+        entry_id TEXT REFERENCES journal_entries(id) ON DELETE CASCADE,
+        tag TEXT,
+        PRIMARY KEY (entry_id, tag)
+      );
+
+      -- Goals table
+      CREATE TABLE IF NOT EXISTS goals (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        type TEXT NOT NULL,
+        target_value INTEGER NOT NULL,
+        current_value INTEGER DEFAULT 0,
+        unit TEXT,
+        target_date DATE,
+        status TEXT DEFAULT 'active' CHECK (status IN ('active', 'completed', 'paused', 'cancelled')),
+        project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Database metadata
+      CREATE TABLE IF NOT EXISTS db_metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Secure settings table for encrypted data storage
+      CREATE TABLE IF NOT EXISTS secure_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Encrypted integrations table for storing integration tokens
+      CREATE TABLE IF NOT EXISTS encrypted_integrations (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK (type IN ('google_calendar', 'github')),
+        encrypted_data TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Create indexes for better performance
+      CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks (project_id);
+      CREATE INDEX IF NOT EXISTS idx_tasks_parent_task_id ON tasks (parent_task_id);
+      CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks (due_date);
+      CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks (completed);
+      CREATE INDEX IF NOT EXISTS idx_journal_entries_date ON journal_entries (date);
+      CREATE INDEX IF NOT EXISTS idx_journal_entries_pinned ON journal_entries (pinned);
+      CREATE INDEX IF NOT EXISTS idx_goals_status ON goals (status);
+      CREATE INDEX IF NOT EXISTS idx_goals_project_id ON goals (project_id);
+
+      -- Insert initial metadata
+      INSERT INTO db_metadata (key, value) VALUES ('version', '1.0.0') ON CONFLICT (key) DO NOTHING;
+      INSERT INTO db_metadata (key, value) VALUES ('created_at', NOW()::TEXT) ON CONFLICT (key) DO NOTHING;
+    `;
+
+    await client.query(schemaSQL);
+    console.log('✅ Application schema created successfully');
   }
 }

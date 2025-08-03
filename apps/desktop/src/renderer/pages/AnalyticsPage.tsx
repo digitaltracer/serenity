@@ -1,13 +1,10 @@
-import React, { useMemo, useState, Suspense, lazy } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { selectAllTasks, selectAllEntries, selectAllProjects } from '@serenity/core';
-import { Card, CardHeader, CardTitle, CardContent } from '@serenity/ui';
+import { Card, CardHeader, CardTitle, CardContent, AdvancedAnalytics } from '@serenity/ui';
 import { BarChart3, TrendingUp, Target, Zap, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 
-// Lazy load the advanced analytics to avoid circular dependencies
-const AdvancedAnalytics = lazy(() => 
-  import('@serenity/ui').then(module => ({ default: module.AdvancedAnalytics }))
-);
+// No longer need lazy loading - circular dependency resolved by using shared types
 
 export const AnalyticsPage: React.FC = () => {
   const tasks = useSelector(selectAllTasks);
@@ -151,18 +148,11 @@ export const AnalyticsPage: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <Suspense fallback={
-                  <div className="text-center py-8">
-                    <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                    <div className="text-gray-500 dark:text-gray-400">Loading advanced analytics...</div>
-                  </div>
-                }>
-                  <AdvancedAnalytics 
-                    tasks={tasks}
-                    journalEntries={journalEntries}
-                    projects={projects}
-                  />
-                </Suspense>
+                <AdvancedAnalytics 
+                  tasks={tasks}
+                  journalEntries={journalEntries}
+                  projects={projects}
+                />
               )}
             </CardContent>
           </Card>

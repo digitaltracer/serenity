@@ -90,3 +90,6 @@ export * from './dragDrop';
 
 // Export goal progress utilities
 export * from './goalProgress';
+
+// Export standardized error handling
+export * from './errorHandler';

@@ -16,8 +16,7 @@ import searchReducer from './slices/searchSlice';
 import dragDropReducer from './slices/dragDropSlice';
 import goalsReducer from './slices/goalsSlice';
 import integrationsReducer from './slices/integrationsSlice';
-import { persistenceMiddleware } from './middleware/persistenceMiddleware';
-import { hybridPersistenceMiddleware, initializeSQLitePersistence } from './middleware/hybridPersistenceMiddleware';
+import { simplifiedPersistenceMiddleware, initializeSQLitePersistence } from './middleware/simplifiedPersistenceMiddleware';
 
 /**
  * Create the enhanced store - always starts with localStorage middleware
@@ -57,7 +56,7 @@ export function createEnhancedStore() {
             'payload.reminderDate'
           ],
         },
-      }).concat(hybridPersistenceMiddleware), // Use hybrid persistence with SQLite support
+      }).concat(simplifiedPersistenceMiddleware), // Use simplified persistence with early SQLite commitment
   });
 }
 

@@ -3,16 +3,49 @@
  * Provides AES-GCM encryption for sensitive user data
  */
 
+import { ErrorHandler, throwEncryptionError } from './errorHandler';
+
 export interface EncryptedData {
   data: string; // Base64 encoded encrypted data
   iv: string; // Base64 encoded initialization vector
   salt: string; // Base64 encoded salt
   tag?: string; // Authentication tag (included in GCM mode)
+  keyVersion?: number; // Key version for rotation support
+  timestamp?: string; // ISO timestamp when encrypted
 }
 
 export interface EncryptionKey {
   key: CryptoKey;
   salt: Uint8Array;
+}
+
+/**
+ * Key rotation configuration
+ */
+export interface KeyRotationConfig {
+  rotationIntervalDays: number; // How often to rotate keys
+  maxKeyAge: number; // Maximum age of keys in days before forced rotation
+  keepOldVersions: number; // Number of old key versions to keep for decryption
+  autoRotate: boolean; // Whether to auto-rotate keys
+}
+
+export const DEFAULT_KEY_ROTATION: KeyRotationConfig = {
+  rotationIntervalDays: 90, // Rotate every 3 months
+  maxKeyAge: 365, // Max 1 year
+  keepOldVersions: 5, // Keep 5 old versions
+  autoRotate: true,
+};
+
+/**
+ * Key version metadata
+ */
+export interface KeyVersionInfo {
+  version: number;
+  createdAt: string; // ISO timestamp
+  rotatedAt?: string; // ISO timestamp when rotated
+  salt: string; // Base64 encoded salt for this version
+  iterations: number; // PBKDF2 iterations for this version
+  status: 'active' | 'deprecated' | 'expired';
 }
 
 /**
@@ -120,7 +153,8 @@ export class EncryptionService {
   static async encrypt(
     data: string, 
     password: string, 
-    classification: DataClassification = 'confidential'
+    classification: DataClassification = 'confidential',
+    keyVersion?: number
   ): Promise<EncryptedData> {
     const config = getEncryptionConfig(classification);
     
@@ -130,6 +164,8 @@ export class EncryptionService {
         data: btoa(data),
         iv: '',
         salt: '',
+        keyVersion: keyVersion || 1,
+        timestamp: new Date().toISOString(),
       };
     }
 
@@ -151,10 +187,15 @@ export class EncryptionService {
         data: btoa(String.fromCharCode(...new Uint8Array(encryptedBuffer))),
         iv: btoa(String.fromCharCode(...iv)),
         salt: btoa(String.fromCharCode(...salt)),
+        keyVersion: keyVersion || 1,
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
-      console.error('Encryption failed:', error instanceof Error ? error.message : 'Unknown error');
-      throw new Error('Failed to encrypt data');
+      throwEncryptionError(
+        'CRYPTO_ENCRYPTION_FAILED',
+        error instanceof Error ? error : new Error(String(error)),
+        { classification, keyVersion }
+      );
     }
   }
 
@@ -195,8 +236,11 @@ export class EncryptionService {
       const decoder = new TextDecoder();
       return decoder.decode(decryptedBuffer);
     } catch (error) {
-      console.error('Decryption failed:', error instanceof Error ? error.message : 'Unknown error');
-      throw new Error('Failed to decrypt data');
+      throwEncryptionError(
+        'CRYPTO_DECRYPTION_FAILED',
+        error instanceof Error ? error : new Error(String(error)),
+        { classification }
+      );
     }
   }
 
@@ -381,6 +425,321 @@ export class EncryptionService {
     // Score based on key iterations and algorithm
     const baseScore = config.keyIterations / 5000; // Max 100 for 500k iterations
     return Math.min(100, Math.round(baseScore));
+  }
+}
+
+/**
+ * Key Rotation Manager
+ * Handles encryption key lifecycle and rotation
+ */
+export class KeyRotationManager {
+  private config: KeyRotationConfig;
+  private keyVersions: Map<number, KeyVersionInfo>;
+  private currentVersion: number;
+
+  constructor(config: KeyRotationConfig = DEFAULT_KEY_ROTATION) {
+    this.config = { ...config };
+    this.keyVersions = new Map();
+    this.currentVersion = 1;
+    
+    // Initialize with version 1 if no versions exist
+    if (this.keyVersions.size === 0) {
+      this.initializeFirstVersion();
+    }
+  }
+
+  /**
+   * Initialize the first key version
+   */
+  private initializeFirstVersion(): void {
+    const salt = EncryptionService.generateSalt();
+    const now = new Date().toISOString();
+    
+    this.keyVersions.set(1, {
+      version: 1,
+      createdAt: now,
+      salt: btoa(String.fromCharCode(...salt)),
+      iterations: 200000, // Default for confidential
+      status: 'active',
+    });
+  }
+
+  /**
+   * Get current active key version
+   */
+  getCurrentVersion(): number {
+    return this.currentVersion;
+  }
+
+  /**
+   * Get key version info
+   */
+  getKeyVersionInfo(version: number): KeyVersionInfo | undefined {
+    return this.keyVersions.get(version);
+  }
+
+  /**
+   * Get all key versions
+   */
+  getAllVersions(): KeyVersionInfo[] {
+    return Array.from(this.keyVersions.values()).sort((a, b) => b.version - a.version);
+  }
+
+  /**
+   * Check if key rotation is needed
+   */
+  isRotationNeeded(): boolean {
+    if (!this.config.autoRotate) return false;
+    
+    const currentVersionInfo = this.keyVersions.get(this.currentVersion);
+    if (!currentVersionInfo) return true;
+    
+    const now = new Date();
+    const createdAt = new Date(currentVersionInfo.createdAt);
+    const daysSinceCreation = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+    
+    return daysSinceCreation >= this.config.rotationIntervalDays;
+  }
+
+  /**
+   * Check if key version is expired
+   */
+  isKeyExpired(version: number): boolean {
+    const versionInfo = this.keyVersions.get(version);
+    if (!versionInfo) return true;
+    
+    const now = new Date();
+    const createdAt = new Date(versionInfo.createdAt);
+    const daysSinceCreation = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+    
+    return daysSinceCreation >= this.config.maxKeyAge;
+  }
+
+  /**
+   * Rotate to a new key version
+   */
+  async rotateKey(classification: DataClassification = 'confidential'): Promise<number> {
+    const config = getEncryptionConfig(classification);
+    const newVersion = this.currentVersion + 1;
+    const salt = EncryptionService.generateSalt();
+    const now = new Date().toISOString();
+    
+    // Mark current version as deprecated
+    const currentVersionInfo = this.keyVersions.get(this.currentVersion);
+    if (currentVersionInfo) {
+      currentVersionInfo.status = 'deprecated';
+      currentVersionInfo.rotatedAt = now;
+    }
+    
+    // Create new version
+    this.keyVersions.set(newVersion, {
+      version: newVersion,
+      createdAt: now,
+      salt: btoa(String.fromCharCode(...salt)),
+      iterations: config.keyIterations,
+      status: 'active',
+    });
+    
+    this.currentVersion = newVersion;
+    
+    // Clean up old versions if needed
+    await this.cleanupOldVersions();
+    
+    console.log(`🔄 Key rotated to version ${newVersion}`);
+    return newVersion;
+  }
+
+  /**
+   * Clean up old key versions
+   */
+  private async cleanupOldVersions(): Promise<void> {
+    const versions = Array.from(this.keyVersions.keys()).sort((a, b) => b - a);
+    const versionsToKeep = Math.max(this.config.keepOldVersions, 1); // Always keep at least 1
+    
+    // Mark expired versions
+    versions.forEach(version => {
+      if (this.isKeyExpired(version) && version !== this.currentVersion) {
+        const versionInfo = this.keyVersions.get(version);
+        if (versionInfo) {
+          versionInfo.status = 'expired';
+        }
+      }
+    });
+    
+    // Remove excess versions (keep only the most recent)
+    const versionsToRemove = versions.slice(versionsToKeep);
+    versionsToRemove.forEach(version => {
+      if (version !== this.currentVersion) {
+        console.log(`🗑️ Removing old key version ${version}`);
+        this.keyVersions.delete(version);
+      }
+    });
+  }
+
+  /**
+   * Encrypt data with current key version
+   */
+  async encryptWithCurrentKey(
+    data: string,
+    password: string,
+    classification: DataClassification = 'confidential'
+  ): Promise<EncryptedData> {
+    // Check if rotation is needed
+    if (this.isRotationNeeded()) {
+      await this.rotateKey(classification);
+    }
+    
+    return EncryptionService.encrypt(data, password, classification, this.currentVersion);
+  }
+
+  /**
+   * Decrypt data with appropriate key version
+   */
+  async decryptWithKeyVersion(
+    encryptedData: EncryptedData,
+    password: string,
+    classification: DataClassification = 'confidential'
+  ): Promise<string> {
+    const keyVersion = encryptedData.keyVersion || 1;
+    const versionInfo = this.keyVersions.get(keyVersion);
+    
+    if (!versionInfo) {
+      throw new Error(`Key version ${keyVersion} not found`);
+    }
+    
+    if (versionInfo.status === 'expired') {
+      console.warn(`⚠️ Decrypting with expired key version ${keyVersion}`);
+    }
+    
+    return EncryptionService.decrypt(encryptedData, password, classification);
+  }
+
+  /**
+   * Re-encrypt data with current key version
+   */
+  async reencryptData(
+    encryptedData: EncryptedData,
+    password: string,
+    classification: DataClassification = 'confidential'
+  ): Promise<EncryptedData> {
+    // First decrypt with old key
+    const decryptedData = await this.decryptWithKeyVersion(encryptedData, password, classification);
+    
+    // Then encrypt with current key
+    return this.encryptWithCurrentKey(decryptedData, password, classification);
+  }
+
+  /**
+   * Bulk re-encrypt multiple items to current key version
+   */
+  async bulkReencrypt(
+    items: Array<{ data: EncryptedData; classification: DataClassification }>,
+    password: string,
+    onProgress?: (completed: number, total: number) => void
+  ): Promise<EncryptedData[]> {
+    const results: EncryptedData[] = [];
+    const total = items.length;
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      
+      // Only re-encrypt if not already using current version
+      if (item.data.keyVersion !== this.currentVersion) {
+        try {
+          const reencrypted = await this.reencryptData(item.data, password, item.classification);
+          results.push(reencrypted);
+          console.log(`🔄 Re-encrypted item ${i + 1}/${total} to version ${this.currentVersion}`);
+        } catch (error) {
+          console.error(`❌ Failed to re-encrypt item ${i + 1}:`, error);
+          // Keep original if re-encryption fails
+          results.push(item.data);
+        }
+      } else {
+        // Already current version
+        results.push(item.data);
+      }
+      
+      // Report progress
+      if (onProgress) {
+        onProgress(i + 1, total);
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * Get rotation status and recommendations
+   */
+  getRotationStatus(): {
+    currentVersion: number;
+    rotationNeeded: boolean;
+    daysSinceLastRotation: number;
+    expiredVersions: number[];
+    totalVersions: number;
+    recommendations: string[];
+  } {
+    const currentVersionInfo = this.keyVersions.get(this.currentVersion);
+    const now = new Date();
+    
+    let daysSinceLastRotation = 0;
+    if (currentVersionInfo) {
+      const createdAt = new Date(currentVersionInfo.createdAt);
+      daysSinceLastRotation = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+    }
+    
+    const expiredVersions = Array.from(this.keyVersions.keys()).filter(v => this.isKeyExpired(v));
+    const recommendations: string[] = [];
+    
+    if (this.isRotationNeeded()) {
+      recommendations.push('Key rotation is recommended due to age');
+    }
+    
+    if (expiredVersions.length > 0) {
+      recommendations.push(`${expiredVersions.length} expired key versions should be cleaned up`);
+    }
+    
+    if (this.keyVersions.size > this.config.keepOldVersions + 2) {
+      recommendations.push('Consider cleaning up old key versions to improve performance');
+    }
+    
+    return {
+      currentVersion: this.currentVersion,
+      rotationNeeded: this.isRotationNeeded(),
+      daysSinceLastRotation,
+      expiredVersions,
+      totalVersions: this.keyVersions.size,
+      recommendations,
+    };
+  }
+
+  /**
+   * Update rotation configuration
+   */
+  updateConfig(newConfig: Partial<KeyRotationConfig>): void {
+    this.config = { ...this.config, ...newConfig };
+  }
+
+  /**
+   * Export key version metadata for backup
+   */
+  exportKeyVersions(): string {
+    const data = {
+      currentVersion: this.currentVersion,
+      config: this.config,
+      versions: Array.from(this.keyVersions.entries()),
+    };
+    return JSON.stringify(data);
+  }
+
+  /**
+   * Import key version metadata from backup
+   */
+  importKeyVersions(jsonData: string): void {
+    const data = JSON.parse(jsonData);
+    this.currentVersion = data.currentVersion;
+    this.config = { ...this.config, ...data.config };
+    this.keyVersions = new Map(data.versions);
   }
 }
 

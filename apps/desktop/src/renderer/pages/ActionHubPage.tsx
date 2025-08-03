@@ -526,6 +526,7 @@ export const ActionHubPage: React.FC = () => {
                       onDelete={() => dispatch(deleteTask(task.id))}
                       index={index}
                       containerName="actionhub-tasks"
+                      projects={projects}
                     />
                   </SelectableItem>
                 ))

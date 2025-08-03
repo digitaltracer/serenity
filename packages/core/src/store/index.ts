@@ -1,6 +1,6 @@
 // Use enhanced store with proper persistence - export through store.ts for consistency
 export { store, type RootState, type AppDispatch, initializeStoreData } from './store';
-export { initializeSQLitePersistence } from './middleware/hybridPersistenceMiddleware';
+export { initializeSQLitePersistence } from './middleware/simplifiedPersistenceMiddleware';
 export * from './slices/tasksSlice';
 export * from './slices/projectsSlice';
 export * from './slices/journalSlice';

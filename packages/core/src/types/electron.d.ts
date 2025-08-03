@@ -53,6 +53,26 @@ declare global {
         onGoogleCancelled: (callback: () => void) => void;
         removeOAuthListeners: () => void;
       };
+      integrations?: {
+        initializeTable: () => Promise<{ success: boolean; data?: any; error?: string }>;
+        saveEncrypted: (integrationData: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+        loadEncrypted: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
+        hasEncrypted: () => Promise<{ success: boolean; data?: { hasEncrypted: boolean; count: number }; error?: string }>;
+        clearEncrypted: () => Promise<{ success: boolean; data?: any; error?: string }>;
+        verifyTable: () => Promise<{ success: boolean; data?: { exists: boolean }; error?: string }>;
+        getVerification: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
+      };
+      auth?: {
+        initializeSecureSettings: () => Promise<{ success: boolean; data?: any; error?: string }>;
+        setMasterPasswordHash: (hash: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+        getMasterPasswordHash: () => Promise<{ success: boolean; data?: { hash: string | null }; error?: string }>;
+        hasMasterPassword: () => Promise<{ success: boolean; data?: { hasMasterPassword: boolean }; error?: string }>;
+        clearMasterPasswordHash: () => Promise<{ success: boolean; data?: any; error?: string }>;
+        clearAllSecureSettings: () => Promise<{ success: boolean; data?: any; error?: string }>;
+        getSecureSetting: (key: string) => Promise<{ success: boolean; data?: { value: string | null }; error?: string }>;
+        setSecureSetting: (key: string, value: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+        deleteSecureSetting: (key: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+      };
       onMenuAction: (callback: (event: string, data?: any) => void) => void;
       removeMenuListeners: () => void;
     };

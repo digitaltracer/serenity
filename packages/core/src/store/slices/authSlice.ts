@@ -40,8 +40,8 @@ export const initializeAuth = createAsyncThunk(
     
     try {
       // Check if database API is available
-      if (!window.electronAPI?.sqlite) {
-        console.log('⚡ Database API not available, using default settings');
+      if (!window.electronAPI?.auth) {
+        console.log('⚡ Auth API not available, using default settings');
         return {
           hasMasterPassword: false,
           autoLockTimeout: 15,

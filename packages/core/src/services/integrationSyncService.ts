@@ -62,9 +62,10 @@ export class IntegrationSyncService {
         try {
           const task = this.convertCalendarEventToTask(event);
           
-          // Check if task already exists
+          // Check if task already exists by event ID (more specific check)
           const existingTask = existingCalendarTasks.find(existing => 
-            existing.tags?.includes(`calendar-event-${event.id}`)
+            existing.tags?.includes(`calendar-event-${event.id}`) ||
+            existing.tags?.includes(`gcal-event-${event.id}`) // Also check old format
           );
 
           if (existingTask) {
@@ -78,10 +79,12 @@ export class IntegrationSyncService {
             };
             syncedTasks.push(updatedTask);
             result.tasksUpdated++;
+            console.log(`📝 Updated existing calendar task: ${event.summary}`);
           } else {
             // Create new task
             syncedTasks.push(task);
             result.tasksCreated++;
+            console.log(`📋 Created new calendar task: ${event.summary}`);
           }
         } catch (error) {
           result.errors.push(`Failed to process event ${event.id}: ${error}`);
@@ -103,8 +106,9 @@ export class IntegrationSyncService {
     accessToken: string,
     repositories: string[], // This is now only used for display purposes
     existingTasks: Task[],
+    existingProjects: any[], // Add projects array to check/create Github project
     since?: Date
-  ): Promise<{ tasks: Task[]; result: SyncResult }> {
+  ): Promise<{ tasks: Task[]; result: SyncResult; githubProjectId?: string }> {
     const result: SyncResult = {
       success: true,
       tasksCreated: 0,
@@ -113,6 +117,33 @@ export class IntegrationSyncService {
     };
 
     try {
+      // Step 1: Ensure "Github" project exists, create if needed
+      let githubProject = existingProjects.find(project => 
+        project.name.toLowerCase() === 'github' && !project.archived
+      );
+      
+      let githubProjectId: string | undefined;
+      
+      if (!githubProject) {
+        // Create Github project
+        const { generateId } = await import('../utils');
+        githubProjectId = generateId();
+        githubProject = {
+          id: githubProjectId,
+          name: 'Github',
+          description: 'Automatically synced GitHub pull requests and issues',
+          color: '#333333', // GitHub's dark color
+          archived: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        console.log('📁 Created new "Github" project for synced items');
+        result.errors.push('CREATED_GITHUB_PROJECT'); // Signal to caller to create project
+      } else {
+        githubProjectId = githubProject.id;
+        console.log('📁 Using existing "Github" project:', githubProjectId);
+      }
+
       // Get today's date range in user's local timezone (start of day to end of day)
       const today = new Date();
       const localStartOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -138,23 +169,27 @@ export class IntegrationSyncService {
       // Process only pull requests (no commits)
       for (const pr of pullRequests) {
         try {
-          const task = this.convertPullRequestToTask(pr);
+          const task = this.convertPullRequestToTask(pr, githubProjectId);
           
-          // Check if task already exists
+          // Check if task already exists by PR ID (more specific check)
           const existingTask = existingGitHubTasks.find(existing => 
-            existing.tags?.includes(`pr-${pr.id}`)
+            existing.tags?.includes(`pr-${pr.id}`) ||
+            existing.tags?.includes(`github-pr-${pr.id}`) // Also check old format
           );
 
           if (!existingTask) {
             syncedTasks.push(task);
             result.tasksCreated++;
+            console.log(`📋 Created task for PR: ${pr.title} (${pr.repository.name})`);
+          } else {
+            console.log(`⏭️ Skipped existing PR: ${pr.title} (${pr.repository.name})`);
           }
         } catch (error) {
           result.errors.push(`Failed to process PR ${pr.id}: ${error}`);
         }
       }
 
-      return { tasks: syncedTasks, result };
+      return { tasks: syncedTasks, result, githubProjectId };
     } catch (error) {
       result.success = false;
       result.errors.push(`GitHub sync failed: ${error}`);
@@ -187,7 +222,7 @@ export class IntegrationSyncService {
       completed: false,
       priority: 'medium',
       dueDate,
-      tags: ['google-calendar', `calendar-event-${event.id}`],
+      tags: ['google-calendar', `calendar-event-${event.id}`, `gcal-event-${event.id}`], // Add both old and new format tags
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -197,7 +232,7 @@ export class IntegrationSyncService {
   /**
    * Convert GitHub pull request to task
    */
-  private static convertPullRequestToTask(pr: GitHubPullRequest): Task {
+  private static convertPullRequestToTask(pr: GitHubPullRequest, projectId?: string): Task {
     // Use PR description as task description, add repository and link info
     let description = pr.body || '';
     if (description) {
@@ -208,8 +243,9 @@ export class IntegrationSyncService {
     // Determine completion status based on PR state
     const isCompleted = pr.state === 'closed' || pr.merged_at !== null;
     
-    // Use appropriate date based on PR state
-    const relevantDate = pr.merged_at || pr.closed_at || pr.updated_at || pr.created_at;
+    // Set due date to today for better organization
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // End of today
 
     return {
       id: generateId(),
@@ -217,8 +253,9 @@ export class IntegrationSyncService {
       description,
       completed: isCompleted, // Open PRs are incomplete, closed/merged are complete
       priority: 'medium',
-      dueDate: new Date(relevantDate),
-      tags: ['github', 'pull-request', pr.repository.name, `pr-${pr.id}`],
+      dueDate: today, // Always set to today for GitHub items
+      projectId: projectId, // Assign to Github project
+      tags: ['github', 'pull-request', pr.repository.name, `pr-${pr.id}`, `github-pr-${pr.id}`], // Add both old and new format tags
       createdAt: new Date(pr.created_at),
       updatedAt: new Date(),
     };

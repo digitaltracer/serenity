@@ -98,7 +98,7 @@ export class CSVExporter {
 
     const rows = entries.map(entry => [
       entry.id,
-      entry.title,
+      entry.title || 'Untitled',
       entry.content.substring(0, 100) + (entry.content.length > 100 ? '...' : ''),
       entry.date.toISOString(),
       entry.tags?.join('; ') || '',

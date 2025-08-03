@@ -3,37 +3,11 @@
  * Statistical and mathematical functions for comprehensive data analysis
  */
 
-export interface Task {
-  id: string;
-  title: string;
-  completed: boolean;
-  createdAt: Date;
-  updatedAt?: Date;
-  priority?: 'low' | 'medium' | 'high';
-  projectId?: string;
-  tags?: string[];
-  dueDate?: Date;
-}
+// Import types from core package to avoid duplication and circular dependencies
+import type { Task, JournalEntry, Project } from '@serenity/core';
 
-export interface JournalEntry {
-  id: string;
-  title: string;
-  content: string;
-  date: Date;
-  tags?: string[];
-  mood?: number;
-  createdAt: Date;
-  updatedAt?: Date;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  color: string;
-  startDate?: Date;
-  targetDate?: Date;
-  isActive: boolean;
-}
+// Re-export for backward compatibility
+export type { Task, JournalEntry, Project } from '@serenity/core';
 
 export interface AnalyticsTimeRange {
   start: Date;

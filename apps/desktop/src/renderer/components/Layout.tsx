@@ -62,7 +62,8 @@ import {
   HelpCircle,
   Target,
   Database,
-  Globe
+  Globe,
+  Brain
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -168,6 +169,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/journal', label: 'Journal', icon: BookOpen },
     { path: '/goals', label: 'Goals', icon: Target },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
+    { path: '/ai-assistant', label: 'AI Assistant', icon: Brain },
   ];
 
   const isActive = (path: string) => location.pathname === path;

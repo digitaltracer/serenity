@@ -40,6 +40,18 @@ const PERSISTENT_ACTIONS = [
   'integrations/setGitHubSyncEnabled',
   'integrations/updateGitHubRepositories',
   'integrations/updateGitHubLastSync',
+  // AI Assistant (secure storage for API keys, localStorage for settings)
+  'aiAssistant/setApiKey/fulfilled',
+  'aiAssistant/setActiveProvider',
+  'aiAssistant/setAutoAnalyze',
+  'aiAssistant/setAnalysisFrequency',
+  'aiAssistant/setDataTypes',
+  'aiAssistant/addInsight',
+  'aiAssistant/removeInsight',
+  'aiAssistant/clearInsights',
+  'aiAssistant/addRecap',
+  'aiAssistant/removeRecap',
+  'aiAssistant/updateAnalysisTracker',
 ];
 
 // Simple state to track if SQLite is initialized

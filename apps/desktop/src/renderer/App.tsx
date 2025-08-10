@@ -30,6 +30,7 @@ import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { DatabasePage } from './pages/DatabasePage';
 import { IntegrationsPage } from './pages/IntegrationsPage';
+import { AIAssistantPage } from './pages/AIAssistantPage';
 
 // Component for handling menu events - must be inside ToastProvider
 function MenuEventHandler() {
@@ -252,6 +253,7 @@ function AppContent() {
                     <Route path="/journal" element={<JournalPage />} />
                     <Route path="/goals" element={<GoalsPage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/ai-assistant" element={<AIAssistantPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/database" element={<DatabasePage />} />
                     <Route path="/integrations" element={<IntegrationsPage />} />

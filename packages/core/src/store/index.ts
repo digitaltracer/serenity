@@ -15,5 +15,6 @@ export * from './slices/searchSlice';
 export * from './slices/dragDropSlice';
 export * from './slices/integrationsSlice';
 export { initializeIntegrations } from './slices/integrationsSlice';
+export * from './slices/aiAssistantSlice';
 export * from './slices/goalsSlice';
 export * from './slices/sampleData';

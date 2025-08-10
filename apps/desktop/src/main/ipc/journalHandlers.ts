@@ -105,3 +105,16 @@ export function registerJournalHandlers(): void {
 
   console.log('✅ Journal IPC handlers registered');
 }
+
+/**
+ * Helper function to query journal entries for AI analysis
+ */
+export async function queryJournalEntriesIPC() {
+  try {
+    console.log('🔐 Querying journal entries for AI analysis...');
+    return await apiService.getJournalEntries();
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to query journal entries';
+    return { success: false, data: null, error: errorMessage };
+  }
+}

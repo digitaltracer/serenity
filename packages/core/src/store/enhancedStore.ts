@@ -16,6 +16,7 @@ import searchReducer from './slices/searchSlice';
 import dragDropReducer from './slices/dragDropSlice';
 import goalsReducer from './slices/goalsSlice';
 import integrationsReducer from './slices/integrationsSlice';
+import aiAssistantReducer from './slices/aiAssistantSlice';
 import { simplifiedPersistenceMiddleware, initializeSQLitePersistence } from './middleware/simplifiedPersistenceMiddleware';
 
 /**
@@ -38,6 +39,7 @@ export function createEnhancedStore() {
       dragDrop: dragDropReducer,
       goals: goalsReducer,
       integrations: integrationsReducer,
+      aiAssistant: aiAssistantReducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({

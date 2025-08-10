@@ -183,6 +183,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteSecureSetting: (key: string) => ipcRenderer.invoke('auth:delete-secure-setting', key),
   },
 
+  // AI Assistant operations
+  aiAssistant: {
+    setApiKey: (provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => ipcRenderer.invoke('ai-assistant:set-api-key', provider, apiKey),
+    testApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => ipcRenderer.invoke('ai-assistant:test-api-key', provider),
+    analyzeData: (options: { provider: 'openai' | 'gemini' | 'anthropic'; dataTypes: string[]; forceReAnalyze?: boolean }) => ipcRenderer.invoke('ai-assistant:analyze-data', options),
+    generateRecap: (options: { provider: 'openai' | 'gemini' | 'anthropic'; type: 'weekly' | 'monthly'; period: { start: string; end: string } }) => ipcRenderer.invoke('ai-assistant:generate-recap', options),
+    getSettings: () => ipcRenderer.invoke('ai-assistant:get-settings'),
+    saveSettings: (settings: any) => ipcRenderer.invoke('ai-assistant:save-settings', settings),
+    hasApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => ipcRenderer.invoke('ai-assistant:has-api-key', provider),
+    removeApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => ipcRenderer.invoke('ai-assistant:remove-api-key', provider),
+  },
+
 });
 
 // Type definitions for the exposed API

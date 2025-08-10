@@ -9,6 +9,7 @@ export * from './services/githubService';
 export * from './services/integrationSyncService';
 export * from './services/encryptedIntegrationService';
 export * from './services/biometricAuthService';
+export * from './services/aiAssistantService';
 // Export secure storage functions
 export { 
   savePostgreSQLConfigSecure,

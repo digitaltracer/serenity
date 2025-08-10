@@ -84,3 +84,16 @@ export function registerTaskHandlers(): void {
 
   console.log('✅ Task IPC handlers registered');
 }
+
+/**
+ * Helper function to query tasks for AI analysis
+ */
+export async function queryTasksIPC() {
+  try {
+    console.log('🔐 Querying tasks for AI analysis...');
+    return await apiService.getTasks();
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to query tasks';
+    return { success: false, data: null, error: errorMessage };
+  }
+}

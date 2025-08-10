@@ -152,6 +152,11 @@ class AppManager {
             accelerator: 'CmdOrCtrl+4',
             click: () => this.sendToRenderer('menu:navigate', 'analytics')
           },
+          {
+            label: 'AI Assistant',
+            accelerator: 'CmdOrCtrl+5',
+            click: () => this.sendToRenderer('menu:navigate', 'ai-assistant')
+          },
           { type: 'separator' },
           {
             label: 'Lock App',

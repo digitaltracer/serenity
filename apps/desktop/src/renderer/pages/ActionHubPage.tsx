@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, selectCompactMode } from '@serenity/core';
-import { addTask, toggleTask, deleteTask, updateTask, addProject, deleteProject, updateGoalsProgress, selectAllEntries, selectAllProjects, addUsedTags, generateId } from '@serenity/core';
+import { addTask, toggleTask, deleteTask, updateTask, addProject, deleteProject, updateGoalsProgress, selectAllEntries, selectAllProjects, addUsedTags, generateId, addSubtask } from '@serenity/core';
 import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, ProjectComboBox, TagInput, DatePicker, Textarea, cn, DraggableTaskCard, SelectableItem, BulkOperationsToolbar, BulkActionsButton } from '@serenity/ui';
 import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List, Trash2 } from 'lucide-react';
 
@@ -29,6 +29,7 @@ export const ActionHubPage: React.FC = () => {
   const [newTaskTags, setNewTaskTags] = useState<string[]>([]);
   const [newTaskDueDate, setNewTaskDueDate] = useState<Date | null>(null);
   const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newTaskParentId, setNewTaskParentId] = useState('');
   const [editingTask, setEditingTask] = useState<string | null>(null);
   const [showCreateProjectForm, setShowCreateProjectForm] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -145,16 +146,31 @@ export const ActionHubPage: React.FC = () => {
 
   const handleCreateTask = () => {
     if (newTaskTitle.trim()) {
+      // If a parent task is selected and this is not an edit, create as subtask
+      if (!editingTask && newTaskParentId) {
+        dispatch(addSubtask({ taskId: newTaskParentId, title: newTaskTitle.trim() }));
+        // Reset form
+        setNewTaskTitle('');
+        setNewTaskDescription('');
+        setNewTaskProject('');
+        setNewTaskPriority('medium');
+        setNewTaskTags([]);
+        setNewTaskDueDate(null);
+        setNewTaskParentId('');
+        setShowCreateForm(false);
+        setEditingTask(null);
+        return;
+      }
       const taskData = {
         title: newTaskTitle,
         description: newTaskDescription,
         projectId: newTaskProject || undefined,
         priority: newTaskPriority,
         tags: newTaskTags,
-        dueDate: newTaskDueDate?.toISOString(),
+        dueDate: newTaskDueDate || undefined,
         completed: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
       
       if (editingTask) {
@@ -175,10 +191,46 @@ export const ActionHubPage: React.FC = () => {
       setNewTaskPriority('medium');
       setNewTaskTags([]);
       setNewTaskDueDate(null);
+      setNewTaskParentId('');
       setShowCreateForm(false);
       setEditingTask(null);
     }
   };
+
+  // Create-as-subtask helper: when the title starts with "> <taskId> : <title>" or "> <title> @<parentId>"
+  const tryCreateAsSubtaskFromTitle = useCallback(() => {
+    const input = newTaskTitle.trim();
+    // Pattern 1: "> parentId: title"
+    const matchIdPrefix = input.match(/^>\s*([a-zA-Z0-9_-]{6,})\s*:\s*(.+)$/);
+    // Pattern 2: "> title @parentId"
+    const matchIdSuffix = input.match(/^>\s*(.+)\s*@([a-zA-Z0-9_-]{6,})\s*$/);
+    let parentId: string | null = null;
+    let title: string | null = null;
+    if (matchIdPrefix) {
+      parentId = matchIdPrefix[1];
+      title = matchIdPrefix[2];
+    } else if (matchIdSuffix) {
+      parentId = matchIdSuffix[2];
+      title = matchIdSuffix[1];
+    }
+    if (parentId && title) {
+      dispatch(addTask({
+        title,
+        description: newTaskDescription,
+        projectId: newTaskProject || undefined,
+        priority: newTaskPriority,
+        tags: newTaskTags,
+        dueDate: newTaskDueDate || undefined,
+        completed: false,
+      }));
+      dispatch(addUsedTags(newTaskTags));
+      dispatch(addTask({} as any));
+      dispatch({ type: 'tasks/addSubtask', payload: { taskId: parentId, title } });
+      setNewTaskTitle('');
+      return true;
+    }
+    return false;
+  }, [dispatch, newTaskTitle, newTaskDescription, newTaskProject, newTaskPriority, newTaskTags, newTaskDueDate]);
 
   const handleEditTask = (task: any) => {
     setNewTaskTitle(task.title);
@@ -368,57 +420,91 @@ export const ActionHubPage: React.FC = () => {
             ) : (
               /* Full Width Create Form */
               <div className="mb-6" ref={createFormRef}>
-                <div className="bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-800/80 dark:to-gray-900/60 border border-gray-200/60 dark:border-gray-700/40 rounded-xl p-6 shadow-lg shadow-gray-200/40 dark:shadow-black/25 ring-1 ring-gray-100/80 dark:ring-gray-800/60 backdrop-blur-sm">
-                  <div className="space-y-4">
-                    <Input
-                      placeholder="What needs to be done?"
-                      value={newTaskTitle}
-                      onChange={(e) => setNewTaskTitle(e.target.value)}
-                      className="text-base"
-                      autoFocus
-                    />
-                    
-                    <Textarea
-                      placeholder="Add task description or details..."
-                      value={newTaskDescription}
-                      onChange={(e) => setNewTaskDescription(e.target.value)}
-                      rows={3}
-                      className="text-sm"
-                    />
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="flex items-center gap-2">
+                <div className="bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-800/80 dark:to-gray-900/60 border border-gray-200/60 dark:border-gray-700/40 rounded-2xl p-6 shadow-lg shadow-gray-200/40 dark:shadow-black/25 ring-1 ring-gray-100/80 dark:ring-gray-800/60 backdrop-blur-sm">
+                  <div className="space-y-5">
+                      <Input
+                        label="Task title"
+                        placeholder="What needs to be done?"
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            // Try create-as-subtask if syntax is used
+                            if (!tryCreateAsSubtaskFromTitle()) {
+                              handleCreateTask();
+                            }
+                          }
+                        }}
+                        className="text-base"
+                        autoFocus
+                      />
+
+                      <Textarea
+                        label="Description"
+                        placeholder="Add task description or details..."
+                        value={newTaskDescription}
+                        onChange={(e) => setNewTaskDescription(e.target.value)}
+                        rows={4}
+                        className="text-sm"
+                      />
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Priority</span>
+                        <div className="flex items-center gap-2">
                         <Flag className="w-4 h-4 text-gray-400" />
                         <div className="flex-1 min-w-0">
                           <CustomSelect
                             options={[
-                              { value: 'medium', label: 'Medium' },
                               { value: 'low', label: 'Low' },
+                              { value: 'medium', label: 'Medium' },
                               { value: 'high', label: 'High' }
                             ]}
                             value={newTaskPriority}
                             onChange={(value) => setNewTaskPriority(value as 'low' | 'medium' | 'high')}
                           />
                         </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Folder className="w-4 h-4 text-gray-400" />
-                        <div className="flex-1 min-w-0">
-                          <ProjectComboBox
-                            projects={projects}
-                            value={newTaskProject}
-                            onChange={(projectId) => {
-                              console.log('🔄 ActionHub: ProjectComboBox onChange called with projectId:', projectId);
-                              setNewTaskProject(projectId);
-                            }}
-                            onCreateProject={handleCreateProjectFromCombo}
-                            placeholder={projects.length === 0 ? "Type new project name..." : "Select or create project"}
-                          />
                         </div>
                       </div>
-                      
-                      <div className="flex items-center gap-2">
+
+                      <div className="space-y-1">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Project</span>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <ProjectComboBox
+                              projects={projects}
+                              value={newTaskProject}
+                              onChange={(projectId) => {
+                                setNewTaskProject(projectId);
+                              }}
+                              onCreateProject={handleCreateProjectFromCombo}
+                              placeholder={projects.length === 0 ? "Type new project name..." : "Select or create project"}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Parent Task selector */}
+                      <div className="space-y-1">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Parent task (optional)</span>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <ProjectComboBox
+                              projects={tasks.map(t => ({ id: t.id, name: t.title, color: '#9CA3AF' })) as any}
+                              value={newTaskParentId}
+                              onChange={(parentId) => setNewTaskParentId(parentId)}
+                              placeholder={newTaskParentId ? newTaskParentId : 'Type to search parent task...'}
+                            />
+                          </div>
+                        </div>
+                        {newTaskParentId && (
+                          <div className="text-[11px] text-blue-600 dark:text-blue-400 mt-1">Will be saved as a subtask of <span className="font-medium">{newTaskParentId}</span></div>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Due date</span>
+                        <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-gray-400" />
                         <div className="flex-1 min-w-0">
                           <DatePicker
@@ -426,6 +512,7 @@ export const ActionHubPage: React.FC = () => {
                             onChange={setNewTaskDueDate}
                             placeholder="Due date"
                           />
+                        </div>
                         </div>
                       </div>
                       
@@ -441,7 +528,7 @@ export const ActionHubPage: React.FC = () => {
                       </div>
                     </div>
                     
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-2 pt-2">
                       <Button variant="ghost" onClick={() => {
                         setShowCreateForm(false);
                         setEditingTask(null);
@@ -451,6 +538,7 @@ export const ActionHubPage: React.FC = () => {
                         setNewTaskPriority('medium');
                         setNewTaskTags([]);
                         setNewTaskDueDate(null);
+                        setNewTaskParentId('');
                       }}>
                         Cancel
                       </Button>
@@ -519,10 +607,10 @@ export const ActionHubPage: React.FC = () => {
               ) : (
                 filteredTasks.map((task, index) => (
                   <SelectableItem key={task.id} id={task.id} type="tasks">
-                    <DraggableTaskCard
+                      <DraggableTaskCard
                       task={task}
                       onToggle={() => dispatch(toggleTask(task.id))}
-                      onClick={handleEditTask}
+                        onEdit={handleEditTask}
                       onDelete={() => dispatch(deleteTask(task.id))}
                       index={index}
                       containerName="actionhub-tasks"

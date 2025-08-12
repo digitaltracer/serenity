@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Task } from '@serenity/core';
 import { Modal } from './Modal';
 import { Button } from './Button';
@@ -19,6 +19,8 @@ export interface TaskModalProps {
   onCreateProject?: (projectName: string) => void;
   onDelete?: (taskId: string) => void;
   onArchive?: (taskId: string) => void;
+  onSaveAsSubtaskOf?: (parentTaskId: string, subtaskTitle: string) => void;
+  allTasks?: Array<{ id: string; title: string }>; // for parent task picker
 }
 
 const TaskModal: React.FC<TaskModalProps> = ({
@@ -30,6 +32,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
   onCreateProject,
   onDelete,
   onArchive,
+  onSaveAsSubtaskOf,
+  allTasks,
 }) => {
   const [formData, setFormData] = useState({
     title: '',
@@ -66,10 +70,28 @@ const TaskModal: React.FC<TaskModalProps> = ({
     }
   }, [task, isOpen]);
 
+  // Detect inline subtask syntax in title
+  const parsedSubtask = useMemo(() => {
+    const input = (formData.title || '').trim();
+    if (!input.startsWith('>')) return null;
+    const m1 = input.match(/^>\s*([a-zA-Z0-9_-]{6,})\s*:\s*(.+)$/);
+    const m2 = input.match(/^>\s*(.+)\s*@([a-zA-Z0-9_-]{6,})\s*$/);
+    if (m1) return { parentId: m1[1], title: m1[2] };
+    if (m2) return { parentId: m2[2], title: m2[1] };
+    return null;
+  }, [formData.title]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.title.trim()) return;
+
+    // If creating a brand-new task and the title uses subtask syntax, save as subtask
+    if (!task && parsedSubtask && onSaveAsSubtaskOf) {
+      onSaveAsSubtaskOf(parsedSubtask.parentId, parsedSubtask.title);
+      onClose();
+      return;
+    }
 
     const taskData: Partial<Task> = {
       ...formData,
@@ -129,6 +151,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
           onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
           required
         />
+        {(!task && parsedSubtask) && (
+          <div className="text-xs text-blue-700 dark:text-blue-300 -mt-2">
+            Will be saved as a subtask of <span className="font-medium">{parsedSubtask.parentId}</span> with title "{parsedSubtask.title}"
+          </div>
+        )}
 
         {/* Description */}
         <Textarea
@@ -184,6 +211,24 @@ const TaskModal: React.FC<TaskModalProps> = ({
         />
 
 
+        {/* Parent Task (save as subtask) */}
+        {!task && onSaveAsSubtaskOf && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Parent Task</label>
+            <ProjectComboBox
+              // reuse combobox UI by mapping tasks -> project option shape
+              projects={(allTasks ?? []).map((t: { id: string; title: string }) => ({ id: t.id, name: t.title, color: '#9CA3AF' }))}
+              value={parsedSubtask?.parentId || ''}
+              onChange={(parentId) => {
+                if (parentId && formData.title.trim()) {
+                  setFormData(prev => ({ ...prev, title: `> ${prev.title.replace(/^>\s*/, '')} @${parentId}` }));
+                }
+              }}
+              placeholder={parsedSubtask ? parsedSubtask.parentId : 'Type to search tasks...'}
+            />
+          </div>
+        )}
+
         {/* Tags */}
         <TagInput
           label="Tags"
@@ -235,6 +280,25 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   Archive Task
                 </Button>
               )}
+            </div>
+          )}
+
+          {/* Save as subtask of another task */}
+          {!task && onSaveAsSubtaskOf && (
+            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  const parentId = prompt('Enter parent task ID to attach as subtask:')?.trim();
+                  if (parentId && formData.title.trim()) {
+                    onSaveAsSubtaskOf(parentId, formData.title.trim());
+                    onClose();
+                  }
+                }}
+              >
+                Save as subtask of another task
+              </Button>
             </div>
           )}
         </div>

@@ -82,6 +82,7 @@ declare global {
         saveSettings: (settings: any) => Promise<{ success: boolean; error?: string }>;
         hasApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; hasKey?: boolean; error?: string }>;
         removeApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; error?: string }>;
+        listModels: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; models?: { id: string; label: string }[]; error?: string }>;
       };
       onMenuAction: (callback: (event: string, data?: any) => void) => void;
       removeMenuListeners: () => void;

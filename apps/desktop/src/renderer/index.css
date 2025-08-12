@@ -6,6 +6,7 @@
   html {
     font-family: 'Inter', system-ui, sans-serif;
     height: 100%;
+    font-size: 90%; /* globally reduce base size by ~10% */
   }
   
   body {

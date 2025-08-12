@@ -2,19 +2,20 @@ import React, { useMemo } from 'react';
 import { Task, selectCompactMode } from '@serenity/core';
 import { useSelector } from 'react-redux';
 import { cn } from '../utils/cn';
-import { CheckCircle2, Circle, Calendar, Flag, RefreshCw, ListTodo, Trash2, MoreVertical } from 'lucide-react';
+import { CheckCircle2, Circle, Calendar, Flag, RefreshCw, ListTodo, Trash2, Pencil } from 'lucide-react';
 
 export interface TaskCardProps {
   task: Task;
   onToggle?: (taskId: string) => void;
   onToggleSubtask?: (taskId: string, subtaskId: string) => void;
-  onClick?: (task: Task) => void;
+  onClick?: (task: Task) => void; // kept for backward compat; not used for edit now
   onDelete?: (taskId: string) => void;
+  onEdit?: (task: Task) => void;
   className?: string;
   projects?: Array<{ id: string; name: string; color?: string; archived?: boolean }>;
 }
 
-const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, onClick, onDelete, className, projects }) => {
+const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, onClick, onDelete, onEdit, className, projects }) => {
   const compactMode = useSelector(selectCompactMode);
   
   const priorityColors = {
@@ -68,7 +69,7 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
         },
         className
       )}
-      onClick={() => onClick?.(task)}
+      onClick={() => { /* disable open-on-click to allow checkbox toggling */ }}
     >
       <div className={cn(
         'flex items-start',
@@ -134,19 +135,15 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
               )}>
                 {task.subtasks.slice(0, 3).map((subtask) => (
                   <div key={subtask.id} className="flex items-center gap-2 text-sm">
-                    <button
-                      className="flex-shrink-0"
-                      onClick={(e) => {
+                    <input
+                      type="checkbox"
+                      className="w-3.5 h-3.5 accent-green-600 cursor-pointer"
+                      checked={subtask.completed}
+                      onChange={(e) => {
                         e.stopPropagation();
                         onToggleSubtask?.(task.id, subtask.id);
                       }}
-                    >
-                      {subtask.completed ? (
-                        <CheckCircle2 className="w-3 h-3 text-green-500" />
-                      ) : (
-                        <Circle className="w-3 h-3 text-gray-400" />
-                      )}
-                    </button>
+                    />
                     <span
                       className={cn(
                         'text-gray-600 dark:text-gray-400 truncate',
@@ -222,6 +219,20 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
                 title="Delete task"
               >
                 <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Edit Button */}
+            {onEdit && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(task);
+                }}
+                className="p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                title="Edit task"
+              >
+                <Pencil className="w-4 h-4" />
               </button>
             )}
 

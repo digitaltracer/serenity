@@ -193,6 +193,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveSettings: (settings: any) => ipcRenderer.invoke('ai-assistant:save-settings', settings),
     hasApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => ipcRenderer.invoke('ai-assistant:has-api-key', provider),
     removeApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => ipcRenderer.invoke('ai-assistant:remove-api-key', provider),
+    listModels: (provider: 'openai' | 'gemini' | 'anthropic') => ipcRenderer.invoke('ai-assistant:list-models', provider),
   },
 
 });

@@ -20,6 +20,8 @@ import {
   clearAllErrors,
   updateProvidersWithModelInfo,
   updateProvidersWithApiKeys,
+  clearActiveProvider,
+  clearProviderModelInfo,
   setApiKey,
   testApiKey,
   analyzeUserData,
@@ -38,6 +40,7 @@ import {
   ProgressBar,
   Badge,
   useToast,
+  CustomSelect,
 } from '@serenity/ui';
 import {
   Brain,
@@ -92,6 +95,7 @@ export const AIAssistantPage: React.FC = () => {
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [recapPeriod, setRecapPeriod] = useState<'weekly' | 'monthly'>('weekly');
   const [activeTab, setActiveTab] = useState<'setup' | 'analyze' | 'insights' | 'recaps'>('setup');
+  const [availableModels, setAvailableModels] = useState<Record<string, { id: string; label: string }[]>>({});
   
   // Enhanced recap management state
   const [selectedRecap, setSelectedRecap] = useState<any>(null);
@@ -128,6 +132,11 @@ export const AIAssistantPage: React.FC = () => {
               dispatch(updateProvidersWithApiKeys(result.settings.providersWithKeys));
               console.log('Loaded providers with keys:', result.settings.providersWithKeys);
             }
+
+            // Set active provider from persisted settings
+            if (result.settings.activeProvider) {
+              dispatch(setActiveProvider(result.settings.activeProvider));
+            }
           }
         }
       } catch (error) {
@@ -137,6 +146,27 @@ export const AIAssistantPage: React.FC = () => {
     
     loadAISettings();
   }, [dispatch]);
+
+  // Load available models per provider when they have keys
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const next: Record<string, { id: string; label: string }[]> = {};
+        for (const p of providers) {
+          if (p.hasApiKey && window.electronAPI?.aiAssistant?.listModels) {
+            const res = await window.electronAPI.aiAssistant.listModels(p.id as any);
+            if (res.success) {
+              next[p.id] = res.models || [];
+            }
+          }
+        }
+        setAvailableModels(next);
+      } catch (e) {
+        // non-blocking
+      }
+    };
+    fetchModels();
+  }, [providers]);
 
   const handleSetApiKey = async (providerId: 'openai' | 'gemini' | 'anthropic') => {
     const apiKey = apiKeys[providerId];
@@ -477,7 +507,10 @@ export const AIAssistantPage: React.FC = () => {
             <CardContent>
               <div className="space-y-6">
                 {providers.map((provider) => (
-                  <div key={provider.id} className="border border-gray-200 dark:border-gray-700 rounded-xl p-6 space-y-5 hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
+                  <div
+                    key={provider.id}
+                    className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/40 p-6 space-y-5 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all"
+                  >
                     {/* Provider Header */}
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-4">
@@ -490,44 +523,52 @@ export const AIAssistantPage: React.FC = () => {
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{provider.name}</h3>
                             {provider.isActive && (
-                              <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-500 text-white text-xs font-medium rounded-full">
+                              <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-blue-600 text-white text-[11px] font-medium rounded-full">
                                 <Zap className="w-3 h-3" />
-                                Active
+                                Selected
                               </div>
                             )}
                           </div>
-                          
-                          {/* Status Badges */}
-                          <div className="flex items-center gap-3 flex-wrap">
+                          {/* Status Pills */}
+                          <div className="flex items-center gap-2 flex-wrap">
                             {provider.hasApiKey ? (
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 text-sm font-medium rounded-lg">
-                                <CheckCircle className="w-4 h-4" />
-                                API Key Connected
+                              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 text-xs font-medium rounded-full">
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                API Key Set
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium rounded-lg">
-                                <AlertCircle className="w-4 h-4" />
-                                No API Key
+                              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-full">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                Set API Key
                               </div>
                             )}
-                            
                             {provider.modelInfo && (
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 text-sm font-medium rounded-lg">
-                                <Star className="w-4 h-4" />
-                                {provider.id === 'gemini' ? `${provider.modelInfo.version}` : provider.modelInfo.version}
+                              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 text-xs font-medium rounded-full">
+                                <Star className="w-3.5 h-3.5" />
+                                {provider.modelInfo.version}
                               </div>
                             )}
                           </div>
                         </div>
                       </div>
-                      
+
                       {provider.hasApiKey && !provider.isActive && (
-                        <Button
-                          onClick={() => dispatch(setActiveProvider(provider.id))}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        <button
+                          onClick={async () => {
+                            dispatch(setActiveProvider(provider.id));
+                            if (window.electronAPI?.aiAssistant?.saveSettings) {
+                              await window.electronAPI.aiAssistant.saveSettings({
+                                activeProvider: provider.id,
+                                autoAnalyze: configuration.autoAnalyze,
+                                analysisFrequency: configuration.analysisFrequency,
+                                dataTypes: configuration.dataTypes,
+                              });
+                            }
+                          }}
+                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                         >
-                          Select Provider
-                        </Button>
+                          Select
+                        </button>
                       )}
                     </div>
                     
@@ -535,10 +576,8 @@ export const AIAssistantPage: React.FC = () => {
                     <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
                       {!provider.hasApiKey ? (
                         <div className="space-y-3">
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Configure API Key
-                          </label>
-                          <div className="flex gap-3">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">API Key</label>
+                          <div className="flex items-center gap-3">
                             <div className="flex-1 relative">
                               <Input
                                 type={showApiKeys[provider.id] ? 'text' : 'password'}
@@ -562,11 +601,19 @@ export const AIAssistantPage: React.FC = () => {
                             <Button
                               onClick={() => handleSetApiKey(provider.id)}
                               disabled={!apiKeys[provider.id]?.trim()}
-                              className="bg-green-600 hover:bg-green-700 text-white px-6 h-11 rounded-lg font-medium transition-colors"
+                              className="bg-green-600 disabled:opacity-60 disabled:cursor-not-allowed hover:bg-green-700 text-white px-6 h-11 rounded-lg font-medium transition-colors"
                             >
                               <Key className="w-4 h-4 mr-2" />
-                              Save Key
+                              Save
                             </Button>
+                            <button
+                              type="button"
+                              onClick={() => handleTestApiKey(provider.id)}
+                              disabled={!apiKeys[provider.id]?.trim() || testingProvider === provider.id}
+                              className="text-sm text-gray-600 dark:text-gray-300 disabled:opacity-50"
+                            >
+                              {testingProvider === provider.id ? 'Testing…' : 'Test'}
+                            </button>
                           </div>
                         </div>
                       ) : (
@@ -576,15 +623,36 @@ export const AIAssistantPage: React.FC = () => {
                               <CheckCircle className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                                API Key Configured
-                              </p>
-                              <p className="text-xs text-green-600 dark:text-green-400">
-                                Ready for AI operations
-                              </p>
+                              <p className="text-sm font-medium text-green-800 dark:text-green-200">API Key Set</p>
+                              <p className="text-xs text-green-600 dark:text-green-400">Ready for AI operations</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-3">
+                            {/* Model selector (if listing is available) */}
+                            {availableModels[provider.id]?.length ? (
+                              <select
+                                value={provider.modelInfo?.model || ''}
+                                onChange={async (e) => {
+                                  const value = e.target.value;
+                                  // Save preferred model via settings
+                                  const settingsUpdate = {
+                                    activeProvider,
+                                    autoAnalyze: configuration.autoAnalyze,
+                                    analysisFrequency: configuration.analysisFrequency,
+                                    dataTypes: configuration.dataTypes,
+                                    preferredModels: { [provider.id]: value },
+                                  } as any;
+                                  await window.electronAPI?.aiAssistant?.saveSettings(settingsUpdate);
+                                  // Update UI immediately
+                                  dispatch(updateProvidersWithModelInfo({ [provider.id]: { model: value, version: value } }));
+                                }}
+                                className="text-sm rounded-md border px-2 py-1 bg-white dark:bg-gray-900"
+                              >
+                                {availableModels[provider.id].map((m) => (
+                                  <option key={m.id} value={m.id}>{m.label}</option>
+                                ))}
+                              </select>
+                            ) : null}
                             <Button
                               variant="outline"
                               size="sm"
@@ -598,6 +666,31 @@ export const AIAssistantPage: React.FC = () => {
                                 <CheckCircle className="w-4 h-4 mr-2" />
                               )}
                               Test Connection
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={async () => {
+                                await window.electronAPI?.aiAssistant?.removeApiKey(provider.id);
+                                showSuccess('API Key Removed', `${provider.name} API key has been removed`);
+                                dispatch(updateProvidersWithApiKeys({ [provider.id]: false }));
+                                if (activeProvider === provider.id) {
+                                  // Clear persisted active provider
+                                  if (window.electronAPI?.aiAssistant?.saveSettings) {
+                                    await window.electronAPI.aiAssistant.saveSettings({
+                                      activeProvider: undefined,
+                                      autoAnalyze: configuration.autoAnalyze,
+                                      analysisFrequency: configuration.analysisFrequency,
+                                      dataTypes: configuration.dataTypes,
+                                    });
+                                  }
+                                  dispatch(clearActiveProvider());
+                                }
+                                // Clear model info badge immediately
+                                dispatch(clearProviderModelInfo(provider.id as any));
+                              }}
+                            >
+                              Remove Key
                             </Button>
                           </div>
                         </div>
@@ -864,15 +957,17 @@ export const AIAssistantPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-gray-500" />
-                  <select
-                    value={recapFilter}
-                    onChange={(e) => setRecapFilter(e.target.value as 'all' | 'weekly' | 'monthly')}
-                    className="px-3 py-1 border rounded-md bg-white dark:bg-gray-800 text-sm"
-                  >
-                    <option value="all">All Recaps</option>
-                    <option value="weekly">Weekly Only</option>
-                    <option value="monthly">Monthly Only</option>
-                  </select>
+                  <div className="min-w-[160px]">
+                    <CustomSelect
+                      value={recapFilter}
+                      onChange={(val) => setRecapFilter(val as 'all' | 'weekly' | 'monthly')}
+                      options={[
+                        { value: 'all', label: 'All Recaps' },
+                        { value: 'weekly', label: 'Weekly Only' },
+                        { value: 'monthly', label: 'Monthly Only' },
+                      ]}
+                    />
+                  </div>
                 </div>
               </div>
             </CardContent>

@@ -255,45 +255,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           )}
 
-          {!sidebarCollapsed && (
-            <SidebarSection title="Quick Actions">
-              <SidebarItem
-                icon={<Plus className="w-5 h-5" />}
-                onClick={() => dispatch(openTaskModal())}
-              >
-                New Task
-              </SidebarItem>
-              <SidebarItem
-                icon={<BookOpen className="w-5 h-5" />}
-                onClick={() => dispatch(openJournalModal())}
-              >
-                New Entry
-              </SidebarItem>
-              <SidebarItem
-                icon={<ListChecks className="w-5 h-5" />}
-                onClick={() => dispatch(openSubtaskModal())}
-              >
-                Add Subtask
-              </SidebarItem>
-            </SidebarSection>
-          )}
+          {/* Quick Actions section removed as requested */}
           
-          {sidebarCollapsed && (
-            <div className="space-y-2 mt-4">
-              <SidebarItem
-                icon={<Plus className="w-5 h-5" />}
-                onClick={() => dispatch(openTaskModal())}
-              />
-              <SidebarItem
-                icon={<BookOpen className="w-5 h-5" />}
-                onClick={() => dispatch(openJournalModal())}
-              />
-              <SidebarItem
-                icon={<ListChecks className="w-5 h-5" />}
-                onClick={() => dispatch(openSubtaskModal())}
-              />
-            </div>
-          )}
+          {/* Collapsed quick buttons removed */}
         </SidebarContent>
 
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
@@ -374,6 +338,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         onCreateProject={handleCreateProject}
         onDelete={handleDeleteTask}
         onArchive={handleArchiveTask}
+        onSaveAsSubtaskOf={(parentId: string, subtaskTitle: string) => {
+          dispatch(addSubtask({ taskId: parentId, title: subtaskTitle }));
+        }}
+        allTasks={tasks.map(t => ({ id: t.id, title: t.title }))}
       />
 
       {/* Journal Entry Modal */}

@@ -606,13 +606,28 @@ export const IntegrationsPage: React.FC = () => {
           if (activeTokens.length > 0) {
             console.log(`🔄 Syncing GitHub with ${activeTokens.length} active tokens...`);
             
-            const since = new Date();
-            since.setDate(since.getDate() - 7); // Last 7 days
-            
-            // Use multi-token approach for comprehensive PR fetching
+            // Determine dynamic sync window
+            // 1) If no history (no token.lastSync and no global lastSync), fetch past 14 days
+            // 2) If last sync exists, fetch from min(token.lastSync, global lastSync) to now
+            const now = new Date();
+            const twoWeeksAgo = new Date(now);
+            twoWeeksAgo.setDate(now.getDate() - 14);
+
+            // Find earliest lastSync among active tokens and global
+            const tokenLastSyncs = activeTokens
+              .map(t => (t.lastSync ? new Date(t.lastSync) : null))
+              .filter((d): d is Date => !!d);
+            const globalLastSync = github.lastSync ? new Date(github.lastSync) : null;
+            const allCandidates = [...tokenLastSyncs, globalLastSync].filter((d): d is Date => !!d);
+
+            const since = allCandidates.length > 0
+              ? new Date(Math.min(...allCandidates.map(d => d.getTime())))
+              : twoWeeksAgo;
+
+            // Normalize to day boundaries
             const startOfDay = new Date(since);
             startOfDay.setHours(0, 0, 0, 0);
-            const endOfDay = new Date();
+            const endOfDay = new Date(now);
             endOfDay.setHours(23, 59, 59, 999);
             
             const pullRequests = await GitHubService.getTodaysPullRequestsMultiToken(
@@ -655,7 +670,13 @@ export const IntegrationsPage: React.FC = () => {
               task.tags?.includes('github')
             );
             
+            // De-duplicate before creating tasks
+            const uniqueById = new Map<string, typeof pullRequests[number]>();
             pullRequests.forEach(pr => {
+              uniqueById.set(String(pr.id), pr);
+            });
+
+            Array.from(uniqueById.values()).forEach(pr => {
               // Check if task already exists (improved duplicate prevention)
               const existingTask = existingGithubTasks.find(existing => 
                 existing.tags?.includes(`pr-${pr.id}`) ||
@@ -686,7 +707,7 @@ export const IntegrationsPage: React.FC = () => {
                 totalTasksCreated++;
                 console.log(`📋 Created task for PR: ${pr.title} (${pr.repository.name})`);
               } else {
-                console.log(`⏭️ Skipped existing PR: ${pr.title} (${pr.repository.name})`);
+                console.log(`⏭️ Skipped existing PR (duplicate): ${pr.title} (${pr.repository.name})`);
               }
             });
             
@@ -1127,7 +1148,13 @@ export const IntegrationsPage: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                     <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      Connected as: @{github.username}
+                      {(() => {
+                        const activeNames = Array.from(new Set((github.tokens || []).filter(t => t.isActive).map(t => t.username))).filter(Boolean);
+                        const allNames = Array.from(new Set((github.tokens || []).map(t => t.username))).filter(Boolean);
+                        const names = activeNames.length > 0 ? activeNames : allNames;
+                        const label = names.length > 0 ? names.map(n => `@${n}`).join(', ') : 'Unknown user';
+                        return `Connected as: ${label}`;
+                      })()}
                     </p>
                   </div>
                   <p className="text-sm text-gray-700 dark:text-gray-300 pl-4">

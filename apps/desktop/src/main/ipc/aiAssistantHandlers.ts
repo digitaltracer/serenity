@@ -28,6 +28,11 @@ interface AISettings {
     includeJournal: boolean;
     includeProjects: boolean;
   };
+  preferredModels?: {
+    openai?: string;
+    gemini?: string;
+    anthropic?: string;
+  };
 }
 
 // In-memory storage for API keys (encrypted)
@@ -197,6 +202,177 @@ function saveAISettings(settings: AISettings): void {
 }
 
 /**
+ * Persist AI settings to SQLite secure_settings table
+ */
+async function persistAISettingsToDatabase(settings: AISettings): Promise<void> {
+  try {
+    const { sqliteService } = await import('@serenity/database');
+    await sqliteService.initialize();
+    await sqliteService.executeRawQuery(
+      `INSERT OR REPLACE INTO secure_settings (key, value, created_at, updated_at) VALUES (?, ?, ?, ?)`,
+      [
+        'ai_settings',
+        JSON.stringify(settings),
+        new Date().toISOString(),
+        new Date().toISOString(),
+      ]
+    );
+    console.log('💾 AI settings saved to database (secure_settings)');
+  } catch (error) {
+    console.warn('⚠️ Failed to persist AI settings to database:', error);
+  }
+}
+
+/**
+ * Load AI settings from SQLite secure_settings table (if present)
+ */
+async function loadAISettingsFromDatabase(): Promise<AISettings | null> {
+  try {
+    const { sqliteService } = await import('@serenity/database');
+    await sqliteService.initialize();
+    const result = await sqliteService.executeRawQuery(
+      `SELECT value FROM secure_settings WHERE key = ?`,
+      ['ai_settings']
+    );
+    const row = Array.isArray(result) ? result[0] : (result && (result as any)[0]);
+    if (row && (row.value || row["value"])) {
+      const value = row.value ?? row["value"];
+      const parsed = JSON.parse(value);
+      console.log('💾 Loaded AI settings from database');
+      return parsed;
+    }
+  } catch (error) {
+    console.warn('⚠️ Failed to load AI settings from database:', error);
+  }
+  return null;
+}
+
+/**
+ * Get current AI settings from DB or file (DB preferred)
+ */
+async function getCurrentAISettings(): Promise<AISettings> {
+  const db = await loadAISettingsFromDatabase();
+  return db || loadAISettings();
+}
+
+/**
+ * Utility to choose model for a provider
+ */
+async function resolveModelForProvider(provider: 'openai' | 'gemini' | 'anthropic', fallbackModel: string): Promise<string> {
+  try {
+    const settings = await getCurrentAISettings();
+    const preferred = settings.preferredModels?.[provider];
+    if (preferred && typeof preferred === 'string' && preferred.trim().length > 0) {
+      return preferred.trim();
+    }
+    // Fall back to stored detected model
+    const info = getModelInfo();
+    const stored = (info as any)[provider]?.model;
+    if (stored) return stored;
+  } catch {}
+  return fallbackModel;
+}
+
+/**
+ * List available models for a provider using the stored API key
+ */
+async function verifyModelUsable(provider: 'openai' | 'gemini' | 'anthropic', apiKey: string, model: string): Promise<boolean> {
+  try {
+    if (provider === 'openai') {
+      // Try Chat Completions first
+      let r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages: [{ role: 'user', content: 'test' }], max_tokens: 1, temperature: 0 }),
+      });
+      if (r.ok) return true;
+      // Some newer models are Responses API only; try that as well
+      r = await fetch('https://api.openai.com/v1/responses', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, input: 'test', max_output_tokens: 1 }),
+      });
+      return r.ok;
+    }
+    if (provider === 'gemini') {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: 'test' }] }], generationConfig: { maxOutputTokens: 1, temperature: 0 } })
+      });
+      return r.ok;
+    }
+    // anthropic
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: 1, temperature: 0, messages: [{ role: 'user', content: 'test' }] })
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
+async function listAvailableModels(provider: 'openai' | 'gemini' | 'anthropic'): Promise<{ id: string; label: string; verified: boolean }[]> {
+  const keys = getApiKeys();
+  const apiKey = (keys as any)[provider];
+  if (!apiKey) return [];
+
+  try {
+    switch (provider) {
+      case 'openai': {
+        const r = await fetch('https://api.openai.com/v1/models', {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!r.ok) return [];
+        const data = await r.json() as { data?: Array<{ id: string }> };
+        const ids = Array.from(new Set((data.data || []).map(m => m.id)));
+        const results: { id: string; label: string; verified: boolean }[] = [];
+        for (const id of ids) {
+          const ok = await verifyModelUsable('openai', apiKey, id);
+          // Include all but mark whether verified with our calling flow
+          results.push({ id, label: id, verified: ok });
+        }
+        return results.sort((a,b) => b.id.localeCompare(a.id));
+      }
+      case 'gemini': {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        if (!r.ok) return [];
+        const data = await r.json() as { models?: Array<{ name: string; displayName?: string }> };
+        const names = Array.from(new Set((data.models || []).map(m => (m.name || '').replace(/^models\//, ''))));
+        const results: { id: string; label: string; verified: boolean }[] = [];
+        for (const id of names) {
+          if (!id) continue;
+          const ok = await verifyModelUsable('gemini', apiKey, id);
+          results.push({ id, label: id, verified: ok });
+        }
+        return results;
+      }
+      case 'anthropic': {
+        const r = await fetch('https://api.anthropic.com/v1/models', {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'anthropic-version': '2023-06-01',
+          },
+        });
+        if (!r.ok) return [];
+        const data = await r.json() as { data?: Array<{ id: string }> };
+        const ids = Array.from(new Set((data.data || []).map(m => m.id)));
+        const results: { id: string; label: string; verified: boolean }[] = [];
+        for (const id of ids) {
+          const ok = await verifyModelUsable('anthropic', apiKey, id);
+          results.push({ id, label: id, verified: ok });
+        }
+        return results;
+      }
+      default:
+        return [];
+    }
+  } catch (e) {
+    console.warn('Failed to list models for', provider, e);
+    return [];
+  }
+}
+
+/**
  * Enhanced API key validation
  */
 function validateApiKey(provider: 'openai' | 'gemini' | 'anthropic', apiKey: string): { valid: boolean; error?: string } {
@@ -313,60 +489,174 @@ async function validateApiKeyPermissions(provider: 'openai' | 'gemini' | 'anthro
     }
 
     if (response.ok) {
-      // For Gemini, detect available models and return the best one
-      if (provider === 'gemini') {
-        // Try to detect which model works by making a test call to different models
-        // Order by newest/best models first
-        const availableModels = [
-          'gemini-2.5-flash', 
-          'gemini-2.5-pro', 
-          'gemini-2.0-flash-exp', 
-          'gemini-1.5-flash', 
-          'gemini-1.5-pro'
+      // For OpenAI, detect best available chat model by probing a short list
+      if (provider === 'openai') {
+        const preferredModels = [
+          'gpt-4o-mini',
+          'gpt-4o',
+          'gpt-4.1-mini',
+          'gpt-4.1',
+          'gpt-3.5-turbo'
         ];
-        
-        for (const modelName of availableModels) {
+
+        for (const modelName of preferredModels) {
           try {
-            const testResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+            const r = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+              },
               body: JSON.stringify({
-                contents: [{ parts: [{ text: 'test' }] }],
-                generationConfig: { maxOutputTokens: 1, temperature: 0 },
+                model: modelName,
+                messages: [{ role: 'user', content: 'test' }],
+                max_tokens: 1,
+                temperature: 0,
               }),
             });
-            
-            if (testResponse.ok) {
-              const versionName = modelName.includes('2.5-flash') ? '2.5 Flash' :
-                                  modelName.includes('2.5-pro') ? '2.5 Pro' :
-                                  modelName.includes('2.0') ? '2.0 Flash Exp' : 
-                                  modelName.includes('1.5-flash') ? '1.5 Flash' :
-                                  modelName.includes('1.5-pro') ? '1.5 Pro' : modelName;
-              
-              console.log(`🔍 Detected working Gemini model: ${modelName} (${versionName})`);
-              return { 
-                valid: true, 
-                modelInfo: { 
-                  model: modelName, 
-                  version: versionName
-                } 
-              };
+            if (r.ok) {
+              const versionName =
+                modelName.includes('4o-mini') ? 'GPT-4o mini' :
+                modelName === 'gpt-4o' ? 'GPT-4o' :
+                modelName.includes('4.1-mini') ? 'GPT-4.1 mini' :
+                modelName === 'gpt-4.1' ? 'GPT-4.1' :
+                'GPT-3.5 Turbo';
+
+              return { valid: true, modelInfo: { model: modelName, version: versionName } };
             }
-          } catch (e) {
-            // Continue to next model
+          } catch (_) {
             continue;
           }
         }
-        
-        // Fallback if no model detection worked
-        return { 
-          valid: true, 
-          modelInfo: { 
-            model: 'gemini-2.5-flash', 
-            version: '2.5 Flash (fallback)' 
-          } 
-        };
+        // Fallback
+        return { valid: true, modelInfo: { model: 'gpt-4o-mini', version: 'GPT-4o mini (fallback)' } };
       }
+
+      // For Gemini, detect available models and return the best one
+      if (provider === 'gemini') {
+        // Prefer dynamic discovery from the models endpoint to avoid stale names
+        try {
+          const list = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+          if (list.ok) {
+            const data = await list.json() as { models?: Array<{ name: string }> };
+            const names = (data.models || [])
+              .map(m => (m.name || '').replace(/^models\//, ''))
+              .filter(Boolean);
+            // Score models to prioritize 2.5 flash/pro (latest first), then 2.0, then 1.5
+            const score = (id: string) => {
+              let s = 0;
+              if (/-latest$/.test(id)) s += 5;
+              if (id.includes('2.5')) s += 50;
+              else if (id.includes('2.0')) s += 30;
+              else if (id.includes('1.5')) s += 10;
+              if (id.includes('flash')) s += 3;
+              if (id.includes('pro')) s += 2;
+              if (id.includes('exp')) s -= 1; // prefer non-exp if both exist
+              return s;
+            };
+            const candidates = Array.from(new Set(names))
+              .filter(id => id.startsWith('gemini-'))
+              .sort((a, b) => score(b) - score(a));
+
+            for (const modelName of candidates) {
+              try {
+                const testResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: [{ parts: [{ text: 'test' }] }],
+                    generationConfig: { maxOutputTokens: 1, temperature: 0 },
+                  }),
+                });
+                if (testResponse.ok) {
+                  const versionName = modelName.includes('2.5')
+                    ? (modelName.includes('flash') ? '2.5 Flash' : modelName.includes('pro') ? '2.5 Pro' : '2.5')
+                    : modelName.includes('2.0')
+                      ? (modelName.includes('flash') ? '2.0 Flash' : '2.0')
+                      : modelName.includes('1.5')
+                        ? (modelName.includes('flash') ? '1.5 Flash' : modelName.includes('pro') ? '1.5 Pro' : '1.5')
+                        : modelName;
+                  console.log(`🔍 Detected working Gemini model: ${modelName} (${versionName})`);
+                  return { valid: true, modelInfo: { model: modelName, version: versionName } };
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+
+        // As a fallback, try a small prioritized static list including '-latest' variants
+        const fallbackModels = [
+          'gemini-2.5-flash-latest', 'gemini-2.5-flash',
+          'gemini-2.5-pro-latest', 'gemini-2.5-pro',
+          'gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro'
+        ];
+        for (const modelName of fallbackModels) {
+          try {
+            const testResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [{ text: 'test' }] }], generationConfig: { maxOutputTokens: 1, temperature: 0 } })
+            });
+            if (testResponse.ok) {
+              const versionName = modelName.includes('2.5')
+                ? (modelName.includes('flash') ? '2.5 Flash' : modelName.includes('pro') ? '2.5 Pro' : '2.5')
+                : modelName.includes('2.0')
+                  ? (modelName.includes('flash') ? '2.0 Flash' : '2.0')
+                  : modelName.includes('1.5')
+                    ? (modelName.includes('flash') ? '1.5 Flash' : modelName.includes('pro') ? '1.5 Pro' : '1.5')
+                    : modelName;
+              return { valid: true, modelInfo: { model: modelName, version: versionName } };
+            }
+          } catch {}
+        }
+
+        // Fallback
+        return { valid: true, modelInfo: { model: 'gemini-2.5-flash', version: '2.5 Flash (fallback)' } };
+      }
+
+      // For Anthropic, detect best Claude model by probing a short list
+      if (provider === 'anthropic') {
+        const preferredModels = [
+          'claude-3-5-sonnet-latest',
+          'claude-3-5-haiku-latest',
+          'claude-3-opus-20240229',
+          'claude-3-sonnet-20240229',
+          'claude-3-haiku-20240307',
+        ];
+
+        for (const modelName of preferredModels) {
+          try {
+            const r = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'anthropic-version': '2023-06-01',
+              },
+              body: JSON.stringify({
+                model: modelName,
+                max_tokens: 1,
+                temperature: 0,
+                messages: [{ role: 'user', content: 'test' }],
+              }),
+            });
+            if (r.ok) {
+              const versionName =
+                modelName.includes('3-5-sonnet') ? 'Claude 3.5 Sonnet' :
+                modelName.includes('3-5-haiku') ? 'Claude 3.5 Haiku' :
+                modelName.includes('opus') ? 'Claude 3 Opus' :
+                modelName.includes('sonnet') ? 'Claude 3 Sonnet' :
+                'Claude 3 Haiku';
+
+              return { valid: true, modelInfo: { model: modelName, version: versionName } };
+            }
+          } catch (_) {
+            continue;
+          }
+        }
+        // Fallback
+        return { valid: true, modelInfo: { model: 'claude-3-5-sonnet-latest', version: 'Claude 3.5 Sonnet (fallback)' } };
+      }
+
       return { valid: true };
     } else {
       const errorData = await response.json().catch(() => ({})) as any;
@@ -393,6 +683,7 @@ async function validateApiKeyPermissions(provider: 'openai' | 'gemini' | 'anthro
  */
 async function callOpenAI(apiKey: string, prompt: string): Promise<any> {
   try {
+    const modelName = await resolveModelForProvider('openai', 'gpt-4o-mini');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -400,7 +691,7 @@ async function callOpenAI(apiKey: string, prompt: string): Promise<any> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: modelName,
         messages: [
           {
             role: 'system',
@@ -445,7 +736,8 @@ async function callGemini(apiKey: string, prompt: string): Promise<any> {
     // We don't want to detect on every call to avoid extra API requests
     const modelInfo = getModelInfo();
     const geminiModelInfo = modelInfo.gemini;
-    const modelName = geminiModelInfo ? geminiModelInfo.model : 'gemini-2.5-flash'; // fallback to newest model
+    const detected = geminiModelInfo ? geminiModelInfo.model : 'gemini-2.5-flash';
+    const modelName = await resolveModelForProvider('gemini', detected);
     
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
       method: 'POST',
@@ -496,6 +788,7 @@ async function callGemini(apiKey: string, prompt: string): Promise<any> {
  */
 async function callAnthropic(apiKey: string, prompt: string): Promise<any> {
   try {
+    const modelName = await resolveModelForProvider('anthropic', 'claude-3-5-sonnet-latest');
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -504,7 +797,7 @@ async function callAnthropic(apiKey: string, prompt: string): Promise<any> {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-sonnet-20240229',
+        model: modelName,
         max_tokens: 1500,
         temperature: 0.7,
         system: 'You are a productivity and well-being assistant. Analyze user data and provide helpful, actionable insights in JSON format.',
@@ -606,13 +899,12 @@ export function registerAIAssistantHandlers(): void {
       // Store encrypted
       storeApiKeys(existingKeys);
 
-      // Store model info if detected (only for Gemini currently)
-      if (provider === 'gemini' && permissionValidation.modelInfo) {
+      // Store model info if detected for any provider
+      if (permissionValidation.modelInfo) {
         const existingModelInfo = getModelInfo();
         existingModelInfo[provider] = permissionValidation.modelInfo;
         storeModelInfo(existingModelInfo);
         console.log(`🔍 Detected ${provider} model: ${permissionValidation.modelInfo.version}`);
-        
         console.log(`✅ API key for ${provider} set and validated successfully`);
         return { success: true, modelInfo: permissionValidation.modelInfo };
       }
@@ -894,9 +1186,11 @@ export function registerAIAssistantHandlers(): void {
   ipcMain.handle('ai-assistant:get-settings', async (event) => {
     try {
       console.log('⚙️ Loading AI Assistant settings...');
-      const settings = loadAISettings();
+      // Prefer DB if present, fallback to file defaults
+      const dbSettings = await loadAISettingsFromDatabase();
+      const settings = dbSettings || loadAISettings();
       const apiKeys = getApiKeys();
-      const modelInfo = getModelInfo();
+      let modelInfo = getModelInfo();
       
       // Check which providers have API keys without exposing the keys
       const providersWithKeys = {
@@ -904,6 +1198,26 @@ export function registerAIAssistantHandlers(): void {
         gemini: !!apiKeys.gemini,
         anthropic: !!apiKeys.anthropic,
       };
+
+      // Backfill model info if missing but API key exists (runs only on settings load)
+      try {
+        const providers: Array<'openai' | 'gemini' | 'anthropic'> = ['openai', 'gemini', 'anthropic'];
+        for (const p of providers) {
+          if (providersWithKeys[p] && (!modelInfo || !modelInfo[p])) {
+            const key = (apiKeys as any)[p];
+            const r = await validateApiKeyPermissions(p, key as string);
+            if (r.valid && r.modelInfo) {
+              const existing = getModelInfo();
+              existing[p] = r.modelInfo;
+              storeModelInfo(existing);
+              modelInfo = existing;
+              console.log(`🔍 Backfilled ${p} model info: ${r.modelInfo.version}`);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ Model info backfill failed:', e);
+      }
 
       console.log('✅ AI Assistant settings loaded successfully');
       return { 
@@ -928,6 +1242,7 @@ export function registerAIAssistantHandlers(): void {
     try {
       console.log('⚙️ Saving AI Assistant settings...');
       saveAISettings(settings);
+      await persistAISettingsToDatabase(settings);
       console.log('✅ AI Assistant settings saved successfully');
       return { success: true };
     } catch (error) {
@@ -936,6 +1251,16 @@ export function registerAIAssistantHandlers(): void {
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to save settings' 
       };
+    }
+  });
+
+  // List available models for a provider
+  ipcMain.handle('ai-assistant:list-models', async (event, provider: 'openai' | 'gemini' | 'anthropic') => {
+    try {
+      const list = await listAvailableModels(provider);
+      return { success: true, models: list };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to list models' };
     }
   });
 
@@ -963,6 +1288,23 @@ export function registerAIAssistantHandlers(): void {
       const existingKeys = getApiKeys();
       delete existingKeys[provider];
       storeApiKeys(existingKeys);
+
+      // Also clear stored model info for this provider
+      const existingModelInfo = getModelInfo();
+      if (existingModelInfo && existingModelInfo[provider]) {
+        delete existingModelInfo[provider];
+        storeModelInfo(existingModelInfo);
+        console.log(`🧹 Cleared stored model info for ${provider}`);
+      }
+
+      // If this provider was active, clear selection in settings and persist
+      const currentSettings = await getCurrentAISettings();
+      if (currentSettings.activeProvider === provider) {
+        const updated = { ...currentSettings, activeProvider: undefined };
+        saveAISettings(updated);
+        await persistAISettingsToDatabase(updated);
+        console.log(`🔄 Cleared active provider selection (${provider})`);
+      }
 
       console.log(`✅ API key for ${provider} removed successfully`);
       return { success: true };

@@ -14,6 +14,7 @@ interface DraggableTaskCardProps {
   onToggle: () => void;
   onClick?: (task: Task) => void;
   onDelete?: (taskId: string) => void;
+  onEdit?: (task: Task) => void;
   className?: string;
   index?: number;
   containerName?: string;
@@ -27,6 +28,7 @@ export const DraggableTaskCard: React.FC<DraggableTaskCardProps> = ({
   onToggle,
   onClick,
   onDelete,
+  onEdit,
   className = '',
   index,
   containerName,
@@ -61,6 +63,7 @@ export const DraggableTaskCard: React.FC<DraggableTaskCardProps> = ({
         task={task}
         onToggle={onToggle}
         onClick={onClick}
+        onEdit={onEdit}
         onDelete={onDelete}
         projects={projects}
         className={`

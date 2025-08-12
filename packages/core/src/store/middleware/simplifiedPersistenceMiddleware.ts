@@ -5,6 +5,8 @@
 
 import { Middleware } from '@reduxjs/toolkit';
 
+type ElectronAPIType = (typeof window & { electronAPI?: any })['electronAPI'];
+
 // Actions that should trigger persistence
 const PERSISTENT_ACTIONS = [
   // Tasks
@@ -43,6 +45,7 @@ const PERSISTENT_ACTIONS = [
   // AI Assistant (secure storage for API keys, localStorage for settings)
   'aiAssistant/setApiKey/fulfilled',
   'aiAssistant/setActiveProvider',
+  'aiAssistant/clearActiveProvider',
   'aiAssistant/setAutoAnalyze',
   'aiAssistant/setAnalysisFrequency',
   'aiAssistant/setDataTypes',
@@ -165,6 +168,24 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
     if (action.type.startsWith('integrations/')) {
       localStorage.setItem('serenity_integrations', JSON.stringify(state.integrations));
       return result;
+    }
+
+    // Persist AI Assistant base settings and active provider to both file (handled in main) and SQLite secure_settings for redundancy
+    if (action.type.startsWith('aiAssistant/')) {
+      try {
+        const aiSettings = {
+          activeProvider: state.aiAssistant.activeProvider,
+          autoAnalyze: state.aiAssistant.autoAnalyze,
+          analysisFrequency: state.aiAssistant.analysisFrequency,
+          dataTypes: state.aiAssistant.dataTypes,
+        };
+        if (window.electronAPI?.aiAssistant?.saveSettings) {
+          // Fire and forget; main process will also persist to DB
+          window.electronAPI.aiAssistant.saveSettings(aiSettings);
+        }
+      } catch (e) {
+        console.warn('⚠️ Failed to trigger AI settings save:', e);
+      }
     }
     
     // For data operations, use SQLite if available, otherwise localStorage as temporary fallback

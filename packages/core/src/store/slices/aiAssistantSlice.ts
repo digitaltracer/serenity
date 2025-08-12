@@ -235,6 +235,16 @@ const aiAssistantSlice = createSlice({
         }
       });
     },
+    clearActiveProvider: (state) => {
+      state.activeProvider = undefined;
+      state.providers.forEach(p => { p.isActive = false; });
+    },
+    clearProviderModelInfo: (state, action: PayloadAction<'openai' | 'gemini' | 'anthropic'>) => {
+      const provider = state.providers.find(p => p.id === action.payload);
+      if (provider) {
+        provider.modelInfo = undefined;
+      }
+    },
     
     setAutoAnalyze: (state, action: PayloadAction<boolean>) => {
       state.autoAnalyze = action.payload;
@@ -412,6 +422,7 @@ const aiAssistantSlice = createSlice({
 
 export const {
   setActiveProvider,
+  clearActiveProvider,
   setAutoAnalyze,
   setAnalysisFrequency,
   setDataTypes,
@@ -425,6 +436,7 @@ export const {
   clearAllErrors,
   updateProvidersWithModelInfo,
   updateProvidersWithApiKeys,
+  clearProviderModelInfo,
 } = aiAssistantSlice.actions;
 
 // Selectors

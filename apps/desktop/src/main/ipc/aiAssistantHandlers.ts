@@ -231,7 +231,7 @@ async function loadAISettingsFromDatabase(): Promise<AISettings | null> {
     const { sqliteService } = await import('@serenity/database');
     await sqliteService.initialize();
     const result = await sqliteService.executeRawQuery(
-      `SELECT value FROM secure_settings WHERE key = ?`,
+      `SELECT value FROM secure_settings WHERE key = ? ORDER BY updated_at DESC LIMIT 1`,
       ['ai_settings']
     );
     const row = Array.isArray(result) ? result[0] : (result && (result as any)[0]);
@@ -728,6 +728,37 @@ async function callOpenAI(apiKey: string, prompt: string): Promise<any> {
 }
 
 /**
+ * Normalize provider-specific usage objects to a common shape
+ */
+function normalizeUsage(raw: any): { promptTokens: number; completionTokens: number; totalTokens: number } {
+  try {
+    if (!raw) return { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+    // OpenAI: { prompt_tokens, completion_tokens, total_tokens }
+    if (typeof raw.prompt_tokens === 'number' || typeof raw.completion_tokens === 'number' || typeof raw.total_tokens === 'number') {
+      const prompt = Number(raw.prompt_tokens || 0);
+      const completion = Number(raw.completion_tokens || 0);
+      const total = Number(raw.total_tokens || prompt + completion);
+      return { promptTokens: prompt, completionTokens: completion, totalTokens: total };
+    }
+    // Anthropic: { input_tokens, output_tokens }
+    if (typeof raw.input_tokens === 'number' || typeof raw.output_tokens === 'number') {
+      const prompt = Number(raw.input_tokens || 0);
+      const completion = Number(raw.output_tokens || 0);
+      const total = prompt + completion;
+      return { promptTokens: prompt, completionTokens: completion, totalTokens: total };
+    }
+    // Already normalized
+    if (typeof raw.promptTokens === 'number' || typeof raw.completionTokens === 'number' || typeof raw.totalTokens === 'number') {
+      const prompt = Number(raw.promptTokens || 0);
+      const completion = Number(raw.completionTokens || 0);
+      const total = Number(raw.totalTokens || prompt + completion);
+      return { promptTokens: prompt, completionTokens: completion, totalTokens: total };
+    }
+  } catch {}
+  return { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+}
+
+/**
  * Make API request to Google Gemini
  */
 async function callGemini(apiKey: string, prompt: string): Promise<any> {
@@ -899,18 +930,40 @@ export function registerAIAssistantHandlers(): void {
       // Store encrypted
       storeApiKeys(existingKeys);
 
+      // Ensure active provider is persisted (renderer may also do this, but we persist here for reliability)
+      try {
+        const current = await getCurrentAISettings();
+        const updated: AISettings = {
+          ...current,
+          activeProvider: provider,
+        };
+        saveAISettings(updated);
+        await persistAISettingsToDatabase(updated);
+        console.log('⚙️ Active provider persisted during set-api-key:', provider);
+      } catch (e) {
+        console.warn('⚠️ Failed to persist activeProvider during set-api-key:', e);
+      }
+
       // Store model info if detected for any provider
       if (permissionValidation.modelInfo) {
         const existingModelInfo = getModelInfo();
         existingModelInfo[provider] = permissionValidation.modelInfo;
         storeModelInfo(existingModelInfo);
         console.log(`🔍 Detected ${provider} model: ${permissionValidation.modelInfo.version}`);
+        // Make a tiny usage-capturing call to surface token usage on setup
+        const testPrompt = 'Respond with only: {"setup":"ok"}';
+        const testResult = await makeAIApiCall(provider, testPrompt);
+        console.log('📊 Setup usage (with model info):', testResult.usage);
         console.log(`✅ API key for ${provider} set and validated successfully`);
-        return { success: true, modelInfo: permissionValidation.modelInfo };
+        return { success: true, modelInfo: permissionValidation.modelInfo, usage: normalizeUsage(testResult.usage) };
       }
 
+      // Even if no model info, still do a tiny usage-capturing call
+      const testPrompt = 'Respond with only: {"setup":"ok"}';
+      const testResult = await makeAIApiCall(provider, testPrompt);
+      console.log('📊 Setup usage (no model info):', testResult.usage);
       console.log(`✅ API key for ${provider} set and validated successfully`);
-      return { success: true };
+      return { success: true, usage: normalizeUsage(testResult.usage) };
     } catch (error) {
       console.error(`❌ Failed to set API key for ${provider}:`, error);
       return { 
@@ -1033,6 +1086,7 @@ export function registerAIAssistantHandlers(): void {
       
       // Analyze with AI provider
       const allInsights = [];
+      let usageTotals = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
       
       for (const [promptType, prompt] of Object.entries(prompts)) {
         console.log(`🤖 Running ${promptType} analysis...`);
@@ -1046,6 +1100,10 @@ export function registerAIAssistantHandlers(): void {
           });
           allInsights.push(...insights);
           console.log(`✅ Generated ${insights.length} insights from ${promptType}`);
+          const u = normalizeUsage(result.usage);
+          usageTotals.promptTokens += u.promptTokens;
+          usageTotals.completionTokens += u.completionTokens;
+          usageTotals.totalTokens += u.totalTokens;
         } else {
           console.warn(`⚠️ ${promptType} analysis failed:`, result.error);
         }
@@ -1063,6 +1121,7 @@ export function registerAIAssistantHandlers(): void {
         success: true,
         insights: allInsights,
         processedData: analysisSummary,
+        usage: usageTotals,
       };
     } catch (error) {
       console.error('❌ Data analysis failed:', error);
@@ -1161,6 +1220,7 @@ export function registerAIAssistantHandlers(): void {
           return {
             success: true,
             recap,
+            usage: normalizeUsage(result.usage),
           };
         } else {
           console.error('❌ Failed to parse recap response');
@@ -1191,6 +1251,7 @@ export function registerAIAssistantHandlers(): void {
       const settings = dbSettings || loadAISettings();
       const apiKeys = getApiKeys();
       let modelInfo = getModelInfo();
+      console.log('⚙️ get-settings current persisted settings:', settings);
       
       // Check which providers have API keys without exposing the keys
       const providersWithKeys = {
@@ -1241,8 +1302,15 @@ export function registerAIAssistantHandlers(): void {
   ipcMain.handle('ai-assistant:save-settings', async (event, settings: AISettings) => {
     try {
       console.log('⚙️ Saving AI Assistant settings...');
-      saveAISettings(settings);
-      await persistAISettingsToDatabase(settings);
+      // Merge with currently persisted settings to avoid wiping fields (e.g., activeProvider)
+      const current = await getCurrentAISettings();
+      const merged: AISettings = {
+        ...current,
+        ...settings,
+      };
+      console.log('⚙️ Merged settings to persist:', merged);
+      saveAISettings(merged);
+      await persistAISettingsToDatabase(merged);
       console.log('✅ AI Assistant settings saved successfully');
       return { success: true };
     } catch (error) {

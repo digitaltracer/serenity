@@ -527,6 +527,55 @@ export const ActionHubPage: React.FC = () => {
                         </div>
                       </div>
                     </div>
+
+                    {/* Subtasks Section - shown when editing, outside the options grid */}
+                    {editingTask && (
+                      <div className="mt-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Subtasks</span>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              const title = prompt('New subtask title')?.trim();
+                              if (!title) return;
+                              dispatch(addSubtask({ taskId: editingTask, title }));
+                            }}
+                          >
+                            <Plus className="w-3 h-3 mr-1" /> Add
+                          </Button>
+                        </div>
+                        {(tasks.find(t => t.id === editingTask)?.subtasks ?? []).length === 0 ? (
+                          <div className="text-[12px] text-gray-500 dark:text-gray-400">No subtasks yet.</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {(tasks.find(t => t.id === editingTask)?.subtasks ?? []).map((st) => (
+                              <div key={st.id} className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  className="w-4 h-4 accent-green-600"
+                                  checked={!!st.completed}
+                                  onChange={() => dispatch(toggleSubtask({ taskId: editingTask!, subtaskId: st.id }))}
+                                />
+                                <input
+                                  className="flex-1 rounded-md border border-gray-200 dark:border-gray-700 bg-transparent px-2 py-1 text-sm"
+                                  value={st.title}
+                                  onChange={(e) => dispatch(updateTask({ id: editingTask!, subtasks: (tasks.find(t => t.id === editingTask)?.subtasks ?? []).map(s => s.id === st.id ? { ...s, title: e.target.value } : s) as any }))}
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => dispatch({ type: 'tasks/removeSubtask', payload: { taskId: editingTask, subtaskId: st.id } })}
+                                  title="Remove subtask"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     
                     <div className="flex justify-end gap-2 pt-2">
                       <Button variant="ghost" onClick={() => {

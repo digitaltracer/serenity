@@ -8,7 +8,7 @@ import { CustomSelect } from './CustomSelect';
 import { ProjectComboBox } from './ProjectComboBox';
 import { TagInput } from './TagInput';
 import { DatePicker } from './DatePicker';
-import { Calendar, Flag, Folder, Trash2, Archive } from 'lucide-react';
+import { Calendar, Flag, Folder, Trash2, Archive, Plus, Pencil, X } from 'lucide-react';
 
 export interface TaskModalProps {
   isOpen: boolean;
@@ -21,6 +21,10 @@ export interface TaskModalProps {
   onArchive?: (taskId: string) => void;
   onSaveAsSubtaskOf?: (parentTaskId: string, subtaskTitle: string) => void;
   allTasks?: Array<{ id: string; title: string }>; // for parent task picker
+  onToggleSubtask?: (taskId: string, subtaskId: string) => void;
+  onUpdateSubtaskTitle?: (taskId: string, subtaskId: string, title: string) => void;
+  onRemoveSubtask?: (taskId: string, subtaskId: string) => void;
+  onAddSubtaskInline?: (taskId: string, title: string) => void;
 }
 
 const TaskModal: React.FC<TaskModalProps> = ({
@@ -34,6 +38,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
   onArchive,
   onSaveAsSubtaskOf,
   allTasks,
+  onToggleSubtask,
+  onUpdateSubtaskTitle,
+  onRemoveSubtask,
+  onAddSubtaskInline,
 }) => {
   const [formData, setFormData] = useState({
     title: '',
@@ -237,6 +245,54 @@ const TaskModal: React.FC<TaskModalProps> = ({
           placeholder="Add a tag..."
           maxTags={8}
         />
+
+        {/* Subtasks editor - show only when editing existing task */}
+        {task && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Subtasks</label>
+              <button
+                type="button"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                onClick={() => {
+                  const title = prompt('New subtask title')?.trim();
+                  if (title && onAddSubtaskInline) onAddSubtaskInline(task.id, title);
+                }}
+              >
+                Add subtask
+              </button>
+            </div>
+            {(!task.subtasks || task.subtasks.length === 0) ? (
+              <div className="text-sm text-gray-500 dark:text-gray-400">No subtasks yet.</div>
+            ) : (
+              <div className="space-y-2">
+                {task.subtasks!.map((st) => (
+                  <div key={st.id} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={st.completed}
+                      onChange={() => onToggleSubtask?.(task.id, st.id)}
+                      className="w-4 h-4 accent-green-600"
+                    />
+                    <input
+                      className="flex-1 rounded-md border border-gray-200 dark:border-gray-700 bg-transparent px-2 py-1 text-sm"
+                      value={st.title}
+                      onChange={(e) => onUpdateSubtaskTitle?.(task.id, st.id, e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="text-gray-400 hover:text-red-500"
+                      onClick={() => onRemoveSubtask?.(task.id, st.id)}
+                      title="Remove subtask"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="space-y-3 pt-4">

@@ -106,6 +106,16 @@ const tasksSlice = createSlice({
         task.updatedAt = new Date();
       }
     },
+    updateSubtaskTitle: (state, action: PayloadAction<{ taskId: string; subtaskId: string; title: string }>) => {
+      const task = state.tasks.find(task => task.id === action.payload.taskId);
+      if (task && task.subtasks) {
+        const subtask = task.subtasks.find(st => st.id === action.payload.subtaskId);
+        if (subtask) {
+          subtask.title = action.payload.title;
+          task.updatedAt = new Date();
+        }
+      }
+    },
     setTaskFilter: (state, action: PayloadAction<Partial<TasksState['filters']>>) => {
       state.filters = { ...state.filters, ...action.payload };
     },
@@ -224,6 +234,7 @@ export const {
   toggleSubtask,
   addSubtask,
   removeSubtask,
+  updateSubtaskTitle,
   setTaskFilter,
   clearFilters: clearTaskFilters,
   setTasks,

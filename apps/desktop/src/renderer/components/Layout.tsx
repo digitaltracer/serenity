@@ -9,6 +9,9 @@ import {
   addTask, 
   addProject,
   addSubtask,
+  removeSubtask,
+  toggleSubtask,
+  updateSubtaskTitle,
   deleteTask,
   selectAllTasks,
   selectAllProjects,
@@ -342,6 +345,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           dispatch(addSubtask({ taskId: parentId, title: subtaskTitle }));
         }}
         allTasks={tasks.map(t => ({ id: t.id, title: t.title }))}
+        onToggleSubtask={(taskId, subtaskId) => dispatch(toggleSubtask({ taskId, subtaskId }))}
+        onUpdateSubtaskTitle={(taskId, subtaskId, title) => dispatch(updateSubtaskTitle({ taskId, subtaskId, title }))}
+        onRemoveSubtask={(taskId, subtaskId) => dispatch(removeSubtask({ taskId, subtaskId }))}
+        onAddSubtaskInline={(taskId, title) => dispatch(addSubtask({ taskId, title }))}
       />
 
       {/* Journal Entry Modal */}

@@ -74,11 +74,11 @@ declare global {
         deleteSecureSetting: (key: string) => Promise<{ success: boolean; data?: any; error?: string }>;
       };
       aiAssistant?: {
-        setApiKey: (provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => Promise<{ success: boolean; error?: string; modelInfo?: { model: string; version: string } }>;
+        setApiKey: (provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => Promise<{ success: boolean; error?: string; modelInfo?: { model: string; version: string }; usage?: { promptTokens: number; completionTokens: number; totalTokens: number } }>;
         testApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; error?: string }>;
-        analyzeData: (options: { provider: 'openai' | 'gemini' | 'anthropic'; dataTypes: string[]; forceReAnalyze?: boolean; tasks?: any[]; journalEntries?: any[]; analysisTracker?: any }) => Promise<{ success: boolean; insights?: any[]; processedData?: any; error?: string; message?: string }>;
-        generateRecap: (options: { provider: 'openai' | 'gemini' | 'anthropic'; type: 'weekly' | 'monthly'; period: { start: string; end: string }; tasks?: any[]; journalEntries?: any[] }) => Promise<{ success: boolean; recap?: any; error?: string }>;
-        getSettings: () => Promise<{ success: boolean; settings?: { modelInfo?: any; [key: string]: any }; error?: string }>;
+        analyzeData: (options: { provider: 'openai' | 'gemini' | 'anthropic'; dataTypes: string[]; forceReAnalyze?: boolean; tasks?: any[]; journalEntries?: any[]; analysisTracker?: any }) => Promise<{ success: boolean; insights?: any[]; processedData?: any; error?: string; message?: string; usage?: { promptTokens: number; completionTokens: number; totalTokens: number } }>;
+        generateRecap: (options: { provider: 'openai' | 'gemini' | 'anthropic'; type: 'weekly' | 'monthly'; period: { start: string; end: string }; tasks?: any[]; journalEntries?: any[] }) => Promise<{ success: boolean; recap?: any; error?: string; usage?: { promptTokens: number; completionTokens: number; totalTokens: number } }>;
+        getSettings: () => Promise<{ success: boolean; settings?: { modelInfo?: any; activeProvider?: 'openai' | 'gemini' | 'anthropic'; preferredModels?: Record<string, string>; [key: string]: any }; error?: string }>;
         saveSettings: (settings: any) => Promise<{ success: boolean; error?: string }>;
         hasApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; hasKey?: boolean; error?: string }>;
         removeApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; error?: string }>;

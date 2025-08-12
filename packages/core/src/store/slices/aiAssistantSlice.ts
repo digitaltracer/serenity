@@ -51,6 +51,17 @@ export interface AnalysisTracker {
   totalJournalEntriesAnalyzed: number;
 }
 
+export interface AIUsageEntry {
+  id: string;
+  timestamp: string;
+  provider: 'openai' | 'gemini' | 'anthropic';
+  operation: 'analyze' | 'recap';
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  note?: string;
+}
+
 export interface AIAssistantState {
   // Provider management
   providers: AIProvider[];
@@ -81,7 +92,18 @@ export interface AIAssistantState {
   // Error handling
   lastError?: string;
   errors: string[];
+  usage: AIUsageEntry[];
 }
+
+const loadStoredUsage = (): AIUsageEntry[] => {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem('serenity_ai_usage');
+      if (raw) return JSON.parse(raw);
+    }
+  } catch {}
+  return [];
+};
 
 const initialState: AIAssistantState = {
   providers: [
@@ -108,6 +130,7 @@ const initialState: AIAssistantState = {
     includeProjects: true,
   },
   errors: [],
+  usage: loadStoredUsage(),
 };
 
 // Async thunks for AI operations
@@ -116,9 +139,13 @@ export const setApiKey = createAsyncThunk(
   async ({ provider, apiKey }: { provider: 'openai' | 'gemini' | 'anthropic'; apiKey: string }) => {
     // This will be handled by the main process for security
     if (typeof globalThis !== 'undefined' && (globalThis as any).window?.electronAPI?.aiAssistant?.setApiKey) {
+      console.log('[aiAssistant/setApiKey] Calling main process setApiKey for', provider);
       const result = await (globalThis as any).window.electronAPI.aiAssistant.setApiKey(provider, apiKey);
+      console.log('[aiAssistant/setApiKey] Main returned:', result);
       if (result.success) {
-        return { provider, hasKey: true, modelInfo: result.modelInfo };
+        const payload = { provider, hasKey: true, modelInfo: result.modelInfo, usage: result.usage } as any;
+        console.log('[aiAssistant/setApiKey] Fulfilled payload:', payload);
+        return payload;
       } else {
         throw new Error(result.error || 'Failed to set API key');
       }
@@ -173,6 +200,9 @@ export const analyzeUserData = createAsyncThunk(
         return {
           insights: result.insights || [],
           processedData: result.processedData || {},
+          usage: result.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+          provider,
+          operation: 'analyze' as const,
         };
       } else {
         throw new Error(result.error || 'Data analysis failed');
@@ -207,7 +237,7 @@ export const generateRecap = createAsyncThunk(
       });
       
       if (result.success) {
-        return result.recap;
+        return { recap: result.recap, usage: result.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 }, provider, operation: 'recap' as const };
       } else {
         throw new Error(result.error || 'Recap generation failed');
       }
@@ -316,6 +346,15 @@ const aiAssistantSlice = createSlice({
         }
       });
     },
+    recordUsage: (state, action: PayloadAction<AIUsageEntry>) => {
+      state.usage.unshift(action.payload);
+      if (state.usage.length > 500) {
+        state.usage = state.usage.slice(0, 500);
+      }
+    },
+    clearUsage: (state) => {
+      state.usage = [];
+    },
   },
   
   extraReducers: (builder) => {
@@ -331,6 +370,21 @@ const aiAssistantSlice = createSlice({
           if (action.payload.modelInfo) {
             provider.modelInfo = action.payload.modelInfo;
           }
+        }
+        // Record any usage returned from key setup
+        const anyAction: any = action as any;
+        if (anyAction.payload && anyAction.payload.usage) {
+          const u = anyAction.payload.usage;
+          state.usage.unshift({
+            id: `usage_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            provider: anyAction.payload.provider,
+            operation: 'analyze',
+            promptTokens: Number(u.promptTokens || 0),
+            completionTokens: Number(u.completionTokens || 0),
+            totalTokens: Number(u.totalTokens || 0),
+            note: 'API key setup verification',
+          });
         }
       })
       .addCase(setApiKey.rejected, (state, action) => {
@@ -380,6 +434,19 @@ const aiAssistantSlice = createSlice({
             ...action.payload.processedData,
           };
         }
+        // Record usage entry
+        if (action.payload.usage) {
+          const u = action.payload.usage as any;
+          state.usage.unshift({
+            id: `usage_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            provider: action.payload.provider,
+            operation: 'analyze',
+            promptTokens: Number(u.promptTokens || 0),
+            completionTokens: Number(u.completionTokens || 0),
+            totalTokens: Number(u.totalTokens || 0),
+          });
+        }
         
         // Keep only last 50 insights
         if (state.insights.length > 50) {
@@ -404,7 +471,20 @@ const aiAssistantSlice = createSlice({
       .addCase(generateRecap.fulfilled, (state, action) => {
         state.isAnalyzing = false;
         state.analysisStatus = 'Recap generated';
-        state.recaps.unshift(action.payload);
+        state.recaps.unshift(action.payload.recap);
+        // Record usage entry
+        if (action.payload.usage) {
+          const u = action.payload.usage as any;
+          state.usage.unshift({
+            id: `usage_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            provider: action.payload.provider,
+            operation: 'recap',
+            promptTokens: Number(u.promptTokens || 0),
+            completionTokens: Number(u.completionTokens || 0),
+            totalTokens: Number(u.totalTokens || 0),
+          });
+        }
         
         // Keep only last 20 recaps
         if (state.recaps.length > 20) {
@@ -437,6 +517,8 @@ export const {
   updateProvidersWithModelInfo,
   updateProvidersWithApiKeys,
   clearProviderModelInfo,
+  recordUsage,
+  clearUsage,
 } = aiAssistantSlice.actions;
 
 // Selectors
@@ -455,5 +537,6 @@ export const selectAIConfiguration = (state: { aiAssistant: AIAssistantState }) 
 });
 export const selectAIErrors = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.errors;
 export const selectLastAIError = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.lastError;
+export const selectAIUsage = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.usage;
 
 export default aiAssistantSlice.reducer;

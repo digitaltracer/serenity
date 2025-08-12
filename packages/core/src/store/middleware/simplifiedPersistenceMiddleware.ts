@@ -152,7 +152,7 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
   const result = next(action);
   
   // Only persist if action type is in our list
-  if (!PERSISTENT_ACTIONS.includes(action.type)) {
+  if (!PERSISTENT_ACTIONS.includes(action.type) && !action.type.startsWith('aiAssistant/')) {
     return result;
   }
   
@@ -182,6 +182,13 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
         if (window.electronAPI?.aiAssistant?.saveSettings) {
           // Fire and forget; main process will also persist to DB
           window.electronAPI.aiAssistant.saveSettings(aiSettings);
+        }
+        // Persist usage to localStorage for quick access across sessions
+        if (state.aiAssistant?.usage) {
+          try {
+            localStorage.setItem('serenity_ai_usage', JSON.stringify(state.aiAssistant.usage));
+            console.log('[simplifiedPersistenceMiddleware] Saved AI usage to localStorage:', state.aiAssistant.usage.length);
+          } catch {}
         }
       } catch (e) {
         console.warn('⚠️ Failed to trigger AI settings save:', e);

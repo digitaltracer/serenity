@@ -12,6 +12,7 @@ import {
   selectAIErrors,
   selectLastAIError,
   selectAnalysisTracker,
+  selectAIUsage,
   setActiveProvider,
   setAutoAnalyze,
   setAnalysisFrequency,
@@ -94,7 +95,8 @@ export const AIAssistantPage: React.FC = () => {
   const [showApiKeys, setShowApiKeys] = useState<{ [key: string]: boolean }>({});
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [recapPeriod, setRecapPeriod] = useState<'weekly' | 'monthly'>('weekly');
-  const [activeTab, setActiveTab] = useState<'setup' | 'analyze' | 'insights' | 'recaps'>('setup');
+  const [activeTab, setActiveTab] = useState<'setup' | 'analyze' | 'insights' | 'recaps' | 'usage'>('setup');
+  const usage = useSelector(selectAIUsage);
   const [availableModels, setAvailableModels] = useState<Record<string, { id: string; label: string }[]>>({});
   
   // Enhanced recap management state
@@ -121,6 +123,7 @@ export const AIAssistantPage: React.FC = () => {
       try {
         if (window.electronAPI?.aiAssistant?.getSettings) {
           const result = await window.electronAPI.aiAssistant.getSettings();
+          console.log('[AIAssistantPage] getSettings result:', result);
           if (result.success) {
             // Update model info if available
             if (result.settings.modelInfo) {
@@ -133,9 +136,30 @@ export const AIAssistantPage: React.FC = () => {
               console.log('Loaded providers with keys:', result.settings.providersWithKeys);
             }
 
-            // Set active provider from persisted settings
+            // Set active provider from persisted settings (ensure provider exists and has key)
             if (result.settings.activeProvider) {
-              dispatch(setActiveProvider(result.settings.activeProvider));
+              const ap = result.settings.activeProvider as 'openai' | 'gemini' | 'anthropic';
+              const hasKey = !!result.settings.providersWithKeys?.[ap];
+              console.log('[AIAssistantPage] Persisted activeProvider:', ap, 'hasKey:', hasKey);
+              if (hasKey) {
+                dispatch(setActiveProvider(ap));
+              }
+            }
+            // If none persisted, default-select the first provider with a key and persist
+            if (!result.settings.activeProvider) {
+              const firstWithKey = (['openai','gemini','anthropic'] as const).find(p => result.settings.providersWithKeys?.[p]);
+              if (firstWithKey) {
+                console.log('[AIAssistantPage] No activeProvider persisted. Selecting first with key:', firstWithKey);
+                dispatch(setActiveProvider(firstWithKey));
+                try {
+                  await window.electronAPI?.aiAssistant?.saveSettings({
+                    activeProvider: firstWithKey,
+                    autoAnalyze: configuration.autoAnalyze,
+                    analysisFrequency: configuration.analysisFrequency,
+                    dataTypes: configuration.dataTypes,
+                  });
+                } catch {}
+              }
             }
           }
         }
@@ -176,29 +200,46 @@ export const AIAssistantPage: React.FC = () => {
     }
 
     try {
-      const result = await dispatch(setApiKey({ provider: providerId, apiKey: apiKey.trim() })).unwrap();
-      console.log('✅ API key set result:', result);
+      const action = setApiKey({ provider: providerId, apiKey: apiKey.trim() });
+      const result = await dispatch(action as any);
+      console.log('[AIAssistantPage] setApiKey dispatch result:', result);
+      const payload = (result as any)?.payload;
+      if (payload?.usage) {
+        console.log('[AIAssistantPage] usage from setApiKey:', payload.usage);
+      }
       showSuccess('API Key Set', `${providerId.toUpperCase()} API key has been saved securely`);
       
       // Clear the input field for security
       setApiKeys(prev => ({ ...prev, [providerId]: '' }));
       
-      // Set as active provider if none is selected
+      // Set as active provider if none is selected and persist immediately
       if (!activeProvider) {
         dispatch(setActiveProvider(providerId));
+        try {
+          if (window.electronAPI?.aiAssistant?.saveSettings) {
+            console.log('[AIAssistantPage] Persisting activeProvider after key setup:', providerId);
+            await window.electronAPI.aiAssistant.saveSettings({
+              activeProvider: providerId,
+              autoAnalyze: configuration.autoAnalyze,
+              analysisFrequency: configuration.analysisFrequency,
+              dataTypes: configuration.dataTypes,
+            });
+            console.log('[AIAssistantPage] Saved activeProvider to settings');
+          }
+        } catch (e) {
+          console.warn('[AIAssistantPage] Failed to save settings after key setup:', e);
+        }
       }
       
-      // Force a re-render by updating the component state
-      // This ensures the UI reflects the new hasApiKey status
       console.log('🔄 API key save completed, UI should update automatically');
       
     } catch (error) {
       console.error('API Key Setting Error:', error);
       console.error('Error details:', {
-        message: error?.message,
-        error: error?.error,
+        message: (error as any)?.message,
+        error: (error as any)?.error,
         type: typeof error,
-        keys: Object.keys(error || {})
+        keys: Object.keys((error as any) || {})
       });
       
       // Extract meaningful error message from Redux async thunk error
@@ -206,12 +247,12 @@ export const AIAssistantPage: React.FC = () => {
       
       if (error && typeof error === 'object') {
         // Handle Redux async thunk rejection
-        if (error.message) {
-          errorMessage = error.message;
-        } else if (error.error && typeof error.error === 'string') {
-          errorMessage = error.error;
-        } else if (error.payload && typeof error.payload === 'string') {
-          errorMessage = error.payload;
+        if ((error as any).message) {
+          errorMessage = (error as any).message;
+        } else if ((error as any).error && typeof (error as any).error === 'string') {
+          errorMessage = (error as any).error;
+        } else if ((error as any).payload && typeof (error as any).payload === 'string') {
+          errorMessage = (error as any).payload;
         } else {
           // Last resort: stringify the object
           try {
@@ -227,6 +268,27 @@ export const AIAssistantPage: React.FC = () => {
       showError('Failed to Set API Key', errorMessage);
     }
   };
+
+  // Persist active provider whenever it changes
+  useEffect(() => {
+    const persistActiveProvider = async () => {
+      try {
+        if (!activeProvider) return;
+        if (window.electronAPI?.aiAssistant?.saveSettings) {
+          console.log('[AIAssistantPage] Persisting activeProvider change:', activeProvider);
+          await window.electronAPI.aiAssistant.saveSettings({
+            activeProvider,
+            autoAnalyze: configuration.autoAnalyze,
+            analysisFrequency: configuration.analysisFrequency,
+            dataTypes: configuration.dataTypes,
+          });
+        }
+      } catch (e) {
+        console.warn('[AIAssistantPage] Failed to persist activeProvider:', e);
+      }
+    };
+    persistActiveProvider();
+  }, [activeProvider, configuration.autoAnalyze, configuration.analysisFrequency, configuration.dataTypes]);
 
   const handleTestApiKey = async (providerId: 'openai' | 'gemini' | 'anthropic') => {
     setTestingProvider(providerId);
@@ -488,6 +550,7 @@ export const AIAssistantPage: React.FC = () => {
         <TabButton id="analyze" label="Analyze" active={activeTab === 'analyze'} onClick={() => setActiveTab('analyze')} />
         <TabButton id="insights" label={`Insights (${insights.length})`} active={activeTab === 'insights'} onClick={() => setActiveTab('insights')} />
         <TabButton id="recaps" label={`Recaps (${recaps.length})`} active={activeTab === 'recaps'} onClick={() => setActiveTab('recaps')} />
+        <TabButton id="usage" label={`Usage (${usage?.length || 0})`} active={activeTab === 'usage'} onClick={() => setActiveTab('usage')} />
       </div>
 
       {/* Setup Tab */}
@@ -509,11 +572,11 @@ export const AIAssistantPage: React.FC = () => {
                 {providers.map((provider) => (
                   <div
                     key={provider.id}
-                    className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/40 p-6 space-y-5 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all"
+                    className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/40 p-4 sm:p-6 space-y-5 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all"
                   >
                     {/* Provider Header */}
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4">
+                    <div className="flex flex-col md:flex-row md:items-start items-stretch justify-between gap-4">
+                      <div className="flex items-start gap-4 min-w-0">
                         <div className="flex-shrink-0">
                           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-lg font-bold shadow-lg">
                             {getProviderIcon(provider.id)}
@@ -565,7 +628,7 @@ export const AIAssistantPage: React.FC = () => {
                               });
                             }
                           }}
-                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                          className="text-blue-600 hover:text-blue-700 text-sm font-medium self-start"
                         >
                           Select
                         </button>
@@ -577,14 +640,14 @@ export const AIAssistantPage: React.FC = () => {
                       {!provider.hasApiKey ? (
                         <div className="space-y-3">
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">API Key</label>
-                          <div className="flex items-center gap-3">
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                             <div className="flex-1 relative">
                               <Input
                                 type={showApiKeys[provider.id] ? 'text' : 'password'}
                                 value={apiKeys[provider.id] || ''}
                                 onChange={(e) => setApiKeys(prev => ({ ...prev, [provider.id]: e.target.value }))}
                                 placeholder={`Enter ${provider.name} API key`}
-                                className="pr-10 h-11"
+                                className="pr-10 h-11 w-full"
                               />
                               <button
                                 type="button"
@@ -601,7 +664,7 @@ export const AIAssistantPage: React.FC = () => {
                             <Button
                               onClick={() => handleSetApiKey(provider.id)}
                               disabled={!apiKeys[provider.id]?.trim()}
-                              className="bg-green-600 disabled:opacity-60 disabled:cursor-not-allowed hover:bg-green-700 text-white px-6 h-11 rounded-lg font-medium transition-colors"
+                              className="bg-green-600 disabled:opacity-60 disabled:cursor-not-allowed hover:bg-green-700 text-white px-6 h-11 rounded-lg font-medium transition-colors w-full sm:w-auto"
                             >
                               <Key className="w-4 h-4 mr-2" />
                               Save
@@ -610,14 +673,14 @@ export const AIAssistantPage: React.FC = () => {
                               type="button"
                               onClick={() => handleTestApiKey(provider.id)}
                               disabled={!apiKeys[provider.id]?.trim() || testingProvider === provider.id}
-                              className="text-sm text-gray-600 dark:text-gray-300 disabled:opacity-50"
+                              className="text-sm text-gray-600 dark:text-gray-300 disabled:opacity-50 sm:self-auto self-start"
                             >
                               {testingProvider === provider.id ? 'Testing…' : 'Test'}
                             </button>
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                        <div className="flex flex-col md:flex-row md:items-center items-stretch justify-between gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
                               <CheckCircle className="w-5 h-5 text-white" />
@@ -627,7 +690,7 @@ export const AIAssistantPage: React.FC = () => {
                               <p className="text-xs text-green-600 dark:text-green-400">Ready for AI operations</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 flex-wrap md:justify-end">
                             {/* Model selector (if listing is available) */}
                             {availableModels[provider.id]?.length ? (
                               <select
@@ -642,11 +705,12 @@ export const AIAssistantPage: React.FC = () => {
                                     dataTypes: configuration.dataTypes,
                                     preferredModels: { [provider.id]: value },
                                   } as any;
+                                  console.log('[AIAssistantPage] Persisting preferred model for', provider.id, value);
                                   await window.electronAPI?.aiAssistant?.saveSettings(settingsUpdate);
                                   // Update UI immediately
                                   dispatch(updateProvidersWithModelInfo({ [provider.id]: { model: value, version: value } }));
                                 }}
-                                className="text-sm rounded-md border px-2 py-1 bg-white dark:bg-gray-900"
+                                className="text-sm rounded-md border px-2 py-1 bg-white dark:bg-gray-900 w-full md:w-auto max-w-full"
                               >
                                 {availableModels[provider.id].map((m) => (
                                   <option key={m.id} value={m.id}>{m.label}</option>
@@ -654,11 +718,11 @@ export const AIAssistantPage: React.FC = () => {
                               </select>
                             ) : null}
                             <Button
-                              variant="outline"
+                              variant="secondary"
                               size="sm"
                               onClick={() => handleTestApiKey(provider.id)}
                               disabled={testingProvider === provider.id}
-                              className="border-green-300 text-green-700 hover:bg-green-100 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-900/30"
+                              className="border-green-300 text-green-700 hover:bg-green-100 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-900/30 w-full md:w-auto"
                             >
                               {testingProvider === provider.id ? (
                                 <RefreshCw className="w-4 h-4 animate-spin mr-2" />
@@ -689,6 +753,7 @@ export const AIAssistantPage: React.FC = () => {
                                 // Clear model info badge immediately
                                 dispatch(clearProviderModelInfo(provider.id as any));
                               }}
+                              className="w-full md:w-auto"
                             >
                               Remove Key
                             </Button>
@@ -1138,6 +1203,72 @@ export const AIAssistantPage: React.FC = () => {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Usage Tab */}
+      {activeTab === 'usage' && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-blue-600" />
+                <h2 className="text-xl font-semibold">Token Usage</h2>
+              </div>
+              <Badge>{usage?.length || 0} records</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {console.log('[UsageTab] rendering with usage count:', usage?.length)}
+            {(usage?.length || 0) === 0 ? (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <Zap className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No usage yet. Run an analysis or generate a recap to see token usage.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {(() => {
+                    const totals = (usage as any[]).reduce((acc, u) => {
+                      acc.prompt += u.promptTokens || 0;
+                      acc.completion += u.completionTokens || 0;
+                      acc.total += u.totalTokens || 0;
+                      return acc;
+                    }, { prompt: 0, completion: 0, total: 0 });
+                    return (
+                      <>
+                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                          <div className="text-xs text-gray-500">Prompt tokens</div>
+                          <div className="text-lg font-semibold">{totals.prompt.toLocaleString()}</div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                          <div className="text-xs text-gray-500">Completion tokens</div>
+                          <div className="text-lg font-semibold">{totals.completion.toLocaleString()}</div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                          <div className="text-xs text-gray-500">Total tokens</div>
+                          <div className="text-lg font-semibold">{totals.total.toLocaleString()}</div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+                {/* List */}
+                <div className="divide-y divide-gray-200 dark:divide-gray-700 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  {(usage as any[]).slice(0, 200).map((u, idx) => (
+                    <div key={u.id || idx} className="grid grid-cols-12 gap-3 p-3 text-sm">
+                      <div className="col-span-3 text-gray-500">{new Date(u.timestamp).toLocaleString()}</div>
+                      <div className="col-span-2 capitalize">{u.provider}</div>
+                      <div className="col-span-2 capitalize">{u.operation}</div>
+                      <div className="col-span-2 text-right">{(u.promptTokens||0).toLocaleString()} / {(u.completionTokens||0).toLocaleString()}</div>
+                      <div className="col-span-3 text-right font-medium">{(u.totalTokens||0).toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Schedule Modal */}

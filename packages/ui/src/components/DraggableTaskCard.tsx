@@ -12,6 +12,7 @@ import { GripVertical } from 'lucide-react';
 interface DraggableTaskCardProps {
   task: Task;
   onToggle: () => void;
+  onToggleSubtask?: (taskId: string, subtaskId: string) => void;
   onClick?: (task: Task) => void;
   onDelete?: (taskId: string) => void;
   onEdit?: (task: Task) => void;
@@ -26,6 +27,7 @@ interface DraggableTaskCardProps {
 export const DraggableTaskCard: React.FC<DraggableTaskCardProps> = ({
   task,
   onToggle,
+  onToggleSubtask,
   onClick,
   onDelete,
   onEdit,
@@ -62,6 +64,7 @@ export const DraggableTaskCard: React.FC<DraggableTaskCardProps> = ({
       <TaskCard
         task={task}
         onToggle={onToggle}
+        onToggleSubtask={onToggleSubtask}
         onClick={onClick}
         onEdit={onEdit}
         onDelete={onDelete}

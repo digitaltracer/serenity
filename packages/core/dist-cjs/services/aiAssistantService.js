@@ -1,0 +1,385 @@
+"use strict";
+/**
+ * AI Assistant Service
+ * Handles AI provider integration, data preprocessing, and analysis coordination
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AIAssistantService = void 0;
+class AIAssistantService {
+    /**
+     * Preprocess tasks for AI analysis
+     * Removes sensitive information and structures data
+     */
+    static preprocessTasks(tasks) {
+        return tasks.map(task => ({
+            id: task.id,
+            title: task.title,
+            // Only include first 100 chars of description to limit token usage
+            description: task.description ? task.description.substring(0, 100) : '',
+            completed: task.completed,
+            priority: task.priority,
+            tags: task.tags || [],
+            createdAt: task.createdAt,
+            updatedAt: task.updatedAt,
+            dueDate: task.dueDate,
+            // Derived fields for analysis
+            daysSinceCreated: task.createdAt ? Math.floor((Date.now() - new Date(task.createdAt).getTime()) / (1000 * 60 * 60 * 24)) : 0,
+            isOverdue: task.dueDate && !task.completed ? new Date(task.dueDate) < new Date() : false,
+            completionTime: task.completed && task.updatedAt && task.createdAt
+                ? Math.floor((new Date(task.updatedAt).getTime() - new Date(task.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+                : null,
+        }));
+    }
+    /**
+     * Preprocess journal entries for AI analysis
+     * Removes sensitive information and structures data
+     */
+    static preprocessJournalEntries(entries) {
+        return entries.map(entry => ({
+            id: entry.id,
+            // Only include first 200 chars of content to limit token usage and maintain privacy
+            content: entry.content ? entry.content.substring(0, 200) : '',
+            mood: entry.mood,
+            tags: entry.tags || [],
+            createdAt: entry.createdAt,
+            updatedAt: entry.updatedAt,
+            // Derived fields for analysis
+            wordCount: entry.content ? entry.content.split(' ').length : 0,
+            dayOfWeek: entry.createdAt ? new Date(entry.createdAt).getDay() : 0,
+            hourOfDay: entry.createdAt ? new Date(entry.createdAt).getHours() : 0,
+        }));
+    }
+    /**
+     * Generate prompts for behavioral analysis
+     */
+    static generateInsightPrompts(data) {
+        const prompts = {};
+        if (data.dataTypes.includes('tasks') && data.tasks.length > 0) {
+            prompts.taskAnalysis = `
+Analyze the following task data and provide insights about productivity patterns, habits, and recommendations:
+
+Tasks Data:
+${JSON.stringify(data.tasks, null, 2)}
+
+Please provide insights in the following JSON format:
+{
+  "insights": [
+    {
+      "type": "productivity|behavior|recommendation|warning",
+      "title": "Brief insight title",
+      "description": "Detailed explanation of the insight",
+      "confidence": 0.8,
+      "category": "tasks",
+      "actionable": true,
+      "metadata": {}
+    }
+  ]
+}
+
+Focus on:
+1. Completion patterns and success rates
+2. Priority management effectiveness
+3. Task creation vs completion trends
+4. Procrastination indicators
+5. Optimal working patterns
+6. Areas for improvement
+
+Keep insights actionable, specific, and helpful for productivity improvement.
+`;
+        }
+        if (data.dataTypes.includes('journal') && data.journalEntries.length > 0) {
+            prompts.journalAnalysis = `
+Analyze the following journal data and provide insights about emotional patterns, reflection habits, and well-being trends:
+
+Journal Data:
+${JSON.stringify(data.journalEntries, null, 2)}
+
+Please provide insights in the following JSON format:
+{
+  "insights": [
+    {
+      "type": "productivity|behavior|recommendation|warning",
+      "title": "Brief insight title",
+      "description": "Detailed explanation of the insight",
+      "confidence": 0.8,
+      "category": "journal",
+      "actionable": true,
+      "metadata": {}
+    }
+  ]
+}
+
+Focus on:
+1. Emotional patterns and mood trends
+2. Reflection consistency and habits
+3. Topic themes and recurring concerns
+4. Writing patterns and frequency
+5. Correlation with productivity metrics
+6. Well-being indicators
+
+Keep insights supportive, constructive, and respectful of personal reflection.
+`;
+        }
+        return prompts;
+    }
+    /**
+     * Generate prompts for recap generation
+     */
+    static generateRecapPrompts(data) {
+        const timeframe = data.type === 'weekly' ? 'week' : 'month';
+        return `
+Generate a comprehensive ${timeframe}ly recap for the period from ${data.period.start} to ${data.period.end}.
+
+Data for analysis:
+Tasks: ${JSON.stringify(data.tasks, null, 2)}
+Journal Entries: ${JSON.stringify(data.journalEntries, null, 2)}
+
+Please provide a recap in the following JSON format:
+{
+  "title": "Week/Month of [Date Range]",
+  "summary": "Brief overall summary of the period",
+  "highlights": ["Key achievement 1", "Key achievement 2", "Key achievement 3"],
+  "challenges": ["Challenge faced 1", "Challenge faced 2"],
+  "recommendations": ["Actionable suggestion 1", "Actionable suggestion 2", "Actionable suggestion 3"],
+  "metrics": {
+    "tasksCompleted": number,
+    "productivityScore": number,
+    "mostProductiveDay": "day name",
+    "topCategories": ["category1", "category2"]
+  }
+}
+
+Focus on:
+1. Key accomplishments and completed tasks
+2. Productivity trends and patterns
+3. Challenges encountered and how they were handled
+4. Emotional well-being indicators from journal entries
+5. Actionable recommendations for improvement
+6. Celebration of progress and growth
+
+Keep the tone positive, encouraging, and forward-looking while being honest about areas for improvement.
+`;
+    }
+    /**
+     * Filter new data that hasn't been analyzed yet
+     */
+    static filterUnanalyzedData(tasks, journalEntries, analysisTracker) {
+        const processedTaskIdsSet = new Set(analysisTracker.processedTaskIds);
+        const processedJournalIdsSet = new Set(analysisTracker.processedJournalIds);
+        const lastTaskAnalysisDate = analysisTracker.lastTaskAnalysis ? new Date(analysisTracker.lastTaskAnalysis) : null;
+        const lastJournalAnalysisDate = analysisTracker.lastJournalAnalysis ? new Date(analysisTracker.lastJournalAnalysis) : null;
+        // Filter tasks: new tasks or updated after last analysis
+        const newTasks = tasks.filter(task => {
+            // Check if task is unprocessed
+            if (!processedTaskIdsSet.has(task.id)) {
+                return true;
+            }
+            // Check if task was updated after last analysis
+            if (lastTaskAnalysisDate && task.updatedAt) {
+                const taskUpdatedDate = new Date(task.updatedAt);
+                return taskUpdatedDate > lastTaskAnalysisDate;
+            }
+            return false;
+        });
+        // Filter journal entries: new entries or updated after last analysis
+        const newJournalEntries = journalEntries.filter(entry => {
+            // Check if entry is unprocessed
+            if (!processedJournalIdsSet.has(entry.id)) {
+                return true;
+            }
+            // Check if entry was updated after last analysis
+            if (lastJournalAnalysisDate && entry.updatedAt) {
+                const entryUpdatedDate = new Date(entry.updatedAt);
+                return entryUpdatedDate > lastJournalAnalysisDate;
+            }
+            return false;
+        });
+        // Log filtering results for debugging
+        if (process.env.NODE_ENV === 'development') {
+            const filteredTasksCount = tasks.length - newTasks.length;
+            const filteredJournalCount = journalEntries.length - newJournalEntries.length;
+            console.log(`🔍 AI Analysis Filtering Results:`);
+            console.log(`📊 Tasks: ${newTasks.length} new / ${filteredTasksCount} already processed`);
+            console.log(`📝 Journal: ${newJournalEntries.length} new / ${filteredJournalCount} already processed`);
+            if (lastTaskAnalysisDate) {
+                console.log(`⏰ Last task analysis: ${lastTaskAnalysisDate.toISOString()}`);
+            }
+            if (lastJournalAnalysisDate) {
+                console.log(`⏰ Last journal analysis: ${lastJournalAnalysisDate.toISOString()}`);
+            }
+        }
+        return { newTasks, newJournalEntries };
+    }
+    /**
+     * Create analysis summary for tracking
+     */
+    static createAnalysisSummary(analyzedTasks, analyzedJournalEntries) {
+        const now = new Date().toISOString();
+        return {
+            processedTaskIds: analyzedTasks.map(task => task.id),
+            processedJournalIds: analyzedJournalEntries.map(entry => entry.id),
+            lastTaskAnalysis: analyzedTasks.length > 0 ? now : undefined,
+            lastJournalAnalysis: analyzedJournalEntries.length > 0 ? now : undefined,
+            totalTasksAnalyzed: analyzedTasks.length,
+            totalJournalEntriesAnalyzed: analyzedJournalEntries.length,
+        };
+    }
+    /**
+     * Parse AI response and extract insights
+     */
+    static parseInsightsResponse(response) {
+        try {
+            // Always log raw response to help debug parsing issues
+            try {
+                // eslint-disable-next-line no-console
+                console.error('[AIAssistantService] Raw AI response (insights):', response);
+            }
+            catch { }
+            // Sanitize common wrapping formats (code fences, prose)
+            let working = String(response).trim();
+            // Quick fence trim
+            working = working.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+            // Remove leading prose up to a fenced block if present
+            working = working.replace(/^[\s\S]*?```(?:json)?[\r\n]*/i, '');
+            // Trim at end fence if present
+            const fenceCloseIdx = working.lastIndexOf('```');
+            if (fenceCloseIdx !== -1) {
+                working = working.slice(0, fenceCloseIdx);
+            }
+            working = working.trim();
+            // If not starting with {, slice between first { and last }
+            if (!working.startsWith('{')) {
+                const start = working.indexOf('{');
+                const end = working.lastIndexOf('}');
+                if (start !== -1 && end !== -1 && end > start) {
+                    working = working.slice(start, end + 1);
+                }
+            }
+            const parsed = JSON.parse(working);
+            if (parsed && parsed.insights && Array.isArray(parsed.insights)) {
+                return parsed.insights.map((insight) => ({
+                    id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    type: insight.type || 'recommendation',
+                    title: insight.title || 'AI Recommendation',
+                    description: insight.description || '',
+                    confidence: Math.max(0, Math.min(1, insight.confidence || 0.5)),
+                    createdAt: new Date().toISOString(),
+                    source: 'openai', // This will be set by the calling function
+                    category: insight.category || 'tasks',
+                    actionable: insight.actionable !== false,
+                    metadata: insight.metadata || {},
+                }));
+            }
+            if (Array.isArray(parsed)) {
+                return parsed.map((insight) => ({
+                    id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    type: insight.type || 'recommendation',
+                    title: insight.title || 'AI Recommendation',
+                    description: insight.description || '',
+                    confidence: Math.max(0, Math.min(1, insight.confidence || 0.5)),
+                    createdAt: new Date().toISOString(),
+                    source: 'openai',
+                    category: insight.category || 'tasks',
+                    actionable: insight.actionable !== false,
+                    metadata: insight.metadata || {},
+                }));
+            }
+        }
+        catch (error) {
+            try {
+                // eslint-disable-next-line no-console
+                console.error('Failed to parse AI insights response:', error, '\n[AIAssistantService] Raw response for debugging:', response);
+            }
+            catch { }
+        }
+        return [];
+    }
+    /**
+     * Parse AI response and extract recap
+     */
+    static parseRecapResponse(response, type, period) {
+        try {
+            const parsed = JSON.parse(response);
+            return {
+                id: `recap_${type}_${Date.now()}`,
+                type,
+                title: parsed.title || `${type === 'weekly' ? 'Weekly' : 'Monthly'} Recap`,
+                summary: parsed.summary || '',
+                highlights: parsed.highlights || [],
+                challenges: parsed.challenges || [],
+                recommendations: parsed.recommendations || [],
+                period,
+                createdAt: new Date().toISOString(),
+                source: 'openai', // This will be set by the calling function
+                metadata: parsed.metrics || {},
+            };
+        }
+        catch (error) {
+            console.error('Failed to parse AI recap response:', error);
+            return null;
+        }
+    }
+    /**
+     * Validate API key format
+     */
+    static validateApiKeyFormat(provider, apiKey) {
+        if (!apiKey || apiKey.trim().length === 0) {
+            return false;
+        }
+        switch (provider) {
+            case 'openai':
+                return apiKey.startsWith('sk-') && apiKey.length > 20;
+            case 'gemini':
+                return apiKey.length > 10; // Gemini keys vary in format
+            case 'anthropic':
+                return apiKey.startsWith('sk-ant-') && apiKey.length > 20;
+            default:
+                return false;
+        }
+    }
+    /**
+     * Estimate token usage for analysis
+     */
+    static estimateTokenUsage(tasks, journalEntries) {
+        // Rough estimate: ~4 characters per token
+        const taskTokens = tasks.reduce((acc, task) => {
+            return acc + (task.title?.length || 0) + (task.description?.length || 0);
+        }, 0) / 4;
+        const journalTokens = journalEntries.reduce((acc, entry) => {
+            return acc + (entry.content?.length || 0);
+        }, 0) / 4;
+        // Add prompt overhead (~500 tokens) and response tokens (~1000 tokens)
+        return Math.ceil(taskTokens + journalTokens + 1500);
+    }
+    /**
+     * Get provider-specific configuration
+     */
+    static getProviderConfig(provider) {
+        const configs = {
+            openai: {
+                name: 'OpenAI',
+                model: 'gpt-3.5-turbo',
+                maxTokens: 4096,
+                apiEndpoint: 'https://api.openai.com/v1/chat/completions',
+                keyPrefix: 'sk-',
+            },
+            gemini: {
+                name: 'Google Gemini',
+                model: 'gemini-pro',
+                maxTokens: 8192,
+                apiEndpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
+                keyPrefix: '',
+            },
+            anthropic: {
+                name: 'Anthropic Claude',
+                model: 'claude-3-sonnet-20240229',
+                maxTokens: 4096,
+                apiEndpoint: 'https://api.anthropic.com/v1/messages',
+                keyPrefix: 'sk-ant-',
+            },
+        };
+        return configs[provider];
+    }
+}
+exports.AIAssistantService = AIAssistantService;
+exports.default = AIAssistantService;

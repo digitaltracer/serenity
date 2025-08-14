@@ -4,6 +4,7 @@
  */
 
 import { ipcMain } from 'electron';
+import { z } from 'zod';
 import { apiService } from '../services/ApiService';
 
 export function registerSystemHandlers(): void {
@@ -143,6 +144,9 @@ export function registerSystemHandlers(): void {
 
   ipcMain.handle('system:backup', async (_, backupPath?: string) => {
     try {
+      if (backupPath !== undefined && typeof backupPath !== 'string') {
+        return { success: false, path: null, error: 'Invalid backup path' };
+      }
       console.log('🔐 Creating backup through business layer...');
       return await apiService.backupDatabase(backupPath);
     } catch (error) {
@@ -153,6 +157,9 @@ export function registerSystemHandlers(): void {
 
   ipcMain.handle('system:import-from-localstorage', async (_, data) => {
     try {
+      if (typeof data !== 'object' || data === null) {
+        return { success: false, result: null, error: 'Invalid import data' };
+      }
       console.log('🔐 Importing data through business layer...');
       return await apiService.importFromLocalStorage(data);
     } catch (error) {
@@ -215,8 +222,7 @@ export function registerSystemHandlers(): void {
           updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )`,
         
-        // Custom queries (for migration and debug purposes)
-        'custom': 'CUSTOM_QUERY_PLACEHOLDER'
+        // Note: custom/raw queries have been disabled for security
       };
       
       if (!allowedQueries[queryType as keyof typeof allowedQueries]) {
@@ -226,11 +232,9 @@ export function registerSystemHandlers(): void {
       let query = allowedQueries[queryType as keyof typeof allowedQueries];
       let queryParams = params;
       
-      // Handle custom queries (for migration and debug purposes)
-      if (queryType === 'custom' && params && params.length >= 1) {
-        query = params[0]; // First param is the actual query
-        queryParams = params[1] || []; // Second param is the query parameters
-        console.log('🔍 Executing custom query:', query, 'with params:', queryParams);
+      // Reject any attempt to run custom/raw queries from renderer
+      if (queryType === 'custom') {
+        return { success: false, data: null, error: 'Custom queries are disabled' };
       }
       
       // Execute through database service with validation

@@ -3,6 +3,8 @@
  * Provides consistent error classification, logging, and handling across the application
  */
 
+import { logger } from './logger';
+
 /**
  * Error severity levels
  */
@@ -283,36 +285,36 @@ class ErrorHandler {
   }
 
   /**
-   * Log error with appropriate level
+   * Log error with appropriate level using centralized logger
    */
   private static logError(error: SerenityError): void {
-    const logData = {
-      code: error.code,
-      category: error.category,
-      severity: error.severity,
-      message: error.message,
-      context: error.context,
-      timestamp: error.timestamp
+    const logContext = {
+      component: 'ErrorHandler',
+      operation: 'logError',
+      metadata: {
+        code: error.code,
+        category: error.category,
+        severity: error.severity,
+        context: error.context,
+        timestamp: error.timestamp
+      }
     };
+
+    const message = `${error.code}: ${error.message}`;
 
     switch (error.severity) {
       case ErrorSeverity.CRITICAL:
-        console.error('🚨 CRITICAL ERROR:', logData);
+        logger.error(`🚨 CRITICAL - ${message}`, logContext, error.originalError);
         break;
       case ErrorSeverity.HIGH:
-        console.error('❌ ERROR:', logData);
+        logger.error(`❌ ERROR - ${message}`, logContext, error.originalError);
         break;
       case ErrorSeverity.MEDIUM:
-        console.warn('⚠️ WARNING:', logData);
+        logger.warn(`⚠️ WARNING - ${message}`, logContext);
         break;
       case ErrorSeverity.LOW:
-        console.info('ℹ️ INFO:', logData);
+        logger.info(`ℹ️ INFO - ${message}`, logContext);
         break;
-    }
-
-    // In development, also log the stack trace
-    if (process.env.NODE_ENV === 'development' && error.stack) {
-      console.error('Stack trace:', error.stack);
     }
   }
 

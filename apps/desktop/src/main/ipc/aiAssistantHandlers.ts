@@ -4,6 +4,7 @@
  */
 
 import { ipcMain, safeStorage, app } from 'electron';
+import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -34,6 +35,47 @@ interface AISettings {
     anthropic?: string;
   };
 }
+
+// In-memory guard to avoid repeated identical saves causing loops
+let lastSavedSettingsSignature: string | null = null;
+let lastSavedAtMs = 0;
+
+// Runtime validation schemas
+const ProviderSchema = z.enum(['openai', 'gemini', 'anthropic']);
+const AISettingsSchema = z.object({
+  activeProvider: ProviderSchema.optional(),
+  autoAnalyze: z.boolean(),
+  analysisFrequency: z.enum(['daily', 'weekly', 'manual']),
+  dataTypes: z.object({
+    includeTasks: z.boolean(),
+    includeJournal: z.boolean(),
+    includeProjects: z.boolean(),
+  }),
+  preferredModels: z
+    .object({
+      openai: z.string().optional(),
+      gemini: z.string().optional(),
+      anthropic: z.string().optional(),
+    })
+    .optional(),
+});
+
+const AnalyzeOptionsSchema = z.object({
+  provider: ProviderSchema,
+  dataTypes: z.array(z.string()),
+  forceReAnalyze: z.boolean().optional(),
+  tasks: z.array(z.any()).optional(),
+  journalEntries: z.array(z.any()).optional(),
+  analysisTracker: z.any().optional(),
+});
+
+const RecapOptionsSchema = z.object({
+  provider: ProviderSchema,
+  type: z.enum(['weekly', 'monthly']),
+  period: z.object({ start: z.string(), end: z.string() }),
+  tasks: z.array(z.any()).optional(),
+  journalEntries: z.array(z.any()).optional(),
+});
 
 // In-memory storage for API keys (encrypted)
 let encryptedApiKeys: Buffer | null = null;
@@ -311,16 +353,44 @@ async function verifyModelUsable(provider: 'openai' | 'gemini' | 'anthropic', ap
   } catch { return false; }
 }
 
+// Simple in-memory cache to avoid repeated model discovery (and network loops)
+const modelListCache: Record<string, { models: { id: string; label: string; verified: boolean }[]; fetchedAt: number; failUntil?: number }> = {};
+
+// Node/Electron main doesn't have DOM lib types; use broad types to avoid TS errors
+async function fetchWithTimeout(input: string | URL, init: { timeoutMs?: number } & Record<string, any> = {}): Promise<any> {
+  const { timeoutMs = 8000, ...rest } = init;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...rest, signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 async function listAvailableModels(provider: 'openai' | 'gemini' | 'anthropic'): Promise<{ id: string; label: string; verified: boolean }[]> {
   const keys = getApiKeys();
   const apiKey = (keys as any)[provider];
   if (!apiKey) return [];
 
+  // Serve from cache if within 15 minutes
+  const cacheKey = provider;
+  const now = Date.now();
+  const cached = modelListCache[cacheKey];
+  if (cached && now - cached.fetchedAt < 15 * 60 * 1000) {
+    return cached.models;
+  }
+  // If previous failure set a cooldown, honor it
+  if (cached?.failUntil && now < cached.failUntil) {
+    return cached.models || [];
+  }
+
   try {
     switch (provider) {
       case 'openai': {
-        const r = await fetch('https://api.openai.com/v1/models', {
+        const r = await fetchWithTimeout('https://api.openai.com/v1/models', {
           headers: { Authorization: `Bearer ${apiKey}` },
+          timeoutMs: 8000,
         });
         if (!r.ok) return [];
         const data = await r.json() as { data?: Array<{ id: string }> };
@@ -334,7 +404,7 @@ async function listAvailableModels(provider: 'openai' | 'gemini' | 'anthropic'):
         return results.sort((a,b) => b.id.localeCompare(a.id));
       }
       case 'gemini': {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        const r = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, { timeoutMs: 8000 });
         if (!r.ok) return [];
         const data = await r.json() as { models?: Array<{ name: string; displayName?: string }> };
         const names = Array.from(new Set((data.models || []).map(m => (m.name || '').replace(/^models\//, ''))));
@@ -344,14 +414,16 @@ async function listAvailableModels(provider: 'openai' | 'gemini' | 'anthropic'):
           const ok = await verifyModelUsable('gemini', apiKey, id);
           results.push({ id, label: id, verified: ok });
         }
+        modelListCache[cacheKey] = { models: results, fetchedAt: now };
         return results;
       }
       case 'anthropic': {
-        const r = await fetch('https://api.anthropic.com/v1/models', {
+        const r = await fetchWithTimeout('https://api.anthropic.com/v1/models', {
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'anthropic-version': '2023-06-01',
           },
+          timeoutMs: 8000,
         });
         if (!r.ok) return [];
         const data = await r.json() as { data?: Array<{ id: string }> };
@@ -361,6 +433,7 @@ async function listAvailableModels(provider: 'openai' | 'gemini' | 'anthropic'):
           const ok = await verifyModelUsable('anthropic', apiKey, id);
           results.push({ id, label: id, verified: ok });
         }
+        modelListCache[cacheKey] = { models: results, fetchedAt: now };
         return results;
       }
       default:
@@ -368,7 +441,10 @@ async function listAvailableModels(provider: 'openai' | 'gemini' | 'anthropic'):
     }
   } catch (e) {
     console.warn('Failed to list models for', provider, e);
-    return [];
+    // set cooldown to prevent tight retry loops
+    const previous = modelListCache[cacheKey]?.models || [];
+    modelListCache[cacheKey] = { models: previous, fetchedAt: now, failUntil: now + 2 * 60 * 1000 };
+    return previous; // return last known cache (or empty) without failing
   }
 }
 
@@ -906,6 +982,13 @@ export function registerAIAssistantHandlers(): void {
   // Set API Key
   ipcMain.handle('ai-assistant:set-api-key', async (event, provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => {
     try {
+      const p = ProviderSchema.safeParse(provider);
+      if (!p.success) {
+        return { success: false, error: 'Invalid provider' };
+      }
+      if (typeof apiKey !== 'string' || apiKey.trim().length === 0) {
+        return { success: false, error: 'API key must be a non-empty string' };
+      }
       console.log(`🔑 Setting API key for ${provider}...`);
       
       // Enhanced format validation
@@ -976,6 +1059,8 @@ export function registerAIAssistantHandlers(): void {
   // Test API Key
   ipcMain.handle('ai-assistant:test-api-key', async (event, provider: 'openai' | 'gemini' | 'anthropic') => {
     try {
+      const p = ProviderSchema.safeParse(provider);
+      if (!p.success) return { success: false, error: 'Invalid provider' };
       console.log(`🧪 Testing API key for ${provider}...`);
       
       // Make a simple test call
@@ -1008,10 +1093,14 @@ export function registerAIAssistantHandlers(): void {
     analysisTracker?: any;
   }) => {
     try {
+      const valid = AnalyzeOptionsSchema.safeParse(options);
+      if (!valid.success) {
+        return { success: false, error: 'Invalid analyze-data options' };
+      }
       console.log(`🔍 Analyzing data with ${options.provider}...`);
       
-      // Import AI Assistant Service
-      const { AIAssistantService } = await import('@serenity/core/src/services/aiAssistantService');
+      // Import AI Assistant Service (use package export to support both CJS and ESM)
+      const { AIAssistantService } = await import('@serenity/core');
       
       // Get data from options or fetch from database
       let tasks = options.tasks || [];
@@ -1083,6 +1172,10 @@ export function registerAIAssistantHandlers(): void {
         journalEntries: preprocessedJournalEntries,
         dataTypes: options.dataTypes,
       });
+      // Instruct providers explicitly to return ONLY JSON to avoid code fences/prose
+      Object.keys(prompts).forEach((k) => {
+        prompts[k] = `${prompts[k]}\n\nRespond with ONLY valid JSON. Do not include code fences, markdown, or any explanatory text.`;
+      });
       
       // Analyze with AI provider
       const allInsights = [];
@@ -1093,6 +1186,8 @@ export function registerAIAssistantHandlers(): void {
         const result = await makeAIApiCall(options.provider, prompt);
         
         if (result.success && result.content) {
+          // Debug: log raw provider content to aid parsing issues (remove later)
+          try { console.error(`[AI][${options.provider}] Raw ${String(promptType)} content:`, result.content); } catch {}
           const insights = AIAssistantService.parseInsightsResponse(result.content);
           // Set correct source provider
           insights.forEach(insight => {
@@ -1105,6 +1200,7 @@ export function registerAIAssistantHandlers(): void {
           usageTotals.completionTokens += u.completionTokens;
           usageTotals.totalTokens += u.totalTokens;
         } else {
+          try { console.error(`[AI][${options.provider}] ${String(promptType)} call failed. Raw result:`, result); } catch {}
           console.warn(`⚠️ ${promptType} analysis failed:`, result.error);
         }
       }
@@ -1141,10 +1237,12 @@ export function registerAIAssistantHandlers(): void {
     journalEntries?: any[];
   }) => {
     try {
+      const valid = RecapOptionsSchema.safeParse(options);
+      if (!valid.success) return { success: false, error: 'Invalid recap options' };
       console.log(`📝 Generating ${options.type} recap with ${options.provider}...`);
       
-      // Import AI Assistant Service
-      const { AIAssistantService } = await import('@serenity/core/src/services/aiAssistantService');
+      // Import AI Assistant Service (use package export to support both CJS and ESM)
+      const { AIAssistantService } = await import('@serenity/core');
       
       // Get data from options or fetch from database
       let tasks = options.tasks || [];
@@ -1301,6 +1399,8 @@ export function registerAIAssistantHandlers(): void {
   // Save AI Settings
   ipcMain.handle('ai-assistant:save-settings', async (event, settings: AISettings) => {
     try {
+      const valid = AISettingsSchema.safeParse(settings);
+      if (!valid.success) return { success: false, error: 'Invalid AI settings' };
       console.log('⚙️ Saving AI Assistant settings...');
       // Merge with currently persisted settings to avoid wiping fields (e.g., activeProvider)
       const current = await getCurrentAISettings();
@@ -1308,9 +1408,17 @@ export function registerAIAssistantHandlers(): void {
         ...current,
         ...settings,
       };
+      // Loop guard: skip if content unchanged in last 5s
+      const signature = JSON.stringify(merged);
+      const now = Date.now();
+      if (lastSavedSettingsSignature === signature && now - lastSavedAtMs < 5000) {
+        return { success: true, skipped: true };
+      }
       console.log('⚙️ Merged settings to persist:', merged);
       saveAISettings(merged);
       await persistAISettingsToDatabase(merged);
+      lastSavedSettingsSignature = signature;
+      lastSavedAtMs = now;
       console.log('✅ AI Assistant settings saved successfully');
       return { success: true };
     } catch (error) {
@@ -1325,6 +1433,8 @@ export function registerAIAssistantHandlers(): void {
   // List available models for a provider
   ipcMain.handle('ai-assistant:list-models', async (event, provider: 'openai' | 'gemini' | 'anthropic') => {
     try {
+      const p = ProviderSchema.safeParse(provider);
+      if (!p.success) return { success: false, error: 'Invalid provider' };
       const list = await listAvailableModels(provider);
       return { success: true, models: list };
     } catch (error) {
@@ -1335,6 +1445,8 @@ export function registerAIAssistantHandlers(): void {
   // Check if provider has API key
   ipcMain.handle('ai-assistant:has-api-key', async (event, provider: 'openai' | 'gemini' | 'anthropic') => {
     try {
+      const p = ProviderSchema.safeParse(provider);
+      if (!p.success) return { success: false, error: 'Invalid provider' };
       const apiKeys = getApiKeys();
       const hasKey = !!apiKeys[provider];
       console.log(`🔍 Provider ${provider} has API key: ${hasKey}`);
@@ -1351,6 +1463,8 @@ export function registerAIAssistantHandlers(): void {
   // Remove API Key
   ipcMain.handle('ai-assistant:remove-api-key', async (event, provider: 'openai' | 'gemini' | 'anthropic') => {
     try {
+      const p = ProviderSchema.safeParse(provider);
+      if (!p.success) return { success: false, error: 'Invalid provider' };
       console.log(`🗑️ Removing API key for ${provider}...`);
       
       const existingKeys = getApiKeys();

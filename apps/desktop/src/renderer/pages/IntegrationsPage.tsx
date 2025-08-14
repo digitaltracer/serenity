@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   Card, 
@@ -49,15 +49,23 @@ import {
   RootState,
   selectHasMasterPassword,
   selectIsLocked,
-  selectSessionMasterPassword,
+  selectSessionActive,
+  getSessionMasterPassword,
   validatePassword,
   store,
   savePrivacySettingsSecure,
   setMasterPassword,
   initializeAuth,
+  initializeIntegrations,
   GitHubToken
 } from '@serenity/core';
 import { Calendar, Github, RotateCw, AlertTriangle, CheckCircle, ExternalLink, Lock, Shield } from 'lucide-react';
+import { useEncryptedIntegrationsCheck } from './Integrations/hooks/useEncryptedIntegrationsCheck';
+import { useGoogleOAuth } from './Integrations/hooks/useGoogleOAuth';
+import { usePersistGoogleCredentials } from './Integrations/hooks/usePersistGoogleCredentials';
+import { useGitHubTokens } from './Integrations/hooks/useGitHubTokens';
+import { useSyncToggles } from './Integrations/hooks/useSyncToggles';
+import { useSyncNow } from './Integrations/hooks/useSyncNow';
 
 export const IntegrationsPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -70,42 +78,13 @@ export const IntegrationsPage: React.FC = () => {
   const projects = useSelector((state: RootState) => state.projects.projects);
   const hasMasterPassword = useSelector(selectHasMasterPassword);
   const isLocked = useSelector(selectIsLocked);
-  const sessionMasterPassword = useSelector(selectSessionMasterPassword);
+  const sessionActive = useSelector(selectSessionActive);
   
   // Check if we need to load encrypted integrations on mount
-  useEffect(() => {
-    const checkAndLoadEncryptedIntegrations = async () => {
-      // Only check if user has master password and isn't locked
-      if (!hasMasterPassword || isLocked) {
-        return;
-      }
-      
-      // Check if integrations are already loaded
-      if (googleCalendar.connected || github.connected) {
-        console.log('ℹ️ Integrations already loaded');
-        return;
-      }
-      
-      try {
-        // Check if there are encrypted integrations in the database
-        if (window.electronAPI?.sqlite) {
-          const result = await window.electronAPI.sqlite.query(
-            'SELECT COUNT(*) as count FROM encrypted_integrations'
-          );
-          
-          if (result.success && result.data?.[0]?.count > 0) {
-            console.log('🔐 Found encrypted integrations, but need master password to load them');
-            setHasEncryptedIntegrations(true);
-          }
-        }
-      } catch (error) {
-        console.log('ℹ️ Could not check for encrypted integrations:', error);
-      }
-    };
-    
-    // Run check after component mounts
-    setTimeout(checkAndLoadEncryptedIntegrations, 500);
-  }, [hasMasterPassword, isLocked, googleCalendar.connected, github.connected, showError]);
+  useEncryptedIntegrationsCheck(
+    hasMasterPassword && !isLocked && !googleCalendar.connected && !github.connected,
+    () => setHasEncryptedIntegrations(true)
+  );
   
   // GitHub token management states
   const [githubTokens, setGithubTokens] = useState<GitHubToken[]>(github.tokens || []);
@@ -114,17 +93,28 @@ export const IntegrationsPage: React.FC = () => {
   const [selectedRepos, setSelectedRepos] = useState<string[]>([]);
   const [availableRepos, setAvailableRepos] = useState<Array<{name: string, full_name: string}>>([]);
   const [showTokenManagement, setShowTokenManagement] = useState(false);
-  const [editingToken, setEditingToken] = useState<string | null>(null);
+  const [editingToken, setEditingToken] = useState<string | undefined>(undefined);
   const [isConnecting, setIsConnecting] = useState(false);
   const [googleClientId, setGoogleClientId] = useState(googleCalendar.clientId || '');
   const [googleClientSecret, setGoogleClientSecret] = useState(googleCalendar.clientSecret || '');
+  // GitHub token hook API
+  const { addToken, removeToken, toggleTokenActive: toggleGitHubTokenActiveHook } = useGitHubTokens({
+    newGithubToken,
+    newTokenDisplayName,
+    sessionMasterPassword: sessionActive ? getSessionMasterPassword() : undefined,
+    setNewGithubToken,
+    setNewTokenDisplayName,
+    showSuccess,
+    showError,
+    getTokenById: (id) => githubTokens.find((t) => t.id === id),
+  });
   
   // Master password authentication states
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState('');
   const [isValidatingPassword, setIsValidatingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
-  const [pendingAction, setPendingAction] = useState<'google' | 'github' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'google' | 'github' | 'load' | null>(null);
   const [validatedMasterPassword, setValidatedMasterPassword] = useState<string>('');
   const [currentMasterPassword, setCurrentMasterPassword] = useState<string>(''); // For OAuth flows
   const masterPasswordRef = useRef<string>(''); // Persistent ref for OAuth flows that survives re-renders
@@ -173,7 +163,7 @@ export const IntegrationsPage: React.FC = () => {
       if (settings.masterPasswordEnabled) {
         // The PrivacySecurityModal handles master password setting internally
         // We just need to reinitialize auth to pick up the new settings
-        await dispatch(initializeAuth());
+        await (dispatch as any)(initializeAuth());
         
         showSuccess('Master Password Set', 'Master password has been configured successfully. You can now connect integrations.');
       } else {
@@ -187,89 +177,24 @@ export const IntegrationsPage: React.FC = () => {
     }
   };
 
-  // Set up OAuth event listeners
-  useEffect(() => {
-    if (!window.electronAPI?.oauth) return;
+  // Google OAuth listeners via hook
+  const { startOAuth } = useGoogleOAuth({
+    googleClientId,
+    googleClientSecret,
+    currentMasterPassword,
+    validatedMasterPassword,
+    masterPasswordRef,
+    setIsConnecting,
+  });
 
-    const handleOAuthSuccess = async (authData: any) => {
-      console.log('📅 OAuth success received:', authData);
-      // Get password from sessionStorage if available
-      const tempKeyFromStorage = sessionStorage.getItem('serenity_oauth_temp_key');
-      const sessionStoragePassword = tempKeyFromStorage ? sessionStorage.getItem(tempKeyFromStorage) : null;
-      
-      console.log('🔍 Checking master password availability in OAuth callback:', {
-        hasCurrentMasterPassword: !!currentMasterPassword,
-        currentMasterPasswordLength: currentMasterPassword?.length || 0,
-        hasValidatedMasterPassword: !!validatedMasterPassword,
-        validatedMasterPasswordLength: validatedMasterPassword?.length || 0,
-        hasMasterPasswordRef: !!masterPasswordRef.current,
-        masterPasswordRefLength: masterPasswordRef.current?.length || 0,
-        hasSessionStoragePassword: !!sessionStoragePassword,
-        sessionStoragePasswordLength: sessionStoragePassword?.length || 0
-      });
-      
-      // Connect to Google Calendar in Redux
-      dispatch(connectGoogleCalendar({
-        ...authData,
-        clientId: googleClientId.trim(),
-        clientSecret: googleClientSecret.trim()
-      }));
-      
-      // Get the current session master password from Redux
-      const currentState = store.getState() as any;
-      const sessionPassword = currentState.auth.sessionMasterPassword;
-      console.log('🔑 Session master password available:', !!sessionPassword);
-      
-      // Encrypt and store the integration data
-      if (sessionPassword) {
-        try {
-          console.log('🔐 Using session master password for Google Calendar encryption (length:', sessionPassword.length, ')');
-          await EncryptedIntegrationService.saveEncryptedIntegrations(
-            currentState.integrations,
-            sessionPassword
-          );
-          console.log('✅ Google Calendar tokens encrypted and stored successfully');
-        } catch (error) {
-          console.error('❌ Failed to encrypt Google Calendar tokens:', error);
-          alert('Warning: Failed to encrypt integration tokens. Please try reconnecting.');
-        }
-      } else {
-        console.warn('⚠️ No session master password available for Google Calendar encryption');
-        alert('Warning: Session master password not available. Integration tokens were not encrypted. Please unlock the app first.');
-      }
-      
-      setIsConnecting(false);
-    };
+  // Check encrypted integrations using extracted hook
+  useEncryptedIntegrationsCheck(
+    hasMasterPassword && !isLocked && !googleCalendar.connected && !github.connected,
+    () => setHasEncryptedIntegrations(true)
+  );
 
-    const handleOAuthError = (error: string) => {
-      console.error('OAuth error:', error);
-      alert(`Google Calendar connection failed: ${error}`);
-      setIsConnecting(false);
-    };
-
-    const handleOAuthCancelled = () => {
-      console.log('OAuth cancelled by user');
-      setIsConnecting(false);
-    };
-
-    window.electronAPI.oauth.onGoogleSuccess(handleOAuthSuccess);
-    window.electronAPI.oauth.onGoogleError(handleOAuthError);
-    window.electronAPI.oauth.onGoogleCancelled(handleOAuthCancelled);
-
-    return () => {
-      window.electronAPI?.oauth.removeOAuthListeners();
-    };
-  }, [dispatch, currentMasterPassword, validatedMasterPassword, googleClientId, googleClientSecret]);
-
-  // Save Google Calendar credentials when they change
-  useEffect(() => {
-    if (googleClientId.trim() && googleClientSecret.trim()) {
-      dispatch(saveGoogleCalendarCredentials({
-        clientId: googleClientId.trim(),
-        clientSecret: googleClientSecret.trim()
-      }));
-    }
-  }, [googleClientId, googleClientSecret, dispatch]);
+  // Persist Google credentials when they change
+  usePersistGoogleCredentials(googleClientId, googleClientSecret);
 
   // Password validation handler
   const handlePasswordSubmit = async () => {
@@ -285,7 +210,8 @@ export const IntegrationsPage: React.FC = () => {
 
     try {
       console.log('🔄 Dispatching validatePassword...');
-      const result = await dispatch(validatePassword(password.trim()));
+      const anyDispatch = dispatch as any;
+      const result = await (dispatch as any)(validatePassword(password.trim()));
       console.log('📝 validatePassword result:', result);
       
       if (validatePassword.fulfilled.match(result)) {
@@ -352,7 +278,8 @@ export const IntegrationsPage: React.FC = () => {
   const performLoadSavedIntegrations = async (masterPassword: string) => {
     try {
       console.log('🔓 Loading saved integrations with master password...');
-      await dispatch(initializeIntegrations(masterPassword));
+      const anyDispatch = dispatch as any;
+      await anyDispatch(initializeIntegrations(masterPassword));
       
       showSuccess('Integrations Loaded', 'Your saved integrations have been loaded successfully.');
       setHasEncryptedIntegrations(false); // Hide the load button
@@ -365,7 +292,8 @@ export const IntegrationsPage: React.FC = () => {
   const performSyncTogglePersistence = async (masterPassword: string, toggleData: { integration: 'google' | 'github', enabled: boolean }) => {
     try {
       console.log(`💾 Persisting ${toggleData.integration} sync toggle (${toggleData.enabled}) with master password...`);
-      await dispatch(persistIntegrationsState(masterPassword));
+      const anyDispatch = dispatch as any;
+      await anyDispatch(persistIntegrationsState(masterPassword));
       
       console.log(`✅ ${toggleData.integration} sync state persisted successfully`);
       showSuccess('Sync Settings', `${toggleData.integration === 'google' ? 'Google Calendar' : 'GitHub'} sync ${toggleData.enabled ? 'enabled' : 'disabled'} and saved permanently.`);
@@ -383,36 +311,8 @@ export const IntegrationsPage: React.FC = () => {
     await performGoogleCalendarConnectWithPassword(validatedMasterPassword!);
   };
 
-  const performGoogleCalendarConnectWithPassword = async (masterPassword: string) => {
-    console.log('📅 performGoogleCalendarConnectWithPassword called with password length:', masterPassword?.length || 0);
-    if (!window.electronAPI?.oauth) {
-      alert('OAuth not available in this environment');
-      return;
-    }
-
-    if (!googleClientId.trim() || !googleClientSecret.trim()) {
-      alert('Please enter both Google Client ID and Client Secret');
-      return;
-    }
-
-    try {
-      setIsConnecting(true);
-      
-      console.log('📅 Starting Google Calendar OAuth flow (session master password available:', !!sessionMasterPassword, ')');
-      
-      const result = await window.electronAPI.oauth.googleStart(googleClientId.trim(), googleClientSecret.trim());
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to start OAuth flow');
-      }
-      
-      console.log('📅 OAuth flow started successfully');
-      // The OAuth flow will continue in the event listeners
-    } catch (error) {
-      console.error('Google Calendar connection failed:', error);
-      alert(`Failed to start Google Calendar connection: ${error}`);
-      setIsConnecting(false);
-    }
+  const performGoogleCalendarConnectWithPassword = async (_masterPassword: string) => {
+    await startOAuth();
   };
 
   const handleGoogleCalendarDisconnect = async () => {
@@ -436,121 +336,17 @@ export const IntegrationsPage: React.FC = () => {
     await performGitHubConnectWithPassword(validatedMasterPassword);
   };
 
-  const performGitHubConnectWithPassword = async (masterPassword: string) => {
-    console.log('🐙 performGitHubConnectWithPassword called with password length:', masterPassword?.length || 0);
-    
-    if (!newGithubToken.trim()) {
-      alert('Please enter a GitHub personal access token');
-      return;
-    }
-
-    try {
-      // Validate token and get user info
-      const userInfo = await GitHubService.validateToken(newGithubToken);
-      
-      // Create new token object
-      const newToken: GitHubToken = {
-        id: `github_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        token: newGithubToken,
-        username: userInfo.login,
-        displayName: newTokenDisplayName.trim() || `${userInfo.login} Token`,
-        organizations: [],
-        repositories: [],
-        lastSync: undefined,
-        isActive: true,
-        createdAt: new Date().toISOString()
-      };
-      
-      console.log('🔍 Adding new GitHub token:', {
-        id: newToken.id,
-        username: newToken.username,
-        displayName: newToken.displayName
-      });
-      
-      // Add token to Redux state
-      dispatch(addGitHubToken(newToken));
-      
-      // Encrypt and store the integration data using session master password
-      if (sessionMasterPassword) {
-        try {
-          console.log('🔐 Starting GitHub tokens encryption process with session master password (length:', sessionMasterPassword.length, ')');
-          
-          // Get updated state after dispatch (synchronous action updates state immediately)
-          const currentState = store.getState() as any;
-          
-          console.log('📊 Current integration state:', {
-            githubConnected: currentState.integrations?.github?.connected,
-            tokenCount: currentState.integrations?.github?.tokens?.length
-          });
-          
-          await EncryptedIntegrationService.saveEncryptedIntegrations(
-            currentState.integrations,
-            sessionMasterPassword
-          );
-          console.log('✅ GitHub tokens encrypted and stored successfully');
-          showSuccess('GitHub Token Added', `GitHub token for ${userInfo.login} has been added and encrypted successfully.`);
-        } catch (error) {
-          console.error('❌ Failed to encrypt GitHub tokens:', error);
-          showError('Encryption Failed', `Failed to encrypt integration tokens: ${error}. Please try reconnecting.`);
-        }
-      } else {
-        console.warn('⚠️ No session master password available for GitHub encryption');
-        showError('Authentication Error', 'Session master password not available. Please unlock the app first.');
-      }
-      
-      // Clear form
-      setNewGithubToken('');
-      setNewTokenDisplayName('');
-      
-    } catch (error) {
-      alert(`GitHub token validation failed: ${error}`);
-    }
+  const performGitHubConnectWithPassword = async (_masterPassword: string) => {
+    await addToken();
   };
   
   // Handle removing a GitHub token
   const handleRemoveGitHubToken = async (tokenId: string) => {
-    const token = githubTokens.find(t => t.id === tokenId);
-    if (!token) return;
-    
-    const confirmed = confirm(`Are you sure you want to remove the GitHub token for ${token.username}?`);
-    if (!confirmed) return;
-    
-    dispatch(removeGitHubToken(tokenId));
-    
-    // Persist changes if session master password is available
-    if (sessionMasterPassword) {
-      try {
-        await dispatch(persistIntegrationsState(sessionMasterPassword));
-        showSuccess('Token Removed', `GitHub token for ${token.username} has been removed successfully.`);
-      } catch (error) {
-        console.error('❌ Failed to persist token removal:', error);
-        showError('Persistence Failed', 'Token removed locally but could not be saved permanently.');
-      }
-    } else {
-      showError('Save Required', 'Token removed locally. Please unlock the app to save changes permanently.');
-    }
+    await removeToken(tokenId);
   };
   
   // Handle toggling token active status
-  const handleToggleTokenActive = async (tokenId: string) => {
-    dispatch(toggleGitHubTokenActive(tokenId));
-    
-    // Persist changes if session master password is available
-    if (sessionMasterPassword) {
-      try {
-        await dispatch(persistIntegrationsState(sessionMasterPassword));
-        const token = githubTokens.find(t => t.id === tokenId);
-        if (token) {
-          showSuccess('Token Updated', `GitHub token for ${token.username} ${token.isActive ? 'disabled' : 'enabled'} successfully.`);
-        }
-      } catch (error) {
-        console.error('❌ Failed to persist token status change:', error);
-        showError('Persistence Failed', 'Token status changed locally but could not be saved permanently.');
-      }
-    } else {
-      showError('Save Required', 'Token status changed locally. Please unlock the app to save changes permanently.');
-    }
-  };
+  const handleToggleTokenActive = async (tokenId: string) => toggleGitHubTokenActiveHook(tokenId, (id) => githubTokens.find((t) => t.id === id));
 
   const handleGitHubDisconnect = async () => {
     dispatch(disconnectGitHub());
@@ -566,231 +362,26 @@ export const IntegrationsPage: React.FC = () => {
     }
   };
 
-  const handleSyncNow = async () => {
-    dispatch(setSyncing(true));
-    dispatch(clearSyncError());
-
-    try {
-      let totalTasksCreated = 0;
-
-      // Sync Google Calendar if connected and enabled
-      if (googleCalendar.connected && googleCalendar.syncEnabled && googleCalendar.accessToken) {
-        try {
-          const dateRange = IntegrationSyncService.getDefaultSyncDateRange(7); // Last 7 days
-          const { tasks: calendarTasks } = await IntegrationSyncService.syncGoogleCalendarEvents(
-            googleCalendar.accessToken,
+  const { handleSyncNow } = useSyncNow({
+    googleCalendar,
+    github,
             tasks,
-            dateRange,
-            googleCalendar.connectionDate // Pass connection date to filter historic events
-          );
-          
-          // Add calendar tasks to store
-          calendarTasks.forEach(task => {
-            dispatch(addTask(task));
-            totalTasksCreated++;
-          });
-          
-          // Update last sync timestamp
-          dispatch(updateGoogleCalendarLastSync(new Date().toISOString()));
-          console.log('✅ Google Calendar sync completed successfully');
-        } catch (error) {
-          console.error('Google Calendar sync failed:', error);
-        }
-      }
+    projects,
+    sessionMasterPassword: sessionActive ? getSessionMasterPassword() : undefined,
+    showSuccess,
+  });
 
-      // Sync GitHub if connected and enabled with active tokens
-      if (github.connected && github.syncEnabled && github.tokens.length > 0) {
-        try {
-          const activeTokens = github.tokens.filter(token => token.isActive);
-          
-          if (activeTokens.length > 0) {
-            console.log(`🔄 Syncing GitHub with ${activeTokens.length} active tokens...`);
-            
-            // Determine dynamic sync window
-            // 1) If no history (no token.lastSync and no global lastSync), fetch past 14 days
-            // 2) If last sync exists, fetch from min(token.lastSync, global lastSync) to now
-            const now = new Date();
-            const twoWeeksAgo = new Date(now);
-            twoWeeksAgo.setDate(now.getDate() - 14);
-
-            // Find earliest lastSync among active tokens and global
-            const tokenLastSyncs = activeTokens
-              .map(t => (t.lastSync ? new Date(t.lastSync) : null))
-              .filter((d): d is Date => !!d);
-            const globalLastSync = github.lastSync ? new Date(github.lastSync) : null;
-            const allCandidates = [...tokenLastSyncs, globalLastSync].filter((d): d is Date => !!d);
-
-            const since = allCandidates.length > 0
-              ? new Date(Math.min(...allCandidates.map(d => d.getTime())))
-              : twoWeeksAgo;
-
-            // Normalize to day boundaries
-            const startOfDay = new Date(since);
-            startOfDay.setHours(0, 0, 0, 0);
-            const endOfDay = new Date(now);
-            endOfDay.setHours(23, 59, 59, 999);
-            
-            const pullRequests = await GitHubService.getTodaysPullRequestsMultiToken(
-              activeTokens.map(token => ({
-                id: token.id,
-                token: token.token,
-                username: token.username,
-                isActive: token.isActive
-              })),
-              startOfDay,
-              endOfDay
-            );
-            
-            console.log(`📊 Found ${pullRequests.length} PRs from multi-token sync`);
-            
-            // Step 1: Ensure "Github" project exists
-            let githubProject = projects.find(project => 
-              project.name.toLowerCase() === 'github' && !project.archived
-            );
-            
-            if (!githubProject) {
-              // Create Github project
-              const newGithubProject = {
-                id: `github_project_${Date.now()}`,
-                name: 'Github',
-                description: 'Automatically synced GitHub pull requests and issues',
-                color: '#333333', // GitHub's dark color
-                archived: false,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              };
-              
-              dispatch(addProject(newGithubProject));
-              githubProject = newGithubProject;
-              console.log('📁 Created new "Github" project for synced items');
-            }
-
-            // Step 2: Convert PRs to tasks with improved duplicate prevention
-            const existingGithubTasks = tasks.filter(task => 
-              task.tags?.includes('github')
-            );
-            
-            // De-duplicate before creating tasks
-            const uniqueById = new Map<string, typeof pullRequests[number]>();
-            pullRequests.forEach(pr => {
-              uniqueById.set(String(pr.id), pr);
-            });
-
-            Array.from(uniqueById.values()).forEach(pr => {
-              // Check if task already exists (improved duplicate prevention)
-              const existingTask = existingGithubTasks.find(existing => 
-                existing.tags?.includes(`pr-${pr.id}`) ||
-                existing.tags?.includes(`github-pr-${pr.id}`) ||
-                existing.id === `github_pr_${pr.id}` // Check old ID format too
-              );
-              
-              if (!existingTask) {
-                // Set due date to today for better organization
-                const today = new Date();
-                today.setHours(23, 59, 59, 999); // End of today
-                
-                const task = {
-                  id: `github_pr_${pr.id}`,
-                  title: pr.title, // Use PR title directly, no prefix
-                  description: `${pr.body || 'No description'}\n\nRepository: ${pr.repository.full_name}\nPull Request: ${pr.html_url}`,
-                  completed: pr.state === 'closed' || pr.state === 'merged',
-                  priority: 'medium' as const,
-                  tags: ['github', 'pull-request', pr.repository.name, `pr-${pr.id}`, `github-pr-${pr.id}`], // Add both old and new format tags
-                  projectId: githubProject.id, // Assign to Github project
-                  createdAt: new Date(pr.created_at).toISOString(),
-                  updatedAt: new Date().toISOString(),
-                  dueDate: today.toISOString(), // Always set to today for GitHub items
-                  subtasks: []
-                };
-                
-                dispatch(addTask(task));
-                totalTasksCreated++;
-                console.log(`📋 Created task for PR: ${pr.title} (${pr.repository.name})`);
-              } else {
-                console.log(`⏭️ Skipped existing PR (duplicate): ${pr.title} (${pr.repository.name})`);
-              }
-            });
-            
-            // Update last sync timestamp
-            dispatch(updateGitHubLastSync(new Date().toISOString()));
-            console.log('✅ GitHub multi-token sync completed successfully');
-          } else {
-            console.log('⚠️ No active GitHub tokens found for sync');
-          }
-        } catch (error) {
-          console.error('GitHub multi-token sync failed:', error);
-        }
-      }
-
-      console.log(`Sync completed: ${totalTasksCreated} tasks created`);
-      
-      // Persist the updated lastSync timestamps to encrypted storage
-      if (sessionMasterPassword && (
-        (googleCalendar.connected && googleCalendar.syncEnabled) || 
-        (github.connected && github.syncEnabled)
-      )) {
-        try {
-          await dispatch(persistIntegrationsState(sessionMasterPassword));
-          console.log('✅ Integration timestamps persisted to encrypted storage');
-        } catch (error) {
-          console.warn('⚠️ Failed to persist integration timestamps:', error);
-        }
-      }
-      
-    } catch (error) {
-      dispatch(setSyncError(String(error)));
-    } finally {
-      dispatch(setSyncing(false));
-    }
-  };
-
-  // Handle Google Calendar sync toggle with persistence
-  const handleGoogleCalendarSyncToggle = async (enabled: boolean) => {
-    console.log('🔄 Google Calendar sync toggled to:', enabled);
-    
-    // Update Redux state immediately for responsive UI
-    dispatch(setGoogleCalendarSyncEnabled(enabled));
-    
-    // Persist the change using session master password
-    if (sessionMasterPassword) {
-      try {
-        console.log('💾 Persisting Google Calendar sync state change...');
-        await dispatch(persistIntegrationsState(sessionMasterPassword));
-        console.log('✅ Google Calendar sync state persisted successfully');
-        showSuccess('Sync Settings', `Google Calendar sync ${enabled ? 'enabled' : 'disabled'} and saved permanently.`);
-      } catch (error) {
-        console.error('❌ Failed to persist Google Calendar sync state:', error);
-        showError('Sync Settings', 'Sync preference updated locally but could not be saved permanently. Changes may be lost on restart.');
-      }
-    } else {
-      console.log('ℹ️ No session master password available - sync state updated locally only');
-      showError('Sync Settings', 'Sync preference updated locally but could not be saved permanently. Please unlock the app to save changes.');
-    }
-  };
-
-  // Handle GitHub sync toggle with persistence
-  const handleGitHubSyncToggle = async (enabled: boolean) => {
-    console.log('🔄 GitHub sync toggled to:', enabled);
-    
-    // Update Redux state immediately for responsive UI
-    dispatch(setGitHubSyncEnabled(enabled));
-    
-    // Persist the change using session master password
-    if (sessionMasterPassword) {
-      try {
-        console.log('💾 Persisting GitHub sync state change...');
-        await dispatch(persistIntegrationsState(sessionMasterPassword));
-        console.log('✅ GitHub sync state persisted successfully');
-        showSuccess('Sync Settings', `GitHub sync ${enabled ? 'enabled' : 'disabled'} and saved permanently.`);
-      } catch (error) {
-        console.error('❌ Failed to persist GitHub sync state:', error);
-        showError('Sync Settings', 'Sync preference updated locally but could not be saved permanently. Changes may be lost on restart.');
-      }
-    } else {
-      console.log('ℹ️ No session master password available - sync state updated locally only');
-      showError('Sync Settings', 'Sync preference updated locally but could not be saved permanently. Please unlock the app to save changes.');
-    }
-  };
+  // Replace inline toggles with centralized hooks
+  const { toggleGoogle: handleGoogleCalendarSyncToggle, toggleGitHub: handleGitHubSyncToggle } = useSyncToggles({
+    setPendingAction,
+    setShowPasswordModal,
+    setPassword,
+    setPasswordError,
+    setPendingSyncToggle,
+    sessionMasterPassword: sessionActive ? getSessionMasterPassword() : undefined,
+    showSuccess,
+    showError,
+  });
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -826,7 +417,7 @@ export const IntegrationsPage: React.FC = () => {
                   Integration tokens will be encrypted and stored securely.
                 </p>
                 <Button 
-                  variant="outline" 
+                  variant="secondary" 
                   className="mt-3 text-amber-700 border-amber-300 hover:bg-amber-100 dark:text-amber-200 dark:border-amber-600 dark:hover:bg-amber-800/30"
                   onClick={() => setShowPrivacyModal(true)}
                 >
@@ -851,7 +442,7 @@ export const IntegrationsPage: React.FC = () => {
                   Enter your master password to load them.
                 </p>
                 <Button 
-                  variant="outline" 
+                  variant="secondary" 
                   className="mt-3 text-blue-700 border-blue-300 hover:bg-blue-100 dark:text-blue-200 dark:border-blue-600 dark:hover:bg-blue-800/30"
                   onClick={handleLoadSavedIntegrations}
                 >
@@ -1012,7 +603,7 @@ export const IntegrationsPage: React.FC = () => {
                     </span>
                   </div>
                   <Button 
-                    variant="outline" 
+                    variant="secondary" 
                     size="sm"
                     onClick={handleGoogleCalendarDisconnect}
                     className="min-w-[100px] text-blue-700 border-blue-300 hover:bg-blue-200 dark:text-blue-300 dark:border-blue-600 dark:hover:bg-blue-800/50 font-medium"
@@ -1175,7 +766,7 @@ export const IntegrationsPage: React.FC = () => {
                     </span>
                   </div>
                   <Button 
-                    variant="outline" 
+                    variant="secondary" 
                     size="sm"
                     onClick={handleGitHubDisconnect}
                     className="min-w-[100px] text-gray-700 border-gray-300 hover:bg-gray-200 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700/50 font-medium"
@@ -1205,7 +796,7 @@ export const IntegrationsPage: React.FC = () => {
                       </div>
                     </div>
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       onClick={() => setShowTokenManagement(!showTokenManagement)}
                       className="text-blue-700 border-blue-300 hover:bg-blue-100 dark:text-blue-300 dark:border-blue-600 dark:hover:bg-blue-800/50"
@@ -1231,7 +822,7 @@ export const IntegrationsPage: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
                             onClick={() => handleToggleTokenActive(token.id)}
                             className={`text-xs ${token.isActive 
@@ -1242,7 +833,7 @@ export const IntegrationsPage: React.FC = () => {
                             {token.isActive ? 'Disable' : 'Enable'}
                           </Button>
                           <Button
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
                             onClick={() => handleRemoveGitHubToken(token.id)}
                             className="text-xs text-red-700 border-red-300 hover:bg-red-100 dark:text-red-300 dark:border-red-600 dark:hover:bg-red-800/30"
@@ -1301,7 +892,7 @@ export const IntegrationsPage: React.FC = () => {
                           Add Token
                         </Button>
                         <Button 
-                          variant="outline"
+                          variant="secondary"
                           onClick={() => {
                             setShowTokenManagement(false);
                             setNewGithubToken('');

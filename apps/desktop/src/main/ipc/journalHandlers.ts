@@ -4,6 +4,8 @@
  */
 
 import { ipcMain } from 'electron';
+import { z } from 'zod';
+import { JournalEntrySchema } from '@serenity/core';
 import { apiService } from '../services/ApiService';
 
 export function registerJournalHandlers(): void {
@@ -23,7 +25,8 @@ export function registerJournalHandlers(): void {
   ipcMain.handle('journal:create', async (_, entry) => {
     try {
       console.log('🔐 Creating journal entry through business layer...');
-      return await apiService.createJournalEntry(entry);
+      const validated = JournalEntrySchema.omit({ id: true, createdAt: true, updatedAt: true }).parse(entry);
+      return await apiService.createJournalEntry(validated);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create journal entry';
       return { success: false, data: null, error: errorMessage };
@@ -33,8 +36,8 @@ export function registerJournalHandlers(): void {
   ipcMain.handle('journal:create-with-id', async (_, entry) => {
     try {
       console.log('🔐 Creating journal entry with ID through business layer:', entry.title, entry.id);
-      // Business layer will handle ID assignment validation
-      return await apiService.createJournalEntry(entry);
+      const validated = JournalEntrySchema.parse(entry);
+      return await apiService.createJournalEntry(validated);
     } catch (error) {
       console.error('❌ Business layer: Journal entry creation failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create journal entry with ID';
@@ -45,7 +48,9 @@ export function registerJournalHandlers(): void {
   ipcMain.handle('journal:update', async (_, id, updates) => {
     try {
       console.log('🔐 Updating journal entry through business layer...');
-      return await apiService.updateJournalEntry(id, updates);
+      z.string().min(1).parse(id);
+      const validatedUpdates = JournalEntrySchema.partial().parse(updates);
+      return await apiService.updateJournalEntry(id, validatedUpdates);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update journal entry';
       return { success: false, data: null, error: errorMessage };
@@ -55,6 +60,7 @@ export function registerJournalHandlers(): void {
   ipcMain.handle('journal:delete', async (_, id) => {
     try {
       console.log('🔐 Deleting journal entry through business layer...');
+      z.string().min(1).parse(id);
       return await apiService.deleteJournalEntry(id);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete journal entry';
@@ -66,6 +72,7 @@ export function registerJournalHandlers(): void {
   ipcMain.handle('journal:pin', async (_, id) => {
     try {
       console.log('🔐 Pinning journal entry through business layer...');
+      z.string().min(1).parse(id);
       return await apiService.pinJournalEntry(id);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to pin journal entry';
@@ -76,6 +83,7 @@ export function registerJournalHandlers(): void {
   ipcMain.handle('journal:unpin', async (_, id) => {
     try {
       console.log('🔐 Unpinning journal entry through business layer...');
+      z.string().min(1).parse(id);
       return await apiService.unpinJournalEntry(id);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to unpin journal entry';
@@ -86,7 +94,8 @@ export function registerJournalHandlers(): void {
   ipcMain.handle('journal:get-by-date-range', async (_, startDate, endDate) => {
     try {
       console.log('🔐 Getting journal entries by date range through business layer...');
-      return await apiService.getJournalEntriesByDateRange(startDate, endDate);
+      const date = (v: unknown) => z.union([z.date(), z.string().datetime(), z.string().date()]).transform((val) => new Date(val)).parse(v);
+      return await apiService.getJournalEntriesByDateRange(date(startDate).toISOString(), date(endDate).toISOString());
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get journal entries by date range';
       return { success: false, data: null, error: errorMessage };

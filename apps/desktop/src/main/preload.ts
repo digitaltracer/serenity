@@ -1,4 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { Task, Project, JournalEntry } from '@serenity/core';
+
+type NewTask = Omit<Task, 'id' | 'createdAt' | 'updatedAt'>;
+type UpdateTask = Partial<Task>;
+type NewProject = Omit<Project, 'id' | 'createdAt' | 'updatedAt'>;
+type UpdateProject = Partial<Project>;
+type NewJournalEntry = Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>;
+type UpdateJournalEntry = Partial<JournalEntry>;
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -25,21 +33,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Task operations (business logic)
   tasks: {
     get: () => ipcRenderer.invoke('tasks:get'),
-    create: (task: any) => ipcRenderer.invoke('tasks:create', task),
-    createWithId: (task: any) => ipcRenderer.invoke('tasks:create-with-id', task),
-    update: (id: string, updates: any) => ipcRenderer.invoke('tasks:update', id, updates),
+    create: (task: NewTask) => ipcRenderer.invoke('tasks:create', task),
+    createWithId: (task: Task) => ipcRenderer.invoke('tasks:create-with-id', task),
+    update: (id: string, updates: UpdateTask) => ipcRenderer.invoke('tasks:update', id, updates),
     delete: (id: string) => ipcRenderer.invoke('tasks:delete', id),
     complete: (id: string) => ipcRenderer.invoke('tasks:complete', id),
-    bulkUpdate: (taskIds: string[], updates: any) => ipcRenderer.invoke('tasks:bulk-update', taskIds, updates),
+    bulkUpdate: (taskIds: string[], updates: UpdateTask) => ipcRenderer.invoke('tasks:bulk-update', taskIds, updates),
   },
 
   // Project operations (business logic)
   projects: {
     get: () => ipcRenderer.invoke('projects:get'),
     getSingle: (id: string) => ipcRenderer.invoke('projects:get-single', id),
-    create: (project: any) => ipcRenderer.invoke('projects:create', project),
-    createWithId: (project: any) => ipcRenderer.invoke('projects:create-with-id', project),
-    update: (id: string, updates: any) => ipcRenderer.invoke('projects:update', id, updates),
+    create: (project: NewProject) => ipcRenderer.invoke('projects:create', project),
+    createWithId: (project: Project) => ipcRenderer.invoke('projects:create-with-id', project),
+    update: (id: string, updates: UpdateProject) => ipcRenderer.invoke('projects:update', id, updates),
     delete: (id: string) => ipcRenderer.invoke('projects:delete', id),
     archive: (id: string) => ipcRenderer.invoke('projects:archive', id),
     unarchive: (id: string) => ipcRenderer.invoke('projects:unarchive', id),
@@ -49,9 +57,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Journal operations (business logic)
   journal: {
     get: () => ipcRenderer.invoke('journal:get'),
-    create: (entry: any) => ipcRenderer.invoke('journal:create', entry),
-    createWithId: (entry: any) => ipcRenderer.invoke('journal:create-with-id', entry),
-    update: (id: string, updates: any) => ipcRenderer.invoke('journal:update', id, updates),
+    create: (entry: NewJournalEntry) => ipcRenderer.invoke('journal:create', entry),
+    createWithId: (entry: JournalEntry) => ipcRenderer.invoke('journal:create-with-id', entry),
+    update: (id: string, updates: UpdateJournalEntry) => ipcRenderer.invoke('journal:update', id, updates),
     delete: (id: string) => ipcRenderer.invoke('journal:delete', id),
     pin: (id: string) => ipcRenderer.invoke('journal:pin', id),
     unpin: (id: string) => ipcRenderer.invoke('journal:unpin', id),
@@ -75,9 +83,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     backup: (backupPath?: string) => ipcRenderer.invoke('system:backup', backupPath),
     importFromLocalStorage: (data: any) => ipcRenderer.invoke('system:import-from-localstorage', data),
     exportAllData: () => ipcRenderer.invoke('system:export-all-data'),
-    query: (query: string, params?: any[]) => {
-      // Suppress deprecation warning for now to reduce log noise
-      return ipcRenderer.invoke('system:secure-query', 'custom', [query, params]);
+    query: (_query: string, _params?: any[]) => {
+      // Disabled for security: raw SQL queries are not allowed from renderer
+      return Promise.resolve({ success: false, data: null, error: 'Raw SQL queries are disabled' });
     },
 
     // Task operations - DEPRECATED
@@ -136,7 +144,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // OAuth operations
   oauth: {
-    googleStart: (clientId: string, clientSecret: string) => ipcRenderer.invoke('oauth:google:start', clientId, clientSecret),
+    googleStart: (clientId?: string, clientSecret?: string) => ipcRenderer.invoke('oauth:google:start', clientId, clientSecret),
     onGoogleSuccess: (callback: (authData: any) => void) => {
       ipcRenderer.on('oauth:google:success', (_, authData) => callback(authData));
     },
@@ -219,38 +227,38 @@ export interface ElectronAPI {
 
   // Task operations (business logic)
   tasks: {
-    get: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
-    create: (task: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-    createWithId: (task: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-    update: (id: string, updates: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+    get: () => Promise<{ success: boolean; data?: Task[]; error?: string }>;
+    create: (task: NewTask) => Promise<{ success: boolean; data?: Task; error?: string }>;
+    createWithId: (task: Task) => Promise<{ success: boolean; data?: Task; error?: string }>;
+    update: (id: string, updates: UpdateTask) => Promise<{ success: boolean; data?: Task; error?: string }>;
     delete: (id: string) => Promise<{ success: boolean; data?: boolean; error?: string }>;
-    complete: (id: string) => Promise<{ success: boolean; data?: any; error?: string }>;
-    bulkUpdate: (taskIds: string[], updates: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+    complete: (id: string) => Promise<{ success: boolean; data?: Task; error?: string }>;
+    bulkUpdate: (taskIds: string[], updates: UpdateTask) => Promise<{ success: boolean; data?: any; error?: string }>;
   };
 
   // Project operations (business logic)
   projects: {
-    get: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
-    getSingle: (id: string) => Promise<{ success: boolean; data?: any; error?: string }>;
-    create: (project: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-    createWithId: (project: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-    update: (id: string, updates: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+    get: () => Promise<{ success: boolean; data?: Project[]; error?: string }>;
+    getSingle: (id: string) => Promise<{ success: boolean; data?: Project; error?: string }>;
+    create: (project: NewProject) => Promise<{ success: boolean; data?: Project; error?: string }>;
+    createWithId: (project: Project) => Promise<{ success: boolean; data?: Project; error?: string }>;
+    update: (id: string, updates: UpdateProject) => Promise<{ success: boolean; data?: Project; error?: string }>;
     delete: (id: string) => Promise<{ success: boolean; data?: boolean; error?: string }>;
-    archive: (id: string) => Promise<{ success: boolean; data?: any; error?: string }>;
-    unarchive: (id: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+    archive: (id: string) => Promise<{ success: boolean; data?: Project; error?: string }>;
+    unarchive: (id: string) => Promise<{ success: boolean; data?: Project; error?: string }>;
     getStats: (id: string) => Promise<{ success: boolean; data?: any; error?: string }>;
   };
 
   // Journal operations (business logic)
   journal: {
-    get: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
-    create: (entry: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-    createWithId: (entry: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-    update: (id: string, updates: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+    get: () => Promise<{ success: boolean; data?: JournalEntry[]; error?: string }>;
+    create: (entry: NewJournalEntry) => Promise<{ success: boolean; data?: JournalEntry; error?: string }>;
+    createWithId: (entry: JournalEntry) => Promise<{ success: boolean; data?: JournalEntry; error?: string }>;
+    update: (id: string, updates: UpdateJournalEntry) => Promise<{ success: boolean; data?: JournalEntry; error?: string }>;
     delete: (id: string) => Promise<{ success: boolean; data?: boolean; error?: string }>;
-    pin: (id: string) => Promise<{ success: boolean; data?: any; error?: string }>;
-    unpin: (id: string) => Promise<{ success: boolean; data?: any; error?: string }>;
-    getByDateRange: (startDate: string, endDate: string) => Promise<{ success: boolean; data?: any[]; error?: string }>;
+    pin: (id: string) => Promise<{ success: boolean; data?: JournalEntry; error?: string }>;
+    unpin: (id: string) => Promise<{ success: boolean; data?: JournalEntry; error?: string }>;
+    getByDateRange: (startDate: string, endDate: string) => Promise<{ success: boolean; data?: JournalEntry[]; error?: string }>;
     getStats: () => Promise<{ success: boolean; data?: any; error?: string }>;
   };
 
@@ -306,7 +314,7 @@ export interface ElectronAPI {
   onMenuAction: (callback: (event: string, data?: any) => void) => void;
   removeMenuListeners: () => void;
   oauth: {
-    googleStart: (clientId: string, clientSecret: string) => Promise<{ success: boolean; authUrl?: string; error?: string }>;
+    googleStart: (clientId?: string, clientSecret?: string) => Promise<{ success: boolean; authUrl?: string; error?: string }>;
     onGoogleSuccess: (callback: (authData: any) => void) => void;
     onGoogleError: (callback: (error: string) => void) => void;
     onGoogleCancelled: (callback: () => void) => void;

@@ -1,6 +1,7 @@
 /**
  * Enhanced localStorage-based persistence for Redux state
  * Provides save/load functionality with data validation and error recovery
+ * Handles both browser and Node.js environments (Electron main process)
  */
 
 import { Task, JournalEntry, Project } from '../types';
@@ -9,6 +10,17 @@ import {
   safeValidateJournalEntries, 
   safeValidateProjects
 } from '../validation';
+
+/**
+ * Check if localStorage is available (browser/renderer process)
+ */
+const isLocalStorageAvailable = (): boolean => {
+  try {
+    return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+  } catch {
+    return false;
+  }
+};
 
 const STORAGE_KEYS = {
   TASKS: 'serenity_tasks',
@@ -42,6 +54,11 @@ const safeJSONParse = <T>(data: string | null, fallback: T, validator?: (data: u
 
 // Helper to safely stringify and save to localStorage
 const safeSave = (key: string, data: any): void => {
+  if (!isLocalStorageAvailable()) {
+    console.warn(`localStorage not available, skipping save of ${key}`);
+    return;
+  }
+  
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (error) {
@@ -53,6 +70,11 @@ const safeSave = (key: string, data: any): void => {
  * Load tasks from localStorage with validation
  */
 export const loadTasks = (): Task[] => {
+  if (!isLocalStorageAvailable()) {
+    console.warn('localStorage not available, returning empty tasks array');
+    return [];
+  }
+  
   const data = localStorage.getItem(STORAGE_KEYS.TASKS);
   return safeJSONParse(data, [], safeValidateTasks);
 };
@@ -75,6 +97,11 @@ export const saveTasks = (tasks: Task[]): void => {
  * Load journal entries from localStorage with validation
  */
 export const loadJournalEntries = (): JournalEntry[] => {
+  if (!isLocalStorageAvailable()) {
+    console.warn('localStorage not available, returning empty journal entries array');
+    return [];
+  }
+  
   const data = localStorage.getItem(STORAGE_KEYS.JOURNAL);
   return safeJSONParse(data, [], safeValidateJournalEntries);
 };
@@ -97,6 +124,11 @@ export const saveJournalEntries = (entries: JournalEntry[]): void => {
  * Load projects from localStorage with validation
  */
 export const loadProjects = (): Project[] => {
+  if (!isLocalStorageAvailable()) {
+    console.warn('localStorage not available, returning empty projects array');
+    return [];
+  }
+  
   const data = localStorage.getItem(STORAGE_KEYS.PROJECTS);
   return safeJSONParse(data, [], safeValidateProjects);
 };
@@ -119,6 +151,11 @@ export const saveProjects = (projects: Project[]): void => {
  * Clear all stored data
  */
 export const clearAllData = (): void => {
+  if (!isLocalStorageAvailable()) {
+    console.warn('localStorage not available, cannot clear data');
+    return;
+  }
+  
   localStorage.removeItem(STORAGE_KEYS.TASKS);
   localStorage.removeItem(STORAGE_KEYS.JOURNAL);
   localStorage.removeItem(STORAGE_KEYS.PROJECTS);
@@ -128,6 +165,10 @@ export const clearAllData = (): void => {
  * Check if there's any existing data in storage
  */
 export const hasExistingData = (): boolean => {
+  if (!isLocalStorageAvailable()) {
+    return false;
+  }
+  
   return !!(
     localStorage.getItem(STORAGE_KEYS.TASKS) ||
     localStorage.getItem(STORAGE_KEYS.JOURNAL) ||
@@ -146,6 +187,16 @@ export const getStorageStats = (): {
   projectsSize: number;
   totalEntries: number;
 } => {
+  if (!isLocalStorageAvailable()) {
+    return {
+      used: 0,
+      tasksSize: 0,
+      journalSize: 0,
+      projectsSize: 0,
+      totalEntries: 0,
+    };
+  }
+  
   const tasks = localStorage.getItem(STORAGE_KEYS.TASKS) || '';
   const journal = localStorage.getItem(STORAGE_KEYS.JOURNAL) || '';
   const projects = localStorage.getItem(STORAGE_KEYS.PROJECTS) || '';
@@ -188,6 +239,19 @@ export const validateStoredData = (): {
   let validTasks = 0;
   let validJournalEntries = 0;
   let validProjects = 0;
+
+  if (!isLocalStorageAvailable()) {
+    return {
+      isValid: true,
+      errors: [],
+      warnings: ['localStorage not available'],
+      stats: {
+        validTasks: 0,
+        validJournalEntries: 0,
+        validProjects: 0,
+      },
+    };
+  }
 
   try {
     // Validate tasks

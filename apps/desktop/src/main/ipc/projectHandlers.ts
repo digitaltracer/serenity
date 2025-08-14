@@ -4,6 +4,8 @@
  */
 
 import { ipcMain } from 'electron';
+import { z } from 'zod';
+import { ProjectSchema } from '@serenity/core';
 import { apiService } from '../services/ApiService';
 
 export function registerProjectHandlers(): void {
@@ -23,6 +25,7 @@ export function registerProjectHandlers(): void {
   ipcMain.handle('projects:get-single', async (_, id) => {
     try {
       console.log('🔐 Getting single project through business layer...');
+      z.string().min(1).parse(id);
       return await apiService.getProject(id);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get project';
@@ -33,7 +36,8 @@ export function registerProjectHandlers(): void {
   ipcMain.handle('projects:create', async (_, project) => {
     try {
       console.log('🔐 Creating project through business layer...');
-      return await apiService.createProject(project);
+      const validated = ProjectSchema.omit({ id: true, createdAt: true, updatedAt: true }).parse(project);
+      return await apiService.createProject(validated);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create project';
       return { success: false, data: null, error: errorMessage };
@@ -43,8 +47,8 @@ export function registerProjectHandlers(): void {
   ipcMain.handle('projects:create-with-id', async (_, project) => {
     try {
       console.log('🔐 Creating project with ID through business layer:', project.name, project.id);
-      // Business layer will handle ID assignment validation
-      return await apiService.createProject(project);
+      const validated = ProjectSchema.parse(project);
+      return await apiService.createProject(validated);
     } catch (error) {
       console.error('❌ Business layer: Project creation failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create project with ID';
@@ -55,7 +59,9 @@ export function registerProjectHandlers(): void {
   ipcMain.handle('projects:update', async (_, id, updates) => {
     try {
       console.log('🔐 Updating project through business layer...');
-      return await apiService.updateProject(id, updates);
+      z.string().min(1).parse(id);
+      const validatedUpdates = ProjectSchema.partial().parse(updates);
+      return await apiService.updateProject(id, validatedUpdates);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update project';
       return { success: false, data: null, error: errorMessage };
@@ -65,6 +71,7 @@ export function registerProjectHandlers(): void {
   ipcMain.handle('projects:delete', async (_, id) => {
     try {
       console.log('🔐 Deleting project through business layer...');
+      z.string().min(1).parse(id);
       return await apiService.deleteProject(id);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete project';
@@ -76,6 +83,7 @@ export function registerProjectHandlers(): void {
   ipcMain.handle('projects:archive', async (_, id) => {
     try {
       console.log('🔐 Archiving project through business layer...');
+      z.string().min(1).parse(id);
       return await apiService.archiveProject(id);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to archive project';
@@ -86,6 +94,7 @@ export function registerProjectHandlers(): void {
   ipcMain.handle('projects:unarchive', async (_, id) => {
     try {
       console.log('🔐 Unarchiving project through business layer...');
+      z.string().min(1).parse(id);
       return await apiService.unarchiveProject(id);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to unarchive project';
@@ -96,6 +105,7 @@ export function registerProjectHandlers(): void {
   ipcMain.handle('projects:get-stats', async (_, id) => {
     try {
       console.log('🔐 Getting project stats through business layer...');
+      z.string().min(1).parse(id);
       return await apiService.getProjectStats(id);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get project stats';

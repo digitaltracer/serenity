@@ -57,3 +57,5 @@ export * from './GoalModal';
 export * from './GoalCard';
 export * from './GoalsPage';
 export * from './TagsManager';
+// Error handling components
+export * from './ErrorBoundary';

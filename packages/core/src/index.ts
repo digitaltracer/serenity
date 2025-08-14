@@ -2,6 +2,8 @@ export * from './types';
 export * from './utils';
 export * from './validation';
 export * from './database/DatabaseManager';
+// Export secure session manager for secure password handling
+export { secureSessionManager } from './utils/secureSessionManager';
 export * from './hooks/useKeyboardShortcuts';
 export * from './hooks/useDragDrop';
 export * from './services/googleCalendarService';
@@ -26,3 +28,5 @@ export { store, initializeStoreData, getDatabaseStats, checkSQLiteAvailability }
 export type { RootState, AppDispatch } from './store/enhancedStore';
 // Export all store functionality
 export * from './store';
+// Explicit selector re-exports used by UI package
+export { selectCompactMode } from './store/slices/uiSlice';

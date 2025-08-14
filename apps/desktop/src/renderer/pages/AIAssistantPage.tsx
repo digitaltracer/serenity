@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useLoadAISettings } from './AIAssistant/hooks/useLoadAISettings';
+import { useListProviderModels } from './AIAssistant/hooks/useListProviderModels';
+import { usePersistActiveProviderSettings } from './AIAssistant/hooks/usePersistActiveProviderSettings';
 import { useSelector, useDispatch } from 'react-redux';
+// Types are provided via ambient declarations in core; fall back to any where needed for stability
 import {
   selectAIProviders,
   selectActiveProvider,
@@ -73,6 +77,7 @@ import {
 
 export const AIAssistantPage: React.FC = () => {
   const dispatch = useDispatch();
+  const anyDispatch = dispatch as any;
   const { showSuccess, showError } = useToast();
   
   // Redux state
@@ -114,83 +119,15 @@ export const AIAssistantPage: React.FC = () => {
     dayOfWeek: 0, // Sunday
   });
 
-  useEffect(() => {
-    // Clear any previous errors when component mounts
-    dispatch(clearAllErrors());
-    
-    // Load AI settings including model info and provider status
-    const loadAISettings = async () => {
-      try {
-        if (window.electronAPI?.aiAssistant?.getSettings) {
-          const result = await window.electronAPI.aiAssistant.getSettings();
-          console.log('[AIAssistantPage] getSettings result:', result);
-          if (result.success) {
-            // Update model info if available
-            if (result.settings.modelInfo) {
-              dispatch(updateProvidersWithModelInfo(result.settings.modelInfo));
-            }
-            
-            // Update provider API key status
-            if (result.settings.providersWithKeys) {
-              dispatch(updateProvidersWithApiKeys(result.settings.providersWithKeys));
-              console.log('Loaded providers with keys:', result.settings.providersWithKeys);
-            }
-
-            // Set active provider from persisted settings (ensure provider exists and has key)
-            if (result.settings.activeProvider) {
-              const ap = result.settings.activeProvider as 'openai' | 'gemini' | 'anthropic';
-              const hasKey = !!result.settings.providersWithKeys?.[ap];
-              console.log('[AIAssistantPage] Persisted activeProvider:', ap, 'hasKey:', hasKey);
-              if (hasKey) {
-                dispatch(setActiveProvider(ap));
-              }
-            }
-            // If none persisted, default-select the first provider with a key and persist
-            if (!result.settings.activeProvider) {
-              const firstWithKey = (['openai','gemini','anthropic'] as const).find(p => result.settings.providersWithKeys?.[p]);
-              if (firstWithKey) {
-                console.log('[AIAssistantPage] No activeProvider persisted. Selecting first with key:', firstWithKey);
-                dispatch(setActiveProvider(firstWithKey));
-                try {
-                  await window.electronAPI?.aiAssistant?.saveSettings({
-                    activeProvider: firstWithKey,
-                    autoAnalyze: configuration.autoAnalyze,
-                    analysisFrequency: configuration.analysisFrequency,
-                    dataTypes: configuration.dataTypes,
-                  });
-                } catch {}
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load AI settings:', error);
-      }
-    };
-    
-    loadAISettings();
-  }, [dispatch]);
+  useEffect(() => { dispatch(clearAllErrors()); }, [dispatch]);
+  useLoadAISettings(dispatch as any, {
+    updateProvidersWithModelInfo,
+    updateProvidersWithApiKeys,
+    setActiveProvider,
+  });
 
   // Load available models per provider when they have keys
-  useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        const next: Record<string, { id: string; label: string }[]> = {};
-        for (const p of providers) {
-          if (p.hasApiKey && window.electronAPI?.aiAssistant?.listModels) {
-            const res = await window.electronAPI.aiAssistant.listModels(p.id as any);
-            if (res.success) {
-              next[p.id] = res.models || [];
-            }
-          }
-        }
-        setAvailableModels(next);
-      } catch (e) {
-        // non-blocking
-      }
-    };
-    fetchModels();
-  }, [providers]);
+  useListProviderModels(providers as any, setAvailableModels);
 
   const handleSetApiKey = async (providerId: 'openai' | 'gemini' | 'anthropic') => {
     const apiKey = apiKeys[providerId];
@@ -216,9 +153,9 @@ export const AIAssistantPage: React.FC = () => {
       if (!activeProvider) {
         dispatch(setActiveProvider(providerId));
         try {
-          if (window.electronAPI?.aiAssistant?.saveSettings) {
+          if ((window as any).electronAPI?.aiAssistant?.saveSettings) {
             console.log('[AIAssistantPage] Persisting activeProvider after key setup:', providerId);
-            await window.electronAPI.aiAssistant.saveSettings({
+            await (window as any).electronAPI.aiAssistant.saveSettings({
               activeProvider: providerId,
               autoAnalyze: configuration.autoAnalyze,
               analysisFrequency: configuration.analysisFrequency,
@@ -270,30 +207,12 @@ export const AIAssistantPage: React.FC = () => {
   };
 
   // Persist active provider whenever it changes
-  useEffect(() => {
-    const persistActiveProvider = async () => {
-      try {
-        if (!activeProvider) return;
-        if (window.electronAPI?.aiAssistant?.saveSettings) {
-          console.log('[AIAssistantPage] Persisting activeProvider change:', activeProvider);
-          await window.electronAPI.aiAssistant.saveSettings({
-            activeProvider,
-            autoAnalyze: configuration.autoAnalyze,
-            analysisFrequency: configuration.analysisFrequency,
-            dataTypes: configuration.dataTypes,
-          });
-        }
-      } catch (e) {
-        console.warn('[AIAssistantPage] Failed to persist activeProvider:', e);
-      }
-    };
-    persistActiveProvider();
-  }, [activeProvider, configuration.autoAnalyze, configuration.analysisFrequency, configuration.dataTypes]);
+  usePersistActiveProviderSettings(activeProvider as any, configuration);
 
   const handleTestApiKey = async (providerId: 'openai' | 'gemini' | 'anthropic') => {
     setTestingProvider(providerId);
     try {
-      await dispatch(testApiKey(providerId)).unwrap();
+      await anyDispatch(testApiKey(providerId)).unwrap();
       showSuccess('API Key Valid', `${providerId.toUpperCase()} API key is working correctly`);
     } catch (error) {
       showError('API Key Test Failed', String(error));
@@ -319,7 +238,7 @@ export const AIAssistantPage: React.FC = () => {
     }
 
     try {
-      await dispatch(analyzeUserData({
+      await anyDispatch(analyzeUserData({
         provider: activeProvider,
         dataTypes,
         forceReAnalyze: false,
@@ -350,7 +269,7 @@ export const AIAssistantPage: React.FC = () => {
     }
 
     try {
-      await dispatch(generateRecap({
+      await anyDispatch(generateRecap({
         provider: activeProvider,
         type: recapPeriod,
         period: {
@@ -619,8 +538,8 @@ export const AIAssistantPage: React.FC = () => {
                         <button
                           onClick={async () => {
                             dispatch(setActiveProvider(provider.id));
-                            if (window.electronAPI?.aiAssistant?.saveSettings) {
-                              await window.electronAPI.aiAssistant.saveSettings({
+                            if ((window as any).electronAPI?.aiAssistant?.saveSettings) {
+                              await (window as any).electronAPI.aiAssistant.saveSettings({
                                 activeProvider: provider.id,
                                 autoAnalyze: configuration.autoAnalyze,
                                 analysisFrequency: configuration.analysisFrequency,
@@ -706,15 +625,15 @@ export const AIAssistantPage: React.FC = () => {
                                     preferredModels: { [provider.id]: value },
                                   } as any;
                                   console.log('[AIAssistantPage] Persisting preferred model for', provider.id, value);
-                                  await window.electronAPI?.aiAssistant?.saveSettings(settingsUpdate);
+                                  await (window as any).electronAPI?.aiAssistant?.saveSettings(settingsUpdate);
                                   // Update UI immediately
                                   dispatch(updateProvidersWithModelInfo({ [provider.id]: { model: value, version: value } }));
                                 }}
                                 className="text-sm rounded-md border px-2 py-1 bg-white dark:bg-gray-900 w-full md:w-auto max-w-full"
                               >
-                                {availableModels[provider.id].map((m) => (
-                                  <option key={m.id} value={m.id}>{m.label}</option>
-                                ))}
+                              {availableModels[provider.id].map((m: { id: string; label: string }) => (
+                                <option key={m.id} value={m.id}>{m.label}</option>
+                              ))}
                               </select>
                             ) : null}
                             <Button
@@ -735,13 +654,13 @@ export const AIAssistantPage: React.FC = () => {
                               variant="destructive"
                               size="sm"
                               onClick={async () => {
-                                await window.electronAPI?.aiAssistant?.removeApiKey(provider.id);
+                                await (window as any).electronAPI?.aiAssistant?.removeApiKey(provider.id);
                                 showSuccess('API Key Removed', `${provider.name} API key has been removed`);
                                 dispatch(updateProvidersWithApiKeys({ [provider.id]: false }));
                                 if (activeProvider === provider.id) {
                                   // Clear persisted active provider
-                                  if (window.electronAPI?.aiAssistant?.saveSettings) {
-                                    await window.electronAPI.aiAssistant.saveSettings({
+                                  if ((window as any).electronAPI?.aiAssistant?.saveSettings) {
+                                    await (window as any).electronAPI.aiAssistant.saveSettings({
                                       activeProvider: undefined,
                                       autoAnalyze: configuration.autoAnalyze,
                                       analysisFrequency: configuration.analysisFrequency,
@@ -824,7 +743,7 @@ export const AIAssistantPage: React.FC = () => {
                       <label className="block text-sm font-medium">Analysis Frequency</label>
                       <Select
                         value={configuration.analysisFrequency}
-                        onChange={(value) => 
+                        onChange={(value: any) => 
                           dispatch(setAnalysisFrequency(value as 'daily' | 'weekly' | 'manual'))
                         }
                         options={[
@@ -860,11 +779,11 @@ export const AIAssistantPage: React.FC = () => {
               <div className="space-y-4">
                 {isAnalyzing ? (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span className="text-sm font-medium">{analysisStatus}</span>
-                    </div>
-                    <ProgressBar progress={analysisProgress} />
+                     <div className="flex items-center gap-2">
+                       <RefreshCw className="w-4 h-4 animate-spin" />
+                       <span className="text-sm font-medium">{analysisStatus}</span>
+                     </div>
+                     <ProgressBar value={analysisProgress} />
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -902,9 +821,9 @@ export const AIAssistantPage: React.FC = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="block text-sm font-medium">Recap Period</label>
-                  <Select
-                    value={recapPeriod}
-                    onChange={(value) => setRecapPeriod(value as 'weekly' | 'monthly')}
+                    <Select
+                      value={recapPeriod}
+                      onChange={(value: unknown) => setRecapPeriod(value as 'weekly' | 'monthly')}
                     options={[
                       { value: 'weekly', label: 'Weekly' },
                       { value: 'monthly', label: 'Monthly' },
@@ -1114,7 +1033,7 @@ export const AIAssistantPage: React.FC = () => {
                               Highlights ({recap.highlights.length})
                             </h4>
                             <ul className="space-y-1 text-sm">
-                              {recap.highlights.slice(0, 2).map((highlight, index) => (
+                               {recap.highlights.slice(0, 2).map((highlight: string, index: number) => (
                                 <li key={index} className="text-gray-600 dark:text-gray-400 flex items-start gap-2">
                                   <span className="w-1 h-1 bg-green-500 rounded-full mt-2 flex-shrink-0"></span>
                                   {highlight}
@@ -1136,7 +1055,7 @@ export const AIAssistantPage: React.FC = () => {
                               Challenges ({recap.challenges.length})
                             </h4>
                             <ul className="space-y-1 text-sm">
-                              {recap.challenges.slice(0, 2).map((challenge, index) => (
+                               {recap.challenges.slice(0, 2).map((challenge: string, index: number) => (
                                 <li key={index} className="text-gray-600 dark:text-gray-400 flex items-start gap-2">
                                   <span className="w-1 h-1 bg-orange-500 rounded-full mt-2 flex-shrink-0"></span>
                                   {challenge}
@@ -1151,14 +1070,14 @@ export const AIAssistantPage: React.FC = () => {
                           </div>
                         )}
                         
-                        {recap.recommendations.length > 0 && (
+            {recap.recommendations.length > 0 && (
                           <div>
                             <h4 className="font-medium text-blue-700 dark:text-blue-400 mb-2 flex items-center gap-1">
                               <Lightbulb className="w-4 h-4" />
                               Recommendations ({recap.recommendations.length})
                             </h4>
-                            <ul className="space-y-1 text-sm">
-                              {recap.recommendations.slice(0, 2).map((recommendation, index) => (
+                <ul className="space-y-1 text-sm">
+                  {recap.recommendations.slice(0, 2).map((recommendation: string, index: number) => (
                                 <li key={index} className="text-gray-600 dark:text-gray-400 flex items-start gap-2">
                                   <span className="w-1 h-1 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
                                   {recommendation}
@@ -1218,7 +1137,7 @@ export const AIAssistantPage: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent>
-            {console.log('[UsageTab] rendering with usage count:', usage?.length)}
+            {/* debug log removed for production typing */}
             {(usage?.length || 0) === 0 ? (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 <Zap className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -1301,12 +1220,12 @@ export const AIAssistantPage: React.FC = () => {
                 <>
                   <div>
                     <label className="block text-sm font-medium mb-2">Frequency</label>
-                    <Select
-                      value={autoRecapSchedule.frequency}
-                      onChange={(value) => setAutoRecapSchedule(prev => ({ 
-                        ...prev, 
-                        frequency: value as 'weekly' | 'monthly' 
-                      }))}
+                      <Select
+                        value={autoRecapSchedule.frequency}
+                        onChange={(value: unknown) => setAutoRecapSchedule(prev => ({ 
+                          ...prev, 
+                          frequency: value as 'weekly' | 'monthly' 
+                        }))}
                       options={[
                         { value: 'weekly', label: 'Weekly' },
                         { value: 'monthly', label: 'Monthly' },
@@ -1319,9 +1238,9 @@ export const AIAssistantPage: React.FC = () => {
                       <label className="block text-sm font-medium mb-2">Day of Week</label>
                       <Select
                         value={autoRecapSchedule.dayOfWeek?.toString() || '0'}
-                        onChange={(value) => setAutoRecapSchedule(prev => ({ 
+                        onChange={(value: unknown) => setAutoRecapSchedule(prev => ({ 
                           ...prev, 
-                          dayOfWeek: parseInt(value) 
+                          dayOfWeek: parseInt(String(value)) 
                         }))}
                         options={[
                           { value: '0', label: 'Sunday' },
@@ -1471,7 +1390,7 @@ export const AIAssistantPage: React.FC = () => {
                       Highlights
                     </h3>
                     <ul className="space-y-3">
-                      {selectedRecap.highlights.map((highlight, index) => (
+                       {selectedRecap.highlights.map((highlight: string, index: number) => (
                         <li key={index} className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                           <Star className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                           <span className="text-gray-700 dark:text-gray-300">{highlight}</span>
@@ -1489,7 +1408,7 @@ export const AIAssistantPage: React.FC = () => {
                       Challenges
                     </h3>
                     <ul className="space-y-3">
-                      {selectedRecap.challenges.map((challenge, index) => (
+                       {selectedRecap.challenges.map((challenge: string, index: number) => (
                         <li key={index} className="flex items-start gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                           <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
                           <span className="text-gray-700 dark:text-gray-300">{challenge}</span>
@@ -1507,7 +1426,7 @@ export const AIAssistantPage: React.FC = () => {
                       Recommendations
                     </h3>
                     <ul className="space-y-3">
-                      {selectedRecap.recommendations.map((recommendation, index) => (
+                       {selectedRecap.recommendations.map((recommendation: string, index: number) => (
                         <li key={index} className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                           <Zap className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
                           <span className="text-gray-700 dark:text-gray-300">{recommendation}</span>

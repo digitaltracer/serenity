@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { validateMasterPasswordSecure, saveMasterPasswordHashSecure } from '../../utils/secureStorage';
 import { getPrivacySettingsSecure, savePrivacySettingsSecure, getSecureStorage, SECURE_KEYS } from '../../utils/secureStorage';
+import { secureSessionManager } from '../../utils/secureSessionManager';
 
 export interface AuthState {
   isLocked: boolean;
@@ -13,8 +14,9 @@ export interface AuthState {
   autoLockTimeout: number; // minutes
   lastActivity: number; // timestamp
   error: string | null;
-  // Secure session storage for master password (cleared on lock/logout)
-  sessionMasterPassword: string | null;
+  // SECURITY FIX: Remove master password from Redux state
+  // Master password should be handled in memory only and cleared immediately after use
+  sessionActive: boolean; // Just track if session is active
 }
 
 const initialState: AuthState = {
@@ -28,7 +30,7 @@ const initialState: AuthState = {
   autoLockTimeout: 15,
   lastActivity: Date.now(),
   error: null,
-  sessionMasterPassword: null,
+  sessionActive: false,
 };
 
 // Async thunks
@@ -126,7 +128,10 @@ export const validatePassword = createAsyncThunk(
         // Don't fail the password validation if biometric storage fails
       }
 
-      return { success: true, password };
+      // SECURITY FIX: Store password in secure session manager instead of Redux
+      secureSessionManager.setMasterPassword(password);
+      
+      return { success: true };
     } catch (error) {
       console.error('Password validation failed:', error);
       return rejectWithValue('Failed to validate password');
@@ -197,17 +202,20 @@ export const authenticateWithBiometric = createAsyncThunk(
       
       console.log('✅ Biometric authentication successful, loading encrypted integrations...');
       
-      // Load encrypted integrations with the retrieved master password
+      // Load encrypted integrations with the retrieved master password (best-effort)
       try {
         const { initializeIntegrations } = await import('./integrationsSlice');
-        await dispatch(initializeIntegrations(result.masterPassword));
+        // Dispatch returns an action; ignore its type to avoid TS mismatch in callers
+        await (dispatch as any)(initializeIntegrations(result.masterPassword));
         console.log('✅ Encrypted integrations loaded successfully after biometric auth');
       } catch (error) {
         console.error('⚠️ Failed to load encrypted integrations after biometric auth:', error);
-        // Don't fail the biometric auth if integrations fail to load
       }
       
-      return { success: true, masterPassword: result.masterPassword };
+      // SECURITY FIX: Store password in secure session manager instead of Redux
+      secureSessionManager.setMasterPassword(result.masterPassword);
+      
+      return { success: true };
     } catch (error) {
       console.error('Biometric authentication failed:', error);
       return rejectWithValue(`Biometric authentication failed: ${error}`);
@@ -220,11 +228,8 @@ export const resetPassword = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       // Remove master password hash from database
-      if (window.electronAPI?.sqlite) {
-        await window.electronAPI.sqlite.query(
-          'DELETE FROM secure_settings WHERE key = ?',
-          ['master_password_hash']
-        );
+      if (window.electronAPI?.auth?.deleteSecureSetting) {
+        await window.electronAPI.auth.deleteSecureSetting('master_password_hash');
         console.log('✅ Removed master password hash from database');
       }
       
@@ -250,9 +255,9 @@ export const factoryReset = createAsyncThunk(
   'auth/factoryReset',
   async (_, { rejectWithValue }) => {
     try {
-      // Clear database secure settings
-      if (window.electronAPI?.sqlite) {
-        await window.electronAPI.sqlite.query('DELETE FROM secure_settings');
+      // Clear database secure settings (iterate known keys or use helper if available)
+      if (window.electronAPI?.auth?.clearAllSecureSettings) {
+        await window.electronAPI.auth.clearAllSecureSettings();
         console.log('✅ Cleared all secure settings from database');
       }
       
@@ -277,8 +282,9 @@ const authSlice = createSlice({
     lockApp: (state) => {
       state.isLocked = true;
       state.error = null;
-      // Clear session master password for security
-      state.sessionMasterPassword = null;
+      state.sessionActive = false;
+      // SECURITY FIX: Clear password from secure session manager
+      secureSessionManager.clearMasterPassword();
     },
     unlockApp: (state) => {
       state.isLocked = false;
@@ -286,6 +292,7 @@ const authSlice = createSlice({
       state.lockoutUntil = null;
       state.error = null;
       state.lastActivity = Date.now();
+      state.sessionActive = secureSessionManager.isSessionActive();
     },
     updateLastActivity: (state) => {
       state.lastActivity = Date.now();
@@ -333,15 +340,14 @@ const authSlice = createSlice({
         state.isValidating = true;
         state.error = null;
       })
-      .addCase(validatePassword.fulfilled, (state, action) => {
+      .addCase(validatePassword.fulfilled, (state) => {
         state.isValidating = false;
         state.isLocked = false;
         state.failedAttempts = 0;
         state.lockoutUntil = null;
         state.error = null;
         state.lastActivity = Date.now();
-        // Store master password in session for integration operations
-        state.sessionMasterPassword = (action.payload as any).password;
+        state.sessionActive = true; // SECURITY FIX: Just track session state, not password
       })
       .addCase(validatePassword.rejected, (state, action) => {
         state.isValidating = false;
@@ -385,8 +391,9 @@ const authSlice = createSlice({
         state.failedAttempts = 0;
         state.lockoutUntil = null;
         state.error = null;
-        // Clear session master password
-        state.sessionMasterPassword = null;
+        state.sessionActive = false;
+        // SECURITY FIX: Clear password from secure session manager
+        secureSessionManager.clearMasterPassword();
       })
       .addCase(resetPassword.rejected, (state, action) => {
         state.isValidating = false;
@@ -414,15 +421,14 @@ const authSlice = createSlice({
         state.isValidating = true;
         state.error = null;
       })
-      .addCase(authenticateWithBiometric.fulfilled, (state, action) => {
+      .addCase(authenticateWithBiometric.fulfilled, (state) => {
         state.isValidating = false;
         state.isLocked = false;
         state.failedAttempts = 0;
         state.lockoutUntil = null;
         state.error = null;
         state.lastActivity = Date.now();
-        // Store master password in session for integration operations
-        state.sessionMasterPassword = (action.payload as any).masterPassword;
+        state.sessionActive = true; // SECURITY FIX: Just track session state, not password
       })
       .addCase(authenticateWithBiometric.rejected, (state, action) => {
         state.isValidating = false;
@@ -455,7 +461,12 @@ export const selectLockoutTime = (state: { auth: AuthState }) => {
   return Math.ceil((lockoutUntil - Date.now()) / 1000);
 };
 
-// Selector for session master password (available when user is authenticated)
-export const selectSessionMasterPassword = (state: { auth: AuthState }) => state.auth.sessionMasterPassword;
+// SECURITY FIX: Selector for session active state (replaces password selector)
+export const selectSessionActive = (state: { auth: AuthState }) => state.auth.sessionActive;
+
+// SECURITY FIX: Safe function to get master password from secure session manager
+export const getSessionMasterPassword = (): string | null => {
+  return secureSessionManager.getMasterPassword();
+};
 
 export default authSlice.reducer;

@@ -5,6 +5,7 @@
 import Database from 'better-sqlite3';
 import { Task, Subtask } from '@serenity/core';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from '@serenity/core';
 
 export class SQLiteTaskQueries {
   private db: Database.Database;
@@ -14,16 +15,15 @@ export class SQLiteTaskQueries {
   }
 
   /**
-   * Get all tasks
+   * Get all tasks (PERFORMANCE OPTIMIZED - fixes N+1 query issue)
    */
   getAllTasks(): Task[] {
-    console.log('🔍 SQLite: Getting all tasks...');
+    logger.debug('Getting all tasks from SQLite', { 
+      component: 'SQLiteTaskQueries', 
+      operation: 'getAllTasks' 
+    });
     
-    // First, let's check what's in the task_tags table
-    const tagCheckStmt = this.db.prepare('SELECT * FROM task_tags');
-    const allTags = tagCheckStmt.all();
-    console.log('🏷️ ALL TAGS IN DATABASE:', allTags);
-    
+    // PERFORMANCE FIX: Load main tasks with tags in one query
     const stmt = this.db.prepare(`
       SELECT 
         t.*,
@@ -36,14 +36,31 @@ export class SQLiteTaskQueries {
     `);
 
     const rows = stmt.all();
-    console.log(`📊 SQLite: Found ${rows.length} task rows in database`);
+    logger.info(`Found ${rows.length} task rows in database`, {
+      component: 'SQLiteTaskQueries',
+      operation: 'getAllTasks',
+      metadata: { taskCount: rows.length }
+    });
     
-    if (rows.length > 0) {
-      console.log('📋 SQLite: Raw task rows:', rows.map((r: any) => ({ id: r.id, title: r.title, tags: r.tags })));
+    if (rows.length === 0) {
+      return [];
     }
+
+    // PERFORMANCE FIX: Load all subtasks in ONE query instead of N queries
+    const taskIds = rows.map((row: any) => row.id);
+    const subtasksMap = this.getAllSubtasksForTasks(taskIds);
     
-    const tasks = rows.map((row) => this.rowToTask(row));
-    console.log(`✅ SQLite: Converted to ${tasks.length} Task objects`);
+    // Convert rows to tasks, assigning pre-loaded subtasks
+    const tasks = rows.map((row) => this.rowToTaskOptimized(row, subtasksMap));
+    
+    logger.info(`Converted to ${tasks.length} Task objects with optimized subtask loading`, {
+      component: 'SQLiteTaskQueries',
+      operation: 'getAllTasks',
+      metadata: { 
+        taskCount: tasks.length,
+        subtasksLoaded: Object.keys(subtasksMap).length
+      }
+    });
     
     return tasks;
   }
@@ -67,7 +84,7 @@ export class SQLiteTaskQueries {
   }
 
   /**
-   * Get tasks by project
+   * Get tasks by project (PERFORMANCE OPTIMIZED)
    */
   getTasksByProject(projectId: string): Task[] {
     const stmt = this.db.prepare(`
@@ -82,7 +99,17 @@ export class SQLiteTaskQueries {
     `);
 
     const rows = stmt.all(projectId);
-    return rows.map((row) => this.rowToTask(row));
+    
+    if (rows.length === 0) {
+      return [];
+    }
+
+    // PERFORMANCE FIX: Load all subtasks in ONE query instead of N queries
+    const taskIds = rows.map((row: any) => row.id);
+    const subtasksMap = this.getAllSubtasksForTasks(taskIds);
+    
+    // Convert rows to tasks using pre-loaded subtasks
+    return rows.map((row) => this.rowToTaskOptimized(row, subtasksMap));
   }
 
   /**
@@ -114,6 +141,15 @@ export class SQLiteTaskQueries {
     
     const id = this.generateUniqueId();
     const now = new Date().toISOString();
+    // Validate optional foreign keys
+    let projectId: string | null = task.projectId || null;
+    if (projectId) {
+      const project = this.db.prepare('SELECT id FROM projects WHERE id = ?').get(projectId) as { id: string } | undefined;
+      if (!project) {
+        console.warn(`⚠️ SQLite: Provided project_id ${projectId} does not exist. Setting project_id to NULL for task ${id}.`);
+        projectId = null;
+      }
+    }
 
     const stmt = this.db.prepare(`
       INSERT INTO tasks (
@@ -129,7 +165,7 @@ export class SQLiteTaskQueries {
       task.completed ? 1 : 0,
       task.priority,
       task.dueDate ? task.dueDate.toISOString() : null,
-      task.projectId || null,
+      projectId,
       now,
       now
     );
@@ -164,6 +200,15 @@ export class SQLiteTaskQueries {
     console.log('📋 SQLite: Full task object:', JSON.stringify(task, null, 2));
     
     try {
+      // Validate optional foreign keys
+      let projectId: string | null = task.projectId || null;
+      if (projectId) {
+        const project = this.db.prepare('SELECT id FROM projects WHERE id = ?').get(projectId) as { id: string } | undefined;
+        if (!project) {
+          console.warn(`⚠️ SQLite: Provided project_id ${projectId} does not exist. Setting project_id to NULL for task ${task.id}.`);
+          projectId = null;
+        }
+      }
       const stmt = this.db.prepare(`
         INSERT INTO tasks (
           id, title, description, completed, priority, due_date, project_id, 
@@ -178,7 +223,7 @@ export class SQLiteTaskQueries {
         task.completed ? 1 : 0,
         task.priority,
         task.dueDate ? (task.dueDate instanceof Date ? task.dueDate.toISOString() : new Date(task.dueDate).toISOString()) : null,
-        task.projectId || null,
+        projectId,
         task.createdAt instanceof Date ? task.createdAt.toISOString() : new Date(task.createdAt).toISOString(),
         task.updatedAt instanceof Date ? task.updatedAt.toISOString() : new Date(task.updatedAt).toISOString()
       );
@@ -239,8 +284,17 @@ export class SQLiteTaskQueries {
       values.push(updates.priority);
     }
     if (updates.projectId !== undefined) {
+      // Validate projectId; set to NULL if not found
+      let nextProjectId: string | null = updates.projectId || null;
+      if (nextProjectId) {
+        const project = this.db.prepare('SELECT id FROM projects WHERE id = ?').get(nextProjectId) as { id: string } | undefined;
+        if (!project) {
+          console.warn(`⚠️ SQLite: Provided project_id ${nextProjectId} does not exist. Setting project_id to NULL for task ${id}.`);
+          nextProjectId = null;
+        }
+      }
       fields.push('project_id = ?');
-      values.push(updates.projectId);
+      values.push(nextProjectId);
     }
     if (updates.dueDate !== undefined) {
       fields.push('due_date = ?');
@@ -344,7 +398,72 @@ export class SQLiteTaskQueries {
   }
 
   /**
-   * Convert database row to Task object
+   * PERFORMANCE OPTIMIZATION: Load all subtasks for multiple tasks in one query
+   */
+  private getAllSubtasksForTasks(taskIds: string[]): Record<string, Subtask[]> {
+    if (taskIds.length === 0) {
+      return {};
+    }
+
+    // Create placeholders for the IN clause
+    const placeholders = taskIds.map(() => '?').join(',');
+    
+    const stmt = this.db.prepare(`
+      SELECT parent_task_id, id, title, completed, \`order\`
+      FROM tasks 
+      WHERE parent_task_id IN (${placeholders})
+      ORDER BY parent_task_id, \`order\` ASC, created_at ASC
+    `);
+
+    const rows = stmt.all(...taskIds);
+    
+    // Group subtasks by parent task ID
+    const subtasksMap: Record<string, Subtask[]> = {};
+    
+    for (const row of rows as any[]) {
+      const parentId = row.parent_task_id;
+      if (!subtasksMap[parentId]) {
+        subtasksMap[parentId] = [];
+      }
+      
+      subtasksMap[parentId].push({
+        id: row.id,
+        title: row.title,
+        completed: Boolean(row.completed),
+        order: row.order || 0
+      });
+    }
+    
+    return subtasksMap;
+  }
+
+  /**
+   * PERFORMANCE OPTIMIZATION: Convert row to Task using pre-loaded subtasks
+   */
+  private rowToTaskOptimized(row: any, subtasksMap: Record<string, Subtask[]>): Task {
+    const rawTags = row.tags;
+    const parsedTags = rawTags ? rawTags.split(',').filter(Boolean) : [];
+    
+    const task: Task = {
+      id: row.id,
+      title: row.title,
+      description: row.description || undefined,
+      completed: Boolean(row.completed),
+      priority: row.priority || 'medium',
+      projectId: row.project_id || undefined,
+      dueDate: row.due_date ? new Date(row.due_date) : undefined,
+      tags: parsedTags,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      // PERFORMANCE FIX: Use pre-loaded subtasks instead of separate query
+      subtasks: subtasksMap[row.id] || [],
+    };
+
+    return task;
+  }
+
+  /**
+   * Convert database row to Task object (LEGACY - kept for backward compatibility)
    */
   private rowToTask(row: any): Task {
     const rawTags = row.tags;
@@ -383,7 +502,7 @@ export class SQLiteTaskQueries {
   }
 
   /**
-   * Search tasks
+   * Search tasks (PERFORMANCE OPTIMIZED)
    */
   searchTasks(query: string): Task[] {
     const stmt = this.db.prepare(`
@@ -399,11 +518,21 @@ export class SQLiteTaskQueries {
 
     const searchTerm = `%${query}%`;
     const rows = stmt.all(searchTerm, searchTerm);
-    return rows.map((row) => this.rowToTask(row));
+    
+    if (rows.length === 0) {
+      return [];
+    }
+
+    // PERFORMANCE FIX: Load all subtasks in ONE query instead of N queries
+    const taskIds = rows.map((row: any) => row.id);
+    const subtasksMap = this.getAllSubtasksForTasks(taskIds);
+    
+    // Convert rows to tasks using pre-loaded subtasks
+    return rows.map((row) => this.rowToTaskOptimized(row, subtasksMap));
   }
 
   /**
-   * Get tasks due today
+   * Get tasks due today (PERFORMANCE OPTIMIZED)
    */
   getTasksDueToday(): Task[] {
     const today = new Date();
@@ -423,11 +552,21 @@ export class SQLiteTaskQueries {
     `);
 
     const rows = stmt.all(today.toISOString(), tomorrow.toISOString());
-    return rows.map((row) => this.rowToTask(row));
+    
+    if (rows.length === 0) {
+      return [];
+    }
+
+    // PERFORMANCE FIX: Load all subtasks in ONE query instead of N queries
+    const taskIds = rows.map((row: any) => row.id);
+    const subtasksMap = this.getAllSubtasksForTasks(taskIds);
+    
+    // Convert rows to tasks using pre-loaded subtasks
+    return rows.map((row) => this.rowToTaskOptimized(row, subtasksMap));
   }
 
   /**
-   * Get overdue tasks
+   * Get overdue tasks (PERFORMANCE OPTIMIZED)
    */
   getOverdueTasks(): Task[] {
     const today = new Date();
@@ -445,6 +584,16 @@ export class SQLiteTaskQueries {
     `);
 
     const rows = stmt.all(today.toISOString());
-    return rows.map((row) => this.rowToTask(row));
+    
+    if (rows.length === 0) {
+      return [];
+    }
+
+    // PERFORMANCE FIX: Load all subtasks in ONE query instead of N queries
+    const taskIds = rows.map((row: any) => row.id);
+    const subtasksMap = this.getAllSubtasksForTasks(taskIds);
+    
+    // Convert rows to tasks using pre-loaded subtasks
+    return rows.map((row) => this.rowToTaskOptimized(row, subtasksMap));
   }
 }

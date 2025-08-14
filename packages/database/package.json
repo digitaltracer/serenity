@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@serenity/core": "*",
+    "better-sqlite3": "^11.5.0",
     "pg": "^8.11.3",
     "pg-promise": "^11.5.4",
     "dotenv": "^16.3.1"

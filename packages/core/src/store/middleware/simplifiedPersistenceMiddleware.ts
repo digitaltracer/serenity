@@ -49,17 +49,20 @@ const PERSISTENT_ACTIONS = [
   'aiAssistant/setAutoAnalyze',
   'aiAssistant/setAnalysisFrequency',
   'aiAssistant/setDataTypes',
-  'aiAssistant/addInsight',
-  'aiAssistant/removeInsight',
-  'aiAssistant/clearInsights',
-  'aiAssistant/addRecap',
-  'aiAssistant/removeRecap',
-  'aiAssistant/updateAnalysisTracker',
+  // Exclude insight/recap/usage actions from triggering settings saves to avoid loops
 ];
 
 // Simple state to track if SQLite is initialized
 let sqliteInitialized = false;
 let isInitializing = false;
+
+// Throttle/persist guards for AI usage to avoid noisy logs and excessive writes
+let lastAIUsageSignature: string | null = null;
+let lastAIUsagePersistMs = 0;
+
+// Debounce AI settings save calls from renderer to main
+let aiSettingsTimer: any = null;
+let lastAISentSignature: string | null = null;
 
 /**
  * Initialize SQLite persistence - called once at app startup
@@ -171,7 +174,7 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
     }
 
     // Persist AI Assistant base settings and active provider to both file (handled in main) and SQLite secure_settings for redundancy
-    if (action.type.startsWith('aiAssistant/')) {
+    if (PERSISTENT_ACTIONS.includes(action.type)) {
       try {
         const aiSettings = {
           activeProvider: state.aiAssistant.activeProvider,
@@ -180,14 +183,26 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
           dataTypes: state.aiAssistant.dataTypes,
         };
         if (window.electronAPI?.aiAssistant?.saveSettings) {
-          // Fire and forget; main process will also persist to DB
-          window.electronAPI.aiAssistant.saveSettings(aiSettings);
+          const signature = JSON.stringify(aiSettings);
+          if (signature !== lastAISentSignature) {
+            lastAISentSignature = signature;
+            if (aiSettingsTimer) clearTimeout(aiSettingsTimer);
+            aiSettingsTimer = setTimeout(() => {
+              try { window.electronAPI!.aiAssistant!.saveSettings(aiSettings); } catch {}
+            }, 300);
+          }
         }
         // Persist usage to localStorage for quick access across sessions
         if (state.aiAssistant?.usage) {
           try {
-            localStorage.setItem('serenity_ai_usage', JSON.stringify(state.aiAssistant.usage));
-            console.log('[simplifiedPersistenceMiddleware] Saved AI usage to localStorage:', state.aiAssistant.usage.length);
+            const signature = JSON.stringify(state.aiAssistant.usage);
+            const now = Date.now();
+            // Only persist if changed and at least 3s since last write
+            if (signature !== lastAIUsageSignature || now - lastAIUsagePersistMs > 3000) {
+              localStorage.setItem('serenity_ai_usage', signature);
+              lastAIUsageSignature = signature;
+              lastAIUsagePersistMs = now;
+            }
           } catch {}
         }
       } catch (e) {
@@ -243,10 +258,22 @@ async function handleTaskPersistence(actionType: string, payload: any, tasksStat
       break;
       
     case 'tasks/updateTask':
-    case 'tasks/toggleTask':
       console.log('📝 Updating task via SQLite API:', payload.id);
       const { id, ...updates } = payload;
       await window.electronAPI?.sqlite?.updateTask(id, updates);
+      break;
+      
+    case 'tasks/toggleTask':
+      console.log('📝 Toggling task via SQLite API:', payload);
+      // For toggleTask, payload is just the task ID (string)
+      // We need to get the updated task from state
+      const toggledTask = tasksState.tasks.find((t: any) => t.id === payload);
+      if (toggledTask) {
+        await window.electronAPI?.sqlite?.updateTask(payload, { 
+          completed: toggledTask.completed,
+          updatedAt: toggledTask.updatedAt 
+        });
+      }
       break;
       
     case 'tasks/deleteTask':

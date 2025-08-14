@@ -3,10 +3,12 @@
  * Handles journal operations with validation and business rules
  */
 
+import type { JournalEntry } from '@serenity/core';
+
 interface JournalEntryData {
   title: string;
   content: string;
-  date: string;
+  date: Date;
   mood?: string;
   tags: string[];
   pinned: boolean;
@@ -15,19 +17,28 @@ interface JournalEntryData {
 interface JournalEntryUpdate {
   title?: string;
   content?: string;
-  date?: string;
+  date?: Date;
   mood?: string;
   tags?: string[];
   pinned?: boolean;
 }
 
-export class JournalService {
-  private sqliteService: any = null;
+interface SQLiteService {
+  initialize(): Promise<void>;
+  getJournalEntries(): Promise<JournalEntry[]>;
+  createJournalEntry(entry: JournalEntryData): Promise<JournalEntry>;
+  updateJournalEntry(id: string, updates: JournalEntryUpdate): Promise<JournalEntry>;
+  deleteJournalEntry(id: string): Promise<boolean>;
+  getJournalEntry(id: string): Promise<JournalEntry | null>;
+}
 
-  private async getSqliteService() {
+export class JournalService {
+  private sqliteService: SQLiteService | null = null;
+
+  private async getSqliteService(): Promise<SQLiteService> {
     if (!this.sqliteService) {
       const { sqliteService } = await import('@serenity/database');
-      this.sqliteService = sqliteService;
+      this.sqliteService = sqliteService as SQLiteService;
       await this.sqliteService.initialize();
     }
     return this.sqliteService;
@@ -43,7 +54,7 @@ export class JournalService {
       const entries = await service.getJournalEntries();
       
       // Business logic: Sort entries by date (newest first), with pinned entries on top
-      const sortedEntries = entries.sort((a: any, b: any) => {
+      const sortedEntries = entries.sort((a: JournalEntry, b: JournalEntry) => {
         // Pinned entries first
         if (a.pinned !== b.pinned) {
           return b.pinned ? 1 : -1;
@@ -93,7 +104,7 @@ export class JournalService {
       }
       
       // Validate date format
-      if (entryData.date && isNaN(new Date(entryData.date).getTime())) {
+      if (entryData.date && isNaN(entryData.date.getTime())) {
         return { success: false, error: 'Invalid date format' };
       }
       
@@ -108,7 +119,7 @@ export class JournalService {
         ...entryData,
         title: entryData.title.trim(),
         content: entryData.content.trim(),
-        date: entryData.date || new Date().toISOString(),
+        date: entryData.date || new Date(),
         tags: entryData.tags.map(tag => tag.trim().toLowerCase()).filter(tag => tag.length > 0),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -162,7 +173,7 @@ export class JournalService {
         return { success: false, error: 'Cannot have more than 15 tags per journal entry' };
       }
       
-      if (updates.date && isNaN(new Date(updates.date).getTime())) {
+      if (updates.date && isNaN(updates.date.getTime())) {
         return { success: false, error: 'Invalid date format' };
       }
       
@@ -253,15 +264,18 @@ export class JournalService {
       console.log('📅 JournalService: Getting journal entries by date range:', startDate, 'to', endDate);
       
       // Validation
-      if (!startDate || isNaN(new Date(startDate).getTime())) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      if (!startDate || isNaN(start.getTime())) {
         return { success: false, error: 'Invalid start date' };
       }
       
-      if (!endDate || isNaN(new Date(endDate).getTime())) {
+      if (!endDate || isNaN(end.getTime())) {
         return { success: false, error: 'Invalid end date' };
       }
       
-      if (new Date(startDate) > new Date(endDate)) {
+      if (start > end) {
         return { success: false, error: 'Start date cannot be after end date' };
       }
 
@@ -271,7 +285,7 @@ export class JournalService {
       // Filter entries by date range
       const filteredEntries = allEntries.filter((entry: any) => {
         const entryDate = new Date(entry.date);
-        return entryDate >= new Date(startDate) && entryDate <= new Date(endDate);
+        return entryDate >= start && entryDate <= end;
       });
       
       // Sort by date (newest first)

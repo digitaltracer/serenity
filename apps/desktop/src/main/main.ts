@@ -32,12 +32,53 @@ class AppManager {
       }
     });
 
-    // Security: Prevent new window creation
+    // Security: Prevent unexpected window creation and navigation
     app.on('web-contents-created', (_, contents) => {
+      const allowedExternalHosts = new Set([
+        'accounts.google.com',
+        'www.googleapis.com',
+        'oauth2.googleapis.com',
+        'openai.com',
+        'api.openai.com',
+        'github.com'
+      ]);
+
       contents.setWindowOpenHandler(({ url }) => {
-        shell.openExternal(url);
+        try {
+          const { host, protocol } = new URL(url);
+          if (protocol === 'https:' && allowedExternalHosts.has(host)) {
+            shell.openExternal(url);
+          }
+        } catch {}
         return { action: 'deny' };
       });
+
+      contents.on('will-navigate', (event, url) => {
+        try {
+          const parsed = new URL(url);
+          // Allow dev server and local file navigation; block others
+          const isDevLocal = parsed.protocol === 'http:' && parsed.host === 'localhost:3000';
+          const isFile = parsed.protocol === 'file:';
+          if (!isDevLocal && !isFile) {
+            event.preventDefault();
+          }
+        } catch {
+          event.preventDefault();
+        }
+      });
+
+      // Add strict CSP headers in production for all responses
+      if (!isDev) {
+        try {
+          const session = contents.session;
+          session.webRequest.onHeadersReceived((details, callback) => {
+            const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: https://api.openai.com https://oauth2.googleapis.com https://www.googleapis.com https://generativelanguage.googleapis.com https://api.anthropic.com https://api.github.com https://github.com; frame-ancestors 'none'";
+            const headers = { ...details.responseHeaders } as Record<string, string[]>;
+            headers['Content-Security-Policy'] = [csp];
+            callback({ responseHeaders: headers });
+          });
+        } catch {}
+      }
     });
   }
 
@@ -282,8 +323,48 @@ class AppManager {
     });
 
     // Handle Google OAuth flow
-    ipcMain.handle('oauth:google:start', async (_, clientId: string, clientSecret: string) => {
+    ipcMain.handle('oauth:google:start', async (_, clientId?: string, clientSecret?: string) => {
       try {
+        // If credentials are not provided by renderer, load from secure settings
+        if (!clientId || !clientSecret) {
+          try {
+            const { sqliteService } = await import('@serenity/database');
+            await sqliteService.initialize();
+            // Ensure tables exist (idempotent)
+            await sqliteService.executeRawQuery(
+              `CREATE TABLE IF NOT EXISTS secure_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+              )`
+            );
+            interface SettingRow {
+              value: string;
+            }
+            
+            const idRows = await sqliteService.executeRawQuery(
+              'SELECT value FROM secure_settings WHERE key = ? LIMIT 1',
+              ['google_client_id']
+            ) as SettingRow[];
+            const secretRows = await sqliteService.executeRawQuery(
+              'SELECT value FROM secure_settings WHERE key = ? LIMIT 1',
+              ['google_client_secret']  
+            ) as SettingRow[];
+            
+            const idRow = Array.isArray(idRows) ? idRows[0] : null;
+            const secretRow = Array.isArray(secretRows) ? secretRows[0] : null;
+            clientId = clientId || idRow?.value;
+            clientSecret = clientSecret || secretRow?.value;
+          } catch (e) {
+            // Ignore and fail below if missing
+          }
+        }
+
+        if (!clientId || !clientSecret) {
+          throw new Error('Missing Google OAuth client credentials');
+        }
+
         const authUrl = this.startGoogleOAuth(clientId, clientSecret);
         return { success: true, authUrl, error: null };
       } catch (error) {
@@ -367,6 +448,48 @@ class AppManager {
       title: 'Google Calendar Authentication',
     });
 
+    // Lock down external window behavior
+    this.currentOAuthWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    this.currentOAuthWindow.webContents.on('will-navigate', (event, url) => {
+      try {
+        const { origin, hostname } = new URL(url);
+        const isAllowed = hostname === 'accounts.google.com' || origin === 'http://localhost:8080';
+        if (!isAllowed) {
+          event.preventDefault();
+        }
+      } catch {
+        event.preventDefault();
+      }
+    });
+
+    // Intercept redirect URI at network level for reliability
+    const oauthSession = this.currentOAuthWindow.webContents.session;
+    const onBeforeRequest = (details: Electron.OnBeforeRequestListenerDetails, callback: (response: Electron.CallbackResponse) => void) => {
+      try {
+        const u = new URL(details.url);
+        if (u.origin === 'http://localhost:8080' && u.pathname === '/oauth/callback') {
+          const code = u.searchParams.get('code');
+          const error = u.searchParams.get('error');
+          if (code) {
+            const credentials = (this.currentOAuthWindow as any)?.clientCredentials || {};
+            if (credentials.clientId && credentials.clientSecret) {
+              this.exchangeGoogleOAuthCode(code, credentials.clientId, credentials.clientSecret);
+            } else {
+              this.mainWindow?.webContents.send('oauth:google:error', 'Missing client credentials');
+            }
+          } else if (error) {
+            this.mainWindow?.webContents.send('oauth:google:error', error);
+          }
+          if (this.currentOAuthWindow && !this.currentOAuthWindow.isDestroyed()) {
+            this.currentOAuthWindow.close();
+          }
+          return callback({ cancel: true });
+        }
+      } catch {}
+      return callback({ cancel: false });
+    };
+    oauthSession.webRequest.onBeforeRequest({ urls: ['http://localhost:8080/*'] }, onBeforeRequest);
+
     this.currentOAuthWindow.loadURL(authUrl);
     
     // Store client credentials for token exchange
@@ -438,8 +561,22 @@ class AppManager {
         throw new Error(`Token exchange failed: ${response.statusText} - ${errorText}`);
       }
 
+      interface GoogleTokenResponse {
+        access_token: string;
+        refresh_token?: string;
+        expires_in: number;
+        token_type: string;
+      }
+
+      interface GoogleUserInfo {
+        id: string;
+        email: string;
+        name: string;
+        picture?: string;
+      }
+
       console.log('✅ Token exchange successful, parsing response...');
-      const tokens: any = await response.json();
+      const tokens: GoogleTokenResponse = await response.json() as GoogleTokenResponse;
       console.log('📋 Received tokens from Google (access token length:', tokens.access_token?.length, ')');
       
       // Get user info
@@ -455,7 +592,7 @@ class AppManager {
         throw new Error(`User info fetch failed: ${userResponse.statusText}`);
       }
 
-      const userInfo: any = await userResponse.json();
+      const userInfo: GoogleUserInfo = await userResponse.json() as GoogleUserInfo;
       console.log('✅ User info received for:', userInfo.email);
 
       const authData = {
@@ -474,7 +611,7 @@ class AppManager {
     }
   }
 
-  private sendToRenderer(channel: string, ...args: any[]): void {
+  private sendToRenderer(channel: string, ...args: unknown[]): void {
     this.mainWindow?.webContents.send(channel, ...args);
   }
 }

@@ -163,8 +163,8 @@ function AppContent() {
           // After initialization, check if we need to prompt for master password to load encrypted integrations
           setTimeout(async () => {
             try {
-              const hasEncrypted = await window.electronAPI?.sqlite?.query?.('SELECT COUNT(*) as count FROM encrypted_integrations');
-              if (hasEncrypted?.success && hasEncrypted.data?.[0]?.count > 0) {
+              const hasEncrypted = await window.electronAPI?.integrations?.hasEncrypted?.();
+              if (hasEncrypted?.success && (hasEncrypted.data?.hasEncrypted || (hasEncrypted.data?.count ?? 0) > 0)) {
                 console.log('🔐 Found encrypted integrations in database, but they require master password to load');
                 console.log('ℹ️ Integrations will be loaded when user authenticates in the Integrations page');
               }

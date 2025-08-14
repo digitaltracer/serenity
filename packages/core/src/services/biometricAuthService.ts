@@ -43,25 +43,18 @@ export class BiometricAuthService {
       // Encrypt the master password using system keychain
       const encryptedPassword = await window.electronAPI.safeStorage.encryptString(masterPassword);
       
-      // Store the encrypted password in SQLite
-      if (window.electronAPI?.sqlite) {
-        const result = await window.electronAPI.sqlite.query(
-          `INSERT OR REPLACE INTO secure_settings (key, value, created_at, updated_at) 
-           VALUES (?, ?, datetime('now'), datetime('now'))`,
-          [this.MASTER_PASSWORD_KEY, encryptedPassword]
-        );
-        
-        if (result.success) {
+      // Store the encrypted password using secure settings API
+      if (window.electronAPI?.auth?.setSecureSetting) {
+        const res = await window.electronAPI.auth.setSecureSetting(this.MASTER_PASSWORD_KEY, encryptedPassword);
+        if (res.success) {
           console.log('✅ Master password stored for biometric authentication');
           return true;
-        } else {
-          console.error('❌ Failed to store encrypted master password:', result.error);
-          return false;
         }
-      } else {
-        console.warn('SQLite not available - cannot store encrypted master password');
+        console.error('❌ Failed to store encrypted master password:', res.error);
         return false;
       }
+      console.warn('Secure settings API not available - cannot store encrypted master password');
+      return false;
     } catch (error) {
       console.error('❌ Failed to store master password for biometric auth:', error);
       return false;
@@ -127,16 +120,12 @@ export class BiometricAuthService {
    */
   static async hasStoredMasterPassword(): Promise<boolean> {
     try {
-      if (!window.electronAPI?.sqlite) {
+      if (!window.electronAPI?.auth?.getSecureSetting) {
         return false;
       }
 
-      const result = await window.electronAPI.sqlite.query(
-        'SELECT value FROM secure_settings WHERE key = ?',
-        [this.MASTER_PASSWORD_KEY]
-      );
-
-      return result.success && result.data && result.data.length > 0;
+      const result = await window.electronAPI.auth.getSecureSetting(this.MASTER_PASSWORD_KEY);
+      return result.success && !!result.data && result.data.value != null;
     } catch (error) {
       console.error('Failed to check for stored master password:', error);
       return false;
@@ -148,22 +137,19 @@ export class BiometricAuthService {
    */
   private static async retrieveStoredMasterPassword(): Promise<string | null> {
     try {
-      if (!window.electronAPI?.sqlite || !window.electronAPI?.safeStorage?.decryptString) {
+      if (!window.electronAPI?.auth?.getSecureSetting || !window.electronAPI?.safeStorage?.decryptString) {
         return null;
       }
 
-      // Get encrypted password from database
-      const result = await window.electronAPI.sqlite.query(
-        'SELECT value FROM secure_settings WHERE key = ?',
-        [this.MASTER_PASSWORD_KEY]
-      );
+      // Get encrypted password from secure settings
+      const result = await window.electronAPI.auth.getSecureSetting(this.MASTER_PASSWORD_KEY);
 
-      if (!result.success || !result.data || result.data.length === 0) {
+      if (!result.success || !result.data || result.data.value == null) {
         console.warn('No encrypted master password found in database');
         return null;
       }
 
-      const encryptedPassword = result.data[0].value;
+      const encryptedPassword = result.data.value as string;
       
       // Decrypt the password using system keychain
       const decryptedPassword = await window.electronAPI.safeStorage.decryptString(encryptedPassword);
@@ -180,15 +166,11 @@ export class BiometricAuthService {
    */
   static async removeStoredMasterPassword(): Promise<boolean> {
     try {
-      if (!window.electronAPI?.sqlite) {
+      if (!window.electronAPI?.auth?.deleteSecureSetting) {
         return false;
       }
 
-      const result = await window.electronAPI.sqlite.query(
-        'DELETE FROM secure_settings WHERE key = ?',
-        [this.MASTER_PASSWORD_KEY]
-      );
-
+      const result = await window.electronAPI.auth.deleteSecureSetting(this.MASTER_PASSWORD_KEY);
       if (result.success) {
         console.log('✅ Removed stored master password for biometric authentication');
         return true;

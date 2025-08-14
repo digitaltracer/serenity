@@ -314,9 +314,36 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
    */
   static parseInsightsResponse(response: string): AIInsight[] {
     try {
-      const parsed = JSON.parse(response);
-      
-      if (parsed.insights && Array.isArray(parsed.insights)) {
+      // Always log raw response to help debug parsing issues
+      try {
+        // eslint-disable-next-line no-console
+        console.error('[AIAssistantService] Raw AI response (insights):', response);
+      } catch {}
+
+      // Sanitize common wrapping formats (code fences, prose)
+      let working = String(response).trim();
+      // Quick fence trim
+      working = working.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+      // Remove leading prose up to a fenced block if present
+      working = working.replace(/^[\s\S]*?```(?:json)?[\r\n]*/i, '');
+      // Trim at end fence if present
+      const fenceCloseIdx = working.lastIndexOf('```');
+      if (fenceCloseIdx !== -1) {
+        working = working.slice(0, fenceCloseIdx);
+      }
+      working = working.trim();
+      // If not starting with {, slice between first { and last }
+      if (!working.startsWith('{')) {
+        const start = working.indexOf('{');
+        const end = working.lastIndexOf('}');
+        if (start !== -1 && end !== -1 && end > start) {
+          working = working.slice(start, end + 1);
+        }
+      }
+
+      const parsed = JSON.parse(working);
+
+      if (parsed && parsed.insights && Array.isArray(parsed.insights)) {
         return parsed.insights.map((insight: any) => ({
           id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           type: insight.type || 'recommendation',
@@ -330,10 +357,27 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
           metadata: insight.metadata || {},
         }));
       }
+      if (Array.isArray(parsed)) {
+        return parsed.map((insight: any) => ({
+          id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          type: insight.type || 'recommendation',
+          title: insight.title || 'AI Recommendation',
+          description: insight.description || '',
+          confidence: Math.max(0, Math.min(1, insight.confidence || 0.5)),
+          createdAt: new Date().toISOString(),
+          source: 'openai',
+          category: insight.category || 'tasks',
+          actionable: insight.actionable !== false,
+          metadata: insight.metadata || {},
+        }));
+      }
     } catch (error) {
-      console.error('Failed to parse AI insights response:', error);
+      try {
+        // eslint-disable-next-line no-console
+        console.error('Failed to parse AI insights response:', error, '\n[AIAssistantService] Raw response for debugging:', response);
+      } catch {}
     }
-    
+
     return [];
   }
 

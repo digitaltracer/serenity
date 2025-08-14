@@ -4,6 +4,15 @@
  */
 
 import { ipcMain } from 'electron';
+import { z } from 'zod';
+
+const EncryptedIntegrationSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(['google_calendar', 'github']),
+  encrypted_data: z.string().min(1),
+  created_at: z.string().min(1),
+  updated_at: z.string().min(1),
+});
 
 export function registerIntegrationHandlers(): void {
   console.log('🔧 Registering integration IPC handlers...');
@@ -37,6 +46,8 @@ export function registerIntegrationHandlers(): void {
   // Save encrypted integration data
   ipcMain.handle('integrations:save-encrypted', async (_, integrationData) => {
     try {
+      const valid = EncryptedIntegrationSchema.safeParse(integrationData);
+      if (!valid.success) return { success: false, data: null, error: 'Invalid integration payload' };
       console.log('🔐 Saving encrypted integration data:', integrationData.type, integrationData.id);
       
       const { sqliteService } = await import('@serenity/database');

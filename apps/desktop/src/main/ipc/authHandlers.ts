@@ -4,6 +4,10 @@
  */
 
 import { ipcMain } from 'electron';
+import { z } from 'zod';
+
+const keySchema = z.string().min(1);
+const valueSchema = z.string();
 
 export function registerAuthHandlers(): void {
   console.log('🔧 Registering authentication IPC handlers...');
@@ -36,6 +40,9 @@ export function registerAuthHandlers(): void {
   // Set master password hash
   ipcMain.handle('auth:set-master-password-hash', async (_, passwordHash) => {
     try {
+      if (typeof passwordHash !== 'string' || passwordHash.length < 10) {
+        return { success: false, data: null, error: 'Invalid password hash' };
+      }
       console.log('🔐 Setting master password hash...');
       
       const { sqliteService } = await import('@serenity/database');
@@ -145,6 +152,8 @@ export function registerAuthHandlers(): void {
   // Get secure setting by key
   ipcMain.handle('auth:get-secure-setting', async (_, key) => {
     try {
+      const v = keySchema.safeParse(key);
+      if (!v.success) return { success: false, data: { value: null }, error: 'Invalid key' };
       console.log('🔍 Getting secure setting:', key);
       
       const { sqliteService } = await import('@serenity/database');
@@ -168,6 +177,9 @@ export function registerAuthHandlers(): void {
   // Set secure setting
   ipcMain.handle('auth:set-secure-setting', async (_, key, value) => {
     try {
+      const k = keySchema.safeParse(key);
+      const v = valueSchema.safeParse(value);
+      if (!k.success || !v.success) return { success: false, data: null, error: 'Invalid key/value' };
       console.log('🔐 Setting secure setting:', key);
       
       const { sqliteService } = await import('@serenity/database');
@@ -190,6 +202,8 @@ export function registerAuthHandlers(): void {
   // Delete secure setting by key
   ipcMain.handle('auth:delete-secure-setting', async (_, key) => {
     try {
+      const v = keySchema.safeParse(key);
+      if (!v.success) return { success: false, data: null, error: 'Invalid key' };
       console.log('🗑️ Deleting secure setting:', key);
       
       const { sqliteService } = await import('@serenity/database');

@@ -20,7 +20,9 @@
     "dist:linux": "npm run build && electron-builder --linux",
     "pack": "npm run build && electron-builder --dir",
     "lint": "eslint src/**/*.{ts,tsx}",
-    "clean": "rm -rf dist release"
+    "clean": "rm -rf dist release",
+    "postinstall": "electron-rebuild",
+    "rebuild": "electron-rebuild"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^1.9.5",
@@ -44,6 +46,7 @@
     "concurrently": "^8.2.0",
     "electron": "^26.6.10",
     "electron-builder": "^24.6.4",
+    "electron-rebuild": "^3.2.9",
     "postcss": "^8.4.29",
     "tailwindcss": "^3.3.3",
     "typescript": "^5.2.2",

@@ -3,6 +3,7 @@ export interface Task {
   title: string;
   description?: string;
   completed: boolean;
+  completedAt?: Date;
   priority: 'low' | 'medium' | 'high';
   dueDate?: Date;
   projectId?: string;

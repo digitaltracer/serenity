@@ -206,8 +206,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <SidebarHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 justify-center w-full">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">S</span>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
+                <img 
+                  src="/logo.png" 
+                  alt="Serenity Logo" 
+                  className="w-6 h-6 object-contain"
+                />
               </div>
               {!sidebarCollapsed && (
                 <h1 className="font-semibold text-gray-900 dark:text-gray-100">

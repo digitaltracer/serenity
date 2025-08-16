@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     title VARCHAR(500) NOT NULL,
     description TEXT,
     completed BOOLEAN DEFAULT FALSE,
+    completed_at TIMESTAMP WITH TIME ZONE,
     priority VARCHAR(10) CHECK (priority IN ('low', 'medium', 'high')) DEFAULT 'medium',
     due_date TIMESTAMP WITH TIME ZONE,
     tags TEXT[] DEFAULT '{}',

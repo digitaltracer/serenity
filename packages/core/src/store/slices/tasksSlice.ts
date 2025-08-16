@@ -13,6 +13,11 @@ export interface TasksState {
     status: 'all' | 'pending' | 'completed';
     project: string | null;
   };
+  pagination: {
+    currentPage: number;
+    tasksPerPage: number;
+    hasMore: boolean;
+  };
 }
 
 // Load tasks from localStorage on initialization
@@ -34,6 +39,11 @@ const initialState: TasksState = {
     priority: 'all',
     status: 'all',
     project: null,
+  },
+  pagination: {
+    currentPage: 1,
+    tasksPerPage: 10,
+    hasMore: true,
   },
 };
 
@@ -72,6 +82,7 @@ const tasksSlice = createSlice({
       const task = state.tasks.find(task => task.id === action.payload);
       if (task) {
         task.completed = !task.completed;
+        task.completedAt = task.completed ? new Date() : undefined;
         task.updatedAt = new Date();
       }
     },
@@ -210,7 +221,12 @@ const tasksSlice = createSlice({
       taskIds.forEach(taskId => {
         const task = state.tasks.find(t => t.id === taskId);
         if (task) {
-          Object.assign(task, updates, { updatedAt: new Date() });
+          const updatedData = { ...updates, updatedAt: new Date() };
+          // If we're updating completion status, set/clear completedAt timestamp
+          if (updates.completed !== undefined) {
+            updatedData.completedAt = updates.completed ? new Date() : undefined;
+          }
+          Object.assign(task, updatedData);
         }
       });
     },
@@ -222,6 +238,20 @@ const tasksSlice = createSlice({
     
     updateAllTasks: (state, action: PayloadAction<Task[]>) => {
       state.tasks = action.payload;
+    },
+    
+    // Pagination Actions
+    loadMoreTasks: (state) => {
+      state.pagination.currentPage += 1;
+    },
+    
+    resetPagination: (state) => {
+      state.pagination.currentPage = 1;
+      state.pagination.hasMore = true;
+    },
+    
+    setPaginationHasMore: (state, action: PayloadAction<boolean>) => {
+      state.pagination.hasMore = action.payload;
     },
   },
 });
@@ -250,6 +280,10 @@ export const {
   bulkUpdateTasks,
   bulkDeleteTasks,
   updateAllTasks,
+  // Pagination actions
+  loadMoreTasks,
+  resetPagination,
+  setPaginationHasMore,
 } = tasksSlice.actions;
 
 // Selectors
@@ -257,6 +291,7 @@ export const selectAllTasks = (state: { tasks: TasksState }) => state.tasks.task
 export const selectTasksLoading = (state: { tasks: TasksState }) => state.tasks.loading;
 export const selectTasksError = (state: { tasks: TasksState }) => state.tasks.error;
 export const selectTaskFilters = (state: { tasks: TasksState }) => state.tasks.filters;
+export const selectTasksPagination = (state: { tasks: TasksState }) => state.tasks.pagination;
 
 export const selectFilteredTasks = createSelector(
   [selectAllTasks, selectTaskFilters],
@@ -304,6 +339,63 @@ export const selectTodayTasks = createSelector(
       const taskDateString = new Date(task.dueDate).toISOString().split('T')[0];
       return taskDateString === todayString;
     });
+  }
+);
+
+export const selectPaginatedTasks = createSelector(
+  [selectFilteredTasks, selectTasksPagination],
+  (filteredTasks, pagination) => {
+    // Sort tasks: unfinished tasks first (by due date, then created date), then completed tasks (by completion date)
+    const sortedTasks = [...filteredTasks].sort((a, b) => {
+      // If one is completed and the other isn't, put unfinished first
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1;
+      }
+      
+      // Both are unfinished - sort by due date first, then created date
+      if (!a.completed && !b.completed) {
+        // Tasks with due dates come first
+        if (a.dueDate && !b.dueDate) return -1;
+        if (!a.dueDate && b.dueDate) return 1;
+        
+        // Both have due dates - sort by due date
+        if (a.dueDate && b.dueDate) {
+          const dueDateDiff = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+          if (dueDateDiff !== 0) return dueDateDiff;
+        }
+        
+        // Sort by created date (newest first for unfinished tasks)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      
+      // Both are completed - sort by completion date (newest first)
+      if (a.completed && b.completed) {
+        const aCompletedDate = a.completedAt ? new Date(a.completedAt) : 
+                               a.updatedAt ? new Date(a.updatedAt) : 
+                               new Date(a.createdAt);
+        const bCompletedDate = b.completedAt ? new Date(b.completedAt) : 
+                               b.updatedAt ? new Date(b.updatedAt) : 
+                               new Date(b.createdAt);
+        return bCompletedDate.getTime() - aCompletedDate.getTime();
+      }
+      
+      return 0;
+    });
+    
+    // Calculate pagination
+    const { currentPage, tasksPerPage } = pagination;
+    const startIndex = 0; // Always start from the beginning
+    const endIndex = currentPage * tasksPerPage;
+    
+    const paginatedTasks = sortedTasks.slice(startIndex, endIndex);
+    const hasMore = endIndex < sortedTasks.length;
+    
+    return {
+      tasks: paginatedTasks,
+      hasMore,
+      totalTasks: sortedTasks.length,
+      currentlyShowing: paginatedTasks.length,
+    };
   }
 );
 

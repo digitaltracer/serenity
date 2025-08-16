@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, selectCompactMode } from '@serenity/core';
-import { addTask, toggleTask, deleteTask, updateTask, addProject, deleteProject, updateGoalsProgress, selectAllEntries, selectAllProjects, addUsedTags, generateId, addSubtask, toggleSubtask } from '@serenity/core';
+import { addTask, toggleTask, deleteTask, updateTask, addProject, deleteProject, updateGoalsProgress, selectAllEntries, selectAllProjects, addUsedTags, generateId, addSubtask, toggleSubtask, selectPaginatedTasks, selectTasksPagination, loadMoreTasks, resetPagination, setPaginationHasMore } from '@serenity/core';
 import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, ProjectComboBox, TagInput, DatePicker, Textarea, cn, DraggableTaskCard, SelectableItem, BulkOperationsToolbar, BulkActionsButton } from '@serenity/ui';
 import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List, Trash2 } from 'lucide-react';
 
@@ -12,6 +12,8 @@ export const ActionHubPage: React.FC = () => {
   const journalEntries = useSelector(selectAllEntries);
   const allProjects = useSelector(selectAllProjects);
   const compactMode = useSelector(selectCompactMode);
+  const paginatedTasksData = useSelector(selectPaginatedTasks);
+  const pagination = useSelector(selectTasksPagination);
 
   // Auto-update goal progress when tasks change
   useEffect(() => {
@@ -35,17 +37,15 @@ export const ActionHubPage: React.FC = () => {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectColor, setNewProjectColor] = useState('#8B5CF6');
 
-  // Memoize expensive calculations to prevent re-computation on every render
-  const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
-      const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesFilter = 
-        activeFilter === 'all' || 
-        (activeFilter === 'active' && !task.completed) ||
-        (activeFilter === 'completed' && task.completed);
-      return matchesSearch && matchesFilter;
-    });
-  }, [tasks, searchQuery, activeFilter]);
+  // Reset pagination when filters change
+  useEffect(() => {
+    dispatch(resetPagination());
+  }, [searchQuery, activeFilter, dispatch]);
+
+  // Handle Load More
+  const handleLoadMore = useCallback(() => {
+    dispatch(loadMoreTasks());
+  }, [dispatch]);
 
   const taskStatistics = useMemo(() => {
     const completedTasks = tasks.filter(task => task.completed);
@@ -90,6 +90,9 @@ export const ActionHubPage: React.FC = () => {
 
   const handleFilterChange = (filter: 'all' | 'active' | 'completed') => {
     setActiveFilter(filter);
+    // Update Redux filter state
+    const statusFilter = filter === 'active' ? 'pending' : filter === 'completed' ? 'completed' : 'all';
+    dispatch({ type: 'tasks/setTaskFilter', payload: { status: statusFilter } });
   };
 
   const handleCreateProject = () => {
@@ -608,7 +611,11 @@ export const ActionHubPage: React.FC = () => {
                 <Input
                   placeholder="Search tasks, projects, or tags..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    // Update Redux search state
+                    dispatch({ type: 'tasks/setTaskFilter', payload: { search: e.target.value } });
+                  }}
                   className="pl-10 h-12 rounded-xl"
                 />
               </div>
@@ -643,7 +650,7 @@ export const ActionHubPage: React.FC = () => {
                 'space-y-2': compactMode,
               }
             )}>
-              {filteredTasks.length === 0 ? (
+              {paginatedTasksData.tasks.length === 0 ? (
                 <div className="text-center py-12">
                   <CheckCircle2 className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
@@ -654,20 +661,45 @@ export const ActionHubPage: React.FC = () => {
                   </p>
                 </div>
               ) : (
-                filteredTasks.map((task, index) => (
-                  <SelectableItem key={task.id} id={task.id} type="tasks">
-                      <DraggableTaskCard
-                      task={task}
-                      onToggle={() => dispatch(toggleTask(task.id))}
-                        onToggleSubtask={(taskId: string, subtaskId: string) => dispatch(toggleSubtask({ taskId, subtaskId }))}
-                        onEdit={handleEditTask}
-                      onDelete={() => dispatch(deleteTask(task.id))}
-                      index={index}
-                      containerName="actionhub-tasks"
-                      projects={projects}
-                    />
-                  </SelectableItem>
-                ))
+                <>
+                  {paginatedTasksData.tasks.map((task, index) => (
+                    <SelectableItem key={task.id} id={task.id} type="tasks">
+                        <DraggableTaskCard
+                        task={task}
+                        onToggle={() => dispatch(toggleTask(task.id))}
+                          onToggleSubtask={(taskId: string, subtaskId: string) => dispatch(toggleSubtask({ taskId, subtaskId }))}
+                          onEdit={handleEditTask}
+                        onDelete={() => dispatch(deleteTask(task.id))}
+                        index={index}
+                        containerName="actionhub-tasks"
+                        projects={projects}
+                      />
+                    </SelectableItem>
+                  ))}
+                  
+                  {/* Load More Button */}
+                  {paginatedTasksData.hasMore && (
+                    <div className="flex justify-center py-6">
+                      <Button
+                        onClick={handleLoadMore}
+                        variant="secondary"
+                        className="px-6 py-3 rounded-xl"
+                      >
+                        Load More Tasks ({paginatedTasksData.totalTasks - paginatedTasksData.currentlyShowing} remaining)
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* Pagination Info */}
+                  {paginatedTasksData.totalTasks > 0 && (
+                    <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
+                      Showing {paginatedTasksData.currentlyShowing} of {paginatedTasksData.totalTasks} tasks
+                      {!paginatedTasksData.hasMore && paginatedTasksData.totalTasks > pagination.tasksPerPage && (
+                        <span className="ml-2">• All tasks loaded</span>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

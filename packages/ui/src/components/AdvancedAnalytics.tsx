@@ -230,7 +230,9 @@ const calculateBasicAnalytics = (tasks: Task[], journalEntries: JournalEntry[]) 
   
   const completedTasks = tasks.filter(task => task.completed);
   const tasksThisWeek = completedTasks.filter(task => {
-    const completedDate = task.updatedAt ? new Date(task.updatedAt) : new Date(task.createdAt);
+    const completedDate = task.completedAt ? new Date(task.completedAt) : 
+                         task.updatedAt ? new Date(task.updatedAt) : 
+                         new Date(task.createdAt);
     return completedDate >= thisWeek;
   });
 
@@ -253,7 +255,9 @@ const calculateBasicAnalytics = (tasks: Task[], journalEntries: JournalEntry[]) 
   const dateMap = new Map<string, number>();
   
   completedTasks.forEach(task => {
-    const date = task.updatedAt ? new Date(task.updatedAt) : new Date(task.createdAt);
+    const date = task.completedAt ? new Date(task.completedAt) : 
+                 task.updatedAt ? new Date(task.updatedAt) : 
+                 new Date(task.createdAt);
     const dateKey = date.toISOString().split('T')[0];
     dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + 1);
   });
@@ -319,8 +323,10 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
       const dateKey = date.toISOString().split('T')[0];
       
       const dayTasks = tasks.filter(task => {
-        if (!task.completed || !task.updatedAt) return false;
-        const taskDate = new Date(task.updatedAt);
+        if (!task.completed) return false;
+        const taskDate = task.completedAt ? new Date(task.completedAt) : 
+                         task.updatedAt ? new Date(task.updatedAt) : 
+                         new Date(task.createdAt);
         return taskDate.toISOString().split('T')[0] === dateKey;
       }).length;
       
@@ -377,10 +383,11 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
     // Best day analysis
     const dayOfWeekStats: { [key: string]: number } = {};
     completedTasks.forEach(task => {
-      if (task.updatedAt) {
-        const day = new Date(task.updatedAt).toLocaleDateString('en-US', { weekday: 'long' });
-        dayOfWeekStats[day] = (dayOfWeekStats[day] || 0) + 1;
-      }
+      const completedDate = task.completedAt ? new Date(task.completedAt) : 
+                           task.updatedAt ? new Date(task.updatedAt) : 
+                           new Date(task.createdAt);
+      const day = completedDate.toLocaleDateString('en-US', { weekday: 'long' });
+      dayOfWeekStats[day] = (dayOfWeekStats[day] || 0) + 1;
     });
     const bestDay = Object.entries(dayOfWeekStats).sort(([,a], [,b]) => b - a)[0]?.[0] || 'Monday';
     
@@ -1120,8 +1127,10 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
                             const dateKey = currentDate.toISOString().split('T')[0];
                             
                             const dayTasks = tasks.filter(task => {
-                              if (!task.completed || !task.updatedAt) return false;
-                              const taskDate = new Date(task.updatedAt);
+                              if (!task.completed) return false;
+                              const taskDate = task.completedAt ? new Date(task.completedAt) : 
+                                               task.updatedAt ? new Date(task.updatedAt) : 
+                                               new Date(task.createdAt);
                               return taskDate.toISOString().split('T')[0] === dateKey;
                             }).length;
                             
@@ -1249,15 +1258,19 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
                 <div className="grid grid-cols-7 gap-2">
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => {
                     const dayStats = tasks.filter(task => {
-                      if (!task.completed || !task.updatedAt) return false;
-                      const taskDate = new Date(task.updatedAt);
+                      if (!task.completed) return false;
+                      const taskDate = task.completedAt ? new Date(task.completedAt) : 
+                                       task.updatedAt ? new Date(task.updatedAt) : 
+                                       new Date(task.createdAt);
                       return taskDate.getDay() === index;
                     }).length;
                     
                     const maxDayStats = Math.max(...['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((_, i) => 
                       tasks.filter(task => {
-                        if (!task.completed || !task.updatedAt) return false;
-                        const taskDate = new Date(task.updatedAt);
+                        if (!task.completed) return false;
+                        const taskDate = task.completedAt ? new Date(task.completedAt) : 
+                                         task.updatedAt ? new Date(task.updatedAt) : 
+                                         new Date(task.createdAt);
                         return taskDate.getDay() === i;
                       }).length
                     ), 1);

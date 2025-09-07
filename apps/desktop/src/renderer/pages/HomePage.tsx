@@ -38,7 +38,7 @@ export const HomePage: React.FC = () => {
   ];
 
   return (
-    <div className="flex-1 h-full bg-gray-50 dark:bg-gray-900">
+    <div className="flex-1 h-full bg-background">
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-6xl mx-auto">
       {/* Header */}
@@ -46,10 +46,10 @@ export const HomePage: React.FC = () => {
         <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
           <span className="text-white font-bold text-2xl">S</span>
         </div>
-        <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+        <h1 className="text-4xl font-bold text-foreground mb-4">
           Serenity Notes
         </h1>
-        <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
           Boost your productivity and mindfulness with a powerful integrated task management and journaling experience.
         </p>
       </div>
@@ -61,17 +61,17 @@ export const HomePage: React.FC = () => {
           return (
             <Card 
               key={feature.title} 
-              className="cursor-pointer hover:shadow-lg transition-shadow bg-white dark:bg-gray-800"
+              className="cursor-pointer hover:shadow-lg transition-shadow"
               onClick={() => navigate(feature.route)}
             >
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg bg-gray-100 dark:bg-gray-700 ${feature.color}`}>
+                  <div className={`p-2 rounded-lg bg-accent/60 ${feature.color}`}>
                     <Icon className="w-6 h-6" />
                   </div>
-                  <CardTitle className="text-gray-900 dark:text-gray-100">{feature.title}</CardTitle>
+                  <CardTitle>{feature.title}</CardTitle>
                 </div>
-                <CardDescription className="text-gray-600 dark:text-gray-400">{feature.description}</CardDescription>
+                <CardDescription>{feature.description}</CardDescription>
               </CardHeader>
             </Card>
           );
@@ -80,12 +80,12 @@ export const HomePage: React.FC = () => {
 
       {/* Get Started */}
       <div className="text-center">
-        <Card className="inline-block bg-white dark:bg-gray-800">
+        <Card className="inline-block">
           <CardContent className="pt-6">
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            <h2 className="text-2xl font-semibold text-foreground mb-4">
               Ready to get started?
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-muted-foreground mb-6">
               Choose your workflow and begin your journey to enhanced productivity.
             </p>
             <div className="flex gap-4 justify-center">

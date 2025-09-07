@@ -102,6 +102,7 @@ export const AIAssistantPage: React.FC = () => {
   const [recapPeriod, setRecapPeriod] = useState<'weekly' | 'monthly'>('weekly');
   const [activeTab, setActiveTab] = useState<'setup' | 'analyze' | 'insights' | 'recaps' | 'usage'>('setup');
   const usage = useSelector(selectAIUsage);
+  const [analysisMode, setAnalysisMode] = useState<'online' | 'offline'>('online');
   const [availableModels, setAvailableModels] = useState<Record<string, { id: string; label: string }[]>>({});
   
   // Enhanced recap management state
@@ -237,19 +238,36 @@ export const AIAssistantPage: React.FC = () => {
       return;
     }
 
+    // If online mode, ensure the active provider has an API key
+    if (analysisMode === 'online') {
+      const providerMeta = providers.find(p => p.id === activeProvider);
+      if (!providerMeta?.hasApiKey) {
+        showError('API Key Required', `Please set an API key for ${providerMeta?.name || activeProvider} or switch to Offline analysis.`);
+        return;
+      }
+    }
+
+    // Sanitize payload to avoid non-cloneable objects over IPC
+    const safeTasks = tasks?.length ? JSON.parse(JSON.stringify(tasks)) : undefined;
+    const safeJournal = journalEntries?.length ? JSON.parse(JSON.stringify(journalEntries)) : undefined;
+
     try {
       await anyDispatch(analyzeUserData({
         provider: activeProvider,
         dataTypes,
         forceReAnalyze: false,
-        tasks,
-        journalEntries,
+        tasks: safeTasks,
+        journalEntries: safeJournal,
+        forceLocal: analysisMode === 'offline',
       })).unwrap();
       
       showSuccess('Analysis Complete', 'Your data has been analyzed successfully');
       setActiveTab('insights');
     } catch (error) {
-      showError('Analysis Failed', String(error));
+      const msg = String(error || '').toLowerCase().includes('clone')
+        ? 'Could not process complex data. Try again after a page refresh.'
+        : String(error);
+      showError('Analysis Failed', msg);
     }
   };
 
@@ -268,6 +286,32 @@ export const AIAssistantPage: React.FC = () => {
       startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
     }
 
+    // Filter data to the selected period and sanitize for IPC
+    const tasksInPeriod = (tasks || []).filter((t: any) => {
+      try {
+        const created = new Date(t.createdAt);
+        return created >= startDate && created <= now;
+      } catch {
+        return true;
+      }
+    });
+    const entriesInPeriod = (journalEntries || []).filter((e: any) => {
+      try {
+        const d = new Date(e.date);
+        return d >= startDate && d <= now;
+      } catch {
+        return true;
+      }
+    });
+
+    if (tasksInPeriod.length === 0 && entriesInPeriod.length === 0) {
+      showError('Nothing to Recap', 'No tasks or journal entries found in the selected period. Add some data and try again.');
+      return;
+    }
+
+    const safeTasks = tasksInPeriod.length ? JSON.parse(JSON.stringify(tasksInPeriod)) : undefined;
+    const safeJournal = entriesInPeriod.length ? JSON.parse(JSON.stringify(entriesInPeriod)) : undefined;
+
     try {
       await anyDispatch(generateRecap({
         provider: activeProvider,
@@ -276,14 +320,17 @@ export const AIAssistantPage: React.FC = () => {
           start: startDate.toISOString(),
           end: now.toISOString(),
         },
-        tasks,
-        journalEntries,
+        tasks: safeTasks,
+        journalEntries: safeJournal,
       })).unwrap();
       
       showSuccess('Recap Generated', `Your ${recapPeriod} recap has been created`);
       setActiveTab('recaps');
     } catch (error) {
-      showError('Recap Generation Failed', String(error));
+      const msg = String(error || '').toLowerCase().includes('clone')
+        ? 'Could not prepare data for recap. Please try again after a page refresh.'
+        : String(error);
+      showError('Recap Generation Failed', msg);
     }
   };
 
@@ -311,8 +358,8 @@ export const AIAssistantPage: React.FC = () => {
       onClick={onClick}
       className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
         active
-          ? 'bg-blue-600 text-white'
-          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+          ? 'bg-primary text-primary-foreground'
+          : 'bg-muted text-foreground/80 hover:bg-accent/60'
       }`}
     >
       {label}
@@ -363,7 +410,7 @@ export const AIAssistantPage: React.FC = () => {
     switch (type) {
       case 'weekly': return 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300';
       case 'monthly': return 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300';
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300';
+      default: return 'bg-muted text-foreground/80';
     }
   };
 
@@ -372,11 +419,11 @@ export const AIAssistantPage: React.FC = () => {
       {/* Enhanced Header with Navigation */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
             <Brain className="w-8 h-8 text-blue-600" />
             AI Assistant
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <p className="text-muted-foreground mt-1">
             Analyze your productivity patterns and get personalized insights
           </p>
         </div>
@@ -421,7 +468,7 @@ export const AIAssistantPage: React.FC = () => {
       </div>
 
       {/* Status Bar */}
-      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+      <div className="bg-card border border-border rounded-lg p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
@@ -433,7 +480,7 @@ export const AIAssistantPage: React.FC = () => {
             {insights.length > 0 && (
               <div className="flex items-center gap-2">
                 <Lightbulb className="w-4 h-4 text-yellow-500" />
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-sm text-muted-foreground">
                   {insights.length} insights available
                 </span>
               </div>
@@ -441,13 +488,13 @@ export const AIAssistantPage: React.FC = () => {
             {recaps.length > 0 && (
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-blue-500" />
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-sm text-muted-foreground">
                   {recaps.length} recaps generated
                 </span>
               </div>
             )}
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             Last updated: {new Date().toLocaleTimeString()}
           </div>
         </div>
@@ -771,9 +818,28 @@ export const AIAssistantPage: React.FC = () => {
                 <Brain className="w-5 h-5 text-blue-600" />
                 <h2 className="text-xl font-semibold">Data Analysis</h2>
               </div>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="text-muted-foreground">
                 Analyze your productivity patterns and behaviors
               </p>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Mode:</span>
+                <div className="inline-flex rounded-md border border-border overflow-hidden">
+                  <button
+                    className={`px-3 py-1 text-xs ${analysisMode === 'online' ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground'}`}
+                    onClick={() => setAnalysisMode('online')}
+                    title="Use your configured AI provider"
+                  >
+                    Online
+                  </button>
+                  <button
+                    className={`px-3 py-1 text-xs ${analysisMode === 'offline' ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground'}`}
+                    onClick={() => setAnalysisMode('offline')}
+                    title="Run local heuristic analysis (no API key)"
+                  >
+                    Offline
+                  </button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -787,7 +853,7 @@ export const AIAssistantPage: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                    <div className="text-sm text-muted-foreground space-y-1">
                       <p>Tasks available: {tasks.length}</p>
                       <p>Journal entries: {journalEntries.length}</p>
                       <p>Last analysis: {analysisTracker.lastTaskAnalysis ? new Date(analysisTracker.lastTaskAnalysis).toLocaleDateString() : 'Never'}</p>
@@ -813,7 +879,7 @@ export const AIAssistantPage: React.FC = () => {
                 <FileText className="w-5 h-5 text-blue-600" />
                 <h2 className="text-xl font-semibold">Generate Recap</h2>
               </div>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="text-muted-foreground">
                 Create weekly or monthly productivity summaries
               </p>
             </CardHeader>
@@ -858,7 +924,7 @@ export const AIAssistantPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             {insights.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <div className="text-center py-8 text-muted-foreground">
                 <Brain className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>No insights yet. Run an analysis to get started!</p>
                 <Button 
@@ -871,7 +937,7 @@ export const AIAssistantPage: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 {insights.map((insight) => (
-                  <div key={insight.id} className="border rounded-lg p-4 space-y-2">
+                  <div key={insight.id} className="border border-border rounded-lg p-4 space-y-2">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
                         {getInsightIcon(insight.type)}
@@ -886,8 +952,8 @@ export const AIAssistantPage: React.FC = () => {
                         </Badge>
                       </div>
                     </div>
-                    <p className="text-gray-600 dark:text-gray-400">{insight.description}</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <p className="text-muted-foreground">{insight.description}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>From {insight.source}</span>
                       <span>•</span>
                       <span>{new Date(insight.createdAt).toLocaleDateString()}</span>
@@ -1139,7 +1205,7 @@ export const AIAssistantPage: React.FC = () => {
           <CardContent>
             {/* debug log removed for production typing */}
             {(usage?.length || 0) === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <div className="text-center py-8 text-muted-foreground">
                 <Zap className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>No usage yet. Run an analysis or generate a recap to see token usage.</p>
               </div>
@@ -1156,16 +1222,16 @@ export const AIAssistantPage: React.FC = () => {
                     }, { prompt: 0, completion: 0, total: 0 });
                     return (
                       <>
-                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                          <div className="text-xs text-gray-500">Prompt tokens</div>
+                        <div className="p-3 rounded-lg bg-card border border-border">
+                          <div className="text-xs text-muted-foreground">Prompt tokens</div>
                           <div className="text-lg font-semibold">{totals.prompt.toLocaleString()}</div>
                         </div>
-                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                          <div className="text-xs text-gray-500">Completion tokens</div>
+                        <div className="p-3 rounded-lg bg-card border border-border">
+                          <div className="text-xs text-muted-foreground">Completion tokens</div>
                           <div className="text-lg font-semibold">{totals.completion.toLocaleString()}</div>
                         </div>
-                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                          <div className="text-xs text-gray-500">Total tokens</div>
+                        <div className="p-3 rounded-lg bg-card border border-border">
+                          <div className="text-xs text-muted-foreground">Total tokens</div>
                           <div className="text-lg font-semibold">{totals.total.toLocaleString()}</div>
                         </div>
                       </>
@@ -1173,10 +1239,10 @@ export const AIAssistantPage: React.FC = () => {
                   })()}
                 </div>
                 {/* List */}
-                <div className="divide-y divide-gray-200 dark:divide-gray-700 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
                   {(usage as any[]).slice(0, 200).map((u, idx) => (
                     <div key={u.id || idx} className="grid grid-cols-12 gap-3 p-3 text-sm">
-                      <div className="col-span-3 text-gray-500">{new Date(u.timestamp).toLocaleString()}</div>
+                      <div className="col-span-3 text-muted-foreground">{new Date(u.timestamp).toLocaleString()}</div>
                       <div className="col-span-2 capitalize">{u.provider}</div>
                       <div className="col-span-2 capitalize">{u.operation}</div>
                       <div className="col-span-2 text-right">{(u.promptTokens||0).toLocaleString()} / {(u.completionTokens||0).toLocaleString()}</div>
@@ -1192,8 +1258,8 @@ export const AIAssistantPage: React.FC = () => {
 
       {/* Schedule Modal */}
       {isScheduleModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card text-card-foreground border border-border rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Clock className="w-5 h-5 text-purple-600" />
@@ -1201,7 +1267,7 @@ export const AIAssistantPage: React.FC = () => {
               </h3>
               <button
                 onClick={() => setIsScheduleModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                className="text-muted-foreground hover:text-foreground p-2"
               >
                 ✕
               </button>
@@ -1275,10 +1341,11 @@ export const AIAssistantPage: React.FC = () => {
               )}
             </div>
             
-            <div className="flex items-center gap-3 mt-6 pt-4 border-t">
+            <div className="flex items-center gap-3 mt-6 pt-4 border-t border-border">
               <Button
                 onClick={() => setIsScheduleModalOpen(false)}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300"
+                variant="secondary"
+                className="flex-1"
               >
                 Cancel
               </Button>
@@ -1296,14 +1363,14 @@ export const AIAssistantPage: React.FC = () => {
 
       {/* Recap Detail Modal */}
       {selectedRecap && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card text-card-foreground border border-border rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-border">
               <div className="flex items-center gap-3">
                 <FileText className="w-6 h-6 text-blue-600" />
                 <div>
                   <h2 className="text-xl font-semibold">{selectedRecap.title}</h2>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     {new Date(selectedRecap.period.start).toLocaleDateString()} - {new Date(selectedRecap.period.end).toLocaleDateString()}
                   </p>
                 </div>
@@ -1311,14 +1378,14 @@ export const AIAssistantPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Button
                   onClick={() => handleExportRecap(selectedRecap)}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300"
+                  variant="secondary"
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Export
                 </Button>
                 <button
                   onClick={() => setSelectedRecap(null)}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-2"
+                  className="text-muted-foreground hover:text-foreground p-2"
                 >
                   ✕
                 </button>

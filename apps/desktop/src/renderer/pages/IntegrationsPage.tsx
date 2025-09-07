@@ -848,16 +848,16 @@ export const IntegrationsPage: React.FC = () => {
                 
                 {/* Add Token Form */}
                 {showTokenManagement && (
-                  <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200/50 dark:border-gray-600/30">
+                  <div className="bg-card text-card-foreground rounded-xl p-4 border border-border">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-gray-100 dark:bg-gray-700/50 rounded-lg">
-                        <Github className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                      <div className="p-2 bg-accent/60 rounded-lg">
+                        <Github className="w-4 h-4" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <p className="text-sm font-medium text-foreground">
                           Add New GitHub Token
                         </p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                        <p className="text-xs text-muted-foreground">
                           Add additional tokens to access more repositories and organizations
                         </p>
                       </div>
@@ -886,7 +886,7 @@ export const IntegrationsPage: React.FC = () => {
                         <Button 
                           onClick={handleGitHubConnect} 
                           disabled={!hasMasterPassword || !newGithubToken.trim()}
-                          className="bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white font-medium py-2 transition-all duration-200 flex items-center justify-center gap-2"
+                          className="font-medium py-2 transition-all duration-200 flex items-center justify-center gap-2"
                         >
                           <Github className="w-4 h-4" />
                           Add Token
@@ -898,7 +898,6 @@ export const IntegrationsPage: React.FC = () => {
                             setNewGithubToken('');
                             setNewTokenDisplayName('');
                           }}
-                          className="text-gray-700 border-gray-300 hover:bg-gray-100 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700/50"
                         >
                           Cancel
                         </Button>
@@ -911,16 +910,16 @@ export const IntegrationsPage: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200/50 dark:border-gray-600/30">
+            <div className="bg-card text-card-foreground rounded-xl p-4 border border-border">
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-gray-100 dark:bg-gray-700/50 rounded-lg">
-                  <Github className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                <div className="p-2 bg-accent/60 rounded-lg">
+                  <Github className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                  <p className="text-sm font-medium text-foreground mb-1">
                     Connect Your GitHub
                   </p>
-                  <p className="text-xs text-gray-700 dark:text-gray-300">
+                  <p className="text-xs text-muted-foreground">
                     Add multiple GitHub tokens to sync pull requests from all accessible repositories (owned, collaborator, and organization repos) as actionable tasks.
                   </p>
                 </div>

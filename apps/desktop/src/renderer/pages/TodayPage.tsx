@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectTodayTasks, selectAllTasks, toggleTask, updateTask, deleteTask, RootState } from '@serenity/core';
+import { selectTodayTasks, selectAllTasks, toggleTask, updateTask, deleteTask, RootState, openTaskModal } from '@serenity/core';
 import { Card, CardHeader, CardTitle, CardContent, TaskCard, ProgressBar, Button, Input, CustomSelect, TagInput, DatePicker, Textarea } from '@serenity/ui';
 import { Calendar, Clock, CheckCircle, AlertTriangle, Target } from 'lucide-react';
 
@@ -91,32 +91,30 @@ export const TodayPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-5xl mx-auto px-6 md:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <Calendar className="w-8 h-8 text-blue-600" />
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Today</h1>
+      <div>
+        <div className="flex items-center gap-3 mb-1">
+          <Calendar className="w-6 h-6 text-gray-300 dark:text-gray-400" />
+          <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-gray-100">Today</h1>
         </div>
-        <p className="text-gray-600 dark:text-gray-400">
-          Focus on what matters most right now
-        </p>
-        <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">{dateString}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">Focus on what matters most right now</p>
+        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{dateString}</p>
       </div>
 
       {/* Today's Progress */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
         <Card>
           <CardHeader>
             <CardTitle>Today's Progress</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            <div className="text-xl md:text-2xl font-semibold tabular-nums text-gray-900 dark:text-gray-100 mb-2">
               {Math.round(progressToday)}%
             </div>
-            <ProgressBar value={progressToday} variant="success" />
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-              {completedToday.length} of {todayTasks.length} tasks completed
+            <ProgressBar value={progressToday} variant="success" size="sm" />
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 tabular-nums">
+              {completedToday} of {todayTasks.length} tasks completed
             </p>
           </CardContent>
         </Card>
@@ -127,23 +125,23 @@ export const TodayPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Planned for today</span>
-                <span className="ml-auto font-semibold text-blue-600 dark:text-blue-400">{plannedToday}</span>
+              <div className="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+                <span className="w-2 h-2 rounded-full bg-gray-400" />
+                <span>Planned for today</span>
+                <span className="ml-auto font-semibold tabular-nums text-gray-900 dark:text-gray-100">{plannedToday}</span>
               </div>
-              
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Completed today</span>
-                <span className="ml-auto font-semibold text-green-600 dark:text-green-400">{completedToday}</span>
+
+              <div className="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                <span>Completed today</span>
+                <span className="ml-auto font-semibold tabular-nums text-gray-900 dark:text-gray-100">{completedToday}</span>
               </div>
-              
+
               {overdueTasks.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Overdue</span>
-                  <span className="ml-auto font-semibold text-red-600 dark:text-red-400">{overdueTasks.length}</span>
+                <div className="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+                  <span className="w-2 h-2 rounded-full bg-red-500" />
+                  <span>Overdue</span>
+                  <span className="ml-auto font-semibold tabular-nums text-gray-900 dark:text-gray-100">{overdueTasks.length}</span>
                 </div>
               )}
             </div>
@@ -159,14 +157,17 @@ export const TodayPage: React.FC = () => {
         
         {todayTasks.length === 0 ? (
           <Card>
-            <CardContent className="text-center py-12">
-              <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            <CardContent className="text-center py-10 space-y-3">
+              <Calendar className="w-10 h-10 text-gray-500 mx-auto" />
+              <h3 className="text-base font-medium text-gray-900 dark:text-gray-100">
                 No tasks scheduled for today
               </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                You have a clear schedule today. Consider adding some tasks or take a well-deserved break!
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                You’re clear for today. Add a task to plan something.
               </p>
+              <div>
+                <Button size="sm" onClick={() => dispatch(openTaskModal())}>Add a Task</Button>
+              </div>
             </CardContent>
           </Card>
         ) : (

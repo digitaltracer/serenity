@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import logo from '../../../assets/logo.png';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
@@ -46,7 +47,8 @@ import {
   JournalEntryModal,
   ThemeToggle,
   SubtaskModal,
-  GlobalSearchModal
+  GlobalSearchModal,
+  PageTransition
 } from '@serenity/ui';
 import { 
   Home,
@@ -183,7 +185,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Sidebar collapsed={sidebarCollapsed}>
         {/* Draggable top section - reserve space for window controls */}
         <div 
-          className="h-12 bg-white/5 dark:bg-gray-900/30 backdrop-blur-md border-b border-gray-200/10 dark:border-gray-700/20 flex items-center justify-end px-4"
+          className="h-12 bg-card text-card-foreground border-b border-border flex items-center justify-end px-4"
           style={{ WebkitAppRegion: 'drag' } as any}
         >
           {!sidebarCollapsed && (
@@ -207,11 +209,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 justify-center w-full">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
-                <img 
-                  src="/logo.png" 
-                  alt="Serenity Logo" 
-                  className="w-6 h-6 object-contain"
-                />
+                <img src={logo} alt="Serenity Logo" className="w-6 h-6 object-contain" />
               </div>
               {!sidebarCollapsed && (
                 <h1 className="font-semibold text-gray-900 dark:text-gray-100">
@@ -267,7 +265,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           {/* Collapsed quick buttons removed */}
         </SidebarContent>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+        <div className="p-4 border-t border-border space-y-2">
           <SidebarItem
             icon={<Globe className="w-5 h-5" />}
             active={isActive('/integrations')}
@@ -297,7 +295,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Drag Region Header */}
         <div 
-          className="h-10 bg-white/5 dark:bg-gray-900/20 backdrop-blur-md border-b border-gray-200/10 dark:border-gray-700/20 flex items-center justify-end px-4"
+          className="h-10 bg-card text-card-foreground border-b border-border flex items-center justify-end px-4"
           style={{ WebkitAppRegion: 'drag' } as any}
         >
           <div 
@@ -332,7 +330,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
         
         <main className="flex-1 overflow-y-auto">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </main>
       </div>
 

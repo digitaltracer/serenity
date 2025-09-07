@@ -244,7 +244,7 @@ function AppContent() {
         <AuthenticatedApp>
           <Router>
             <KeyboardShortcutsProvider>
-              <div className="h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
+              <div className="h-screen bg-background text-foreground">
                 <Layout>
                   <Routes>
                     <Route path="/" element={<HomePage />} />

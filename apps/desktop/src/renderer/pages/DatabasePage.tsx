@@ -28,6 +28,10 @@ import {
   optimizeDatabase,
   DatabaseConfig
 } from '@serenity/core';
+import { selectAllTasks, selectAllProjects } from '@serenity/core';
+import { selectAllEntries } from '@serenity/core';
+import { closeConfigModal } from '@serenity/core';
+import { useMemo } from 'react';
 import {
   DatabaseConfigurationModal,
   DatabaseStatusIndicator,
@@ -46,6 +50,10 @@ export const DatabasePage: React.FC = () => {
   const isConfigModalOpen = useSelector((state: RootState) => selectIsConfigModalOpen(state));
   const isConnecting = useSelector((state: RootState) => selectIsConnecting(state));
   const error = useSelector((state: RootState) => selectDatabaseError(state));
+  // Live app data (source of truth for counts in UI)
+  const tasks = useSelector(selectAllTasks);
+  const projects = useSelector(selectAllProjects);
+  const journalEntries = useSelector(selectAllEntries);
   
   // Load initial data
   useEffect(() => {
@@ -95,8 +103,22 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
+  // Use app state counts to present accurate numbers even if DB adapter returns placeholders
+  const effectiveStats = useMemo(() => {
+    if (!stats) return null;
+    return {
+      ...stats,
+      records: {
+        tasks: tasks?.length ?? 0,
+        projects: projects?.length ?? 0,
+        journalEntries: journalEntries?.length ?? 0,
+        users: stats.records?.users ?? 0,
+      },
+    };
+  }, [stats, tasks, projects, journalEntries]);
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Header */}
         <div className="mb-8">
@@ -171,12 +193,12 @@ export const DatabasePage: React.FC = () => {
         )}
 
         {/* Main Content */}
-        {connectionStatus.connected && stats ? (
+        {connectionStatus.connected && effectiveStats ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Database Statistics */}
             <div className="lg:col-span-2">
               <DatabaseStatsCard
-                stats={stats}
+                stats={effectiveStats}
                 onOptimize={handleOptimize}
                 onBackup={handleBackup}
               />
@@ -296,7 +318,7 @@ export const DatabasePage: React.FC = () => {
         {/* Configuration Modal */}
         <DatabaseConfigurationModal
           isOpen={isConfigModalOpen}
-          onClose={() => dispatch({ type: 'database/closeConfigModal' })}
+          onClose={() => dispatch(closeConfigModal())}
           onSave={handleConfigSave}
           currentConfig={config}
           connectionStatus={connectionStatus}

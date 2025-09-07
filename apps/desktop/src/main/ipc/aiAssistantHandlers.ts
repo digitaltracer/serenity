@@ -1212,7 +1212,29 @@ export function registerAIAssistantHandlers(): void {
       );
       
       console.log(`✅ Analysis complete: ${allInsights.length} insights generated`);
-      
+      // Persist insights to SQLite for durability
+      try {
+        const { sqliteService } = await import('@serenity/database');
+        await sqliteService.initialize();
+        if (allInsights.length > 0) {
+          await sqliteService.addAIInsights(
+            allInsights.map((insight: any) => ({
+              provider: options.provider,
+              type: insight.type,
+              title: insight.title,
+              description: insight.description,
+              confidence: insight.confidence ?? 0.5,
+              category: insight.category,
+              actionable: !!insight.actionable,
+              metadata: insight.metadata || {},
+            }))
+          );
+          console.log(`💾 Persisted ${allInsights.length} AI insights to database`);
+        }
+      } catch (persistError) {
+        console.warn('⚠️ Failed to persist AI insights to database:', persistError);
+      }
+
       return {
         success: true,
         insights: allInsights,
@@ -1315,6 +1337,26 @@ export function registerAIAssistantHandlers(): void {
           recap.source = options.provider;
           
           console.log(`✅ ${options.type} recap generated successfully`);
+          // Persist recap to SQLite for durability
+          try {
+            const { sqliteService } = await import('@serenity/database');
+            await sqliteService.initialize();
+            await sqliteService.addAIRecap({
+              provider: options.provider,
+              type: recap.type,
+              title: recap.title,
+              summary: recap.summary,
+              highlights: recap.highlights,
+              challenges: recap.challenges,
+              recommendations: recap.recommendations,
+              period: recap.period,
+              metadata: recap.metadata || {},
+            });
+            console.log('💾 Persisted AI recap to database');
+          } catch (persistError) {
+            console.warn('⚠️ Failed to persist AI recap to database:', persistError);
+          }
+
           return {
             success: true,
             recap,

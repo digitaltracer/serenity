@@ -3,23 +3,64 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 222 47% 11%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 210 16% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 16% 96%;
+    --muted-foreground: 215 20% 50%;
+    --accent: 210 16% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 222 84% 5%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 213 31% 91%;
+    --card: 222 47% 9%;
+    --card-foreground: 213 31% 91%;
+    --popover: 222 47% 9%;
+    --popover-foreground: 213 31% 91%;
+    --primary: 213 31% 91%;
+    --primary-foreground: 222 47% 9%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 213 31% 91%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 213 31% 91%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 222 47% 9%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 212 43% 15%;
+  }
+
   html {
     font-family: 'InterVariable', 'Inter', system-ui, sans-serif;
     height: 100%;
-    font-size: 90%; /* globally reduce base size by ~10% */
+    font-size: 100%;
   }
   
   body {
     margin: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background-color: #f9fafb;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     height: 100%;
-  }
-  
-  body.dark {
-    background-color: #030712;
-    color: #f9fafb;
   }
 
   * {
@@ -51,18 +92,18 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(100, 116, 139, 0.3);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(100, 116, 139, 0.45);
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(148, 163, 184, 0.3);
 }
-
+ 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(148, 163, 184, 0.45);
 }

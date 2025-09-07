@@ -21,14 +21,12 @@ const Sidebar: React.FC<SidebarProps> = ({ children, className, collapsed }) => 
   return (
     <div
       className={cn(
-        // Professional sidebar styling for both light and dark themes
-        'flex flex-col h-full bg-gray-50/80 backdrop-blur-md border-r border-gray-200',
-        'dark:bg-gray-900/30 dark:border-gray-700/30',
-        'transition-all duration-300 ease-in-out shadow-lg shadow-gray-200/30',
-        'dark:shadow-black/20',
+        // Tokenized sidebar
+        'flex flex-col h-full bg-card border-r border-border text-card-foreground',
+        'transition-all duration-200 ease-in-out',
         {
           'w-56': !collapsed,
-          'w-20': collapsed,
+          'w-16': collapsed,
         },
         className
       )}
@@ -46,8 +44,7 @@ const SidebarHeader: React.FC<{ children: React.ReactNode; className?: string }>
   
   return (
     <div className={cn(
-      'border-b border-gray-200 dark:border-gray-700/20',
-      'bg-gradient-to-b from-gray-100/50 to-transparent dark:from-gray-800/5',
+      'border-b border-border bg-card text-card-foreground',
       // Compact mode responsive padding
       {
         'p-6': !compactMode,
@@ -83,15 +80,15 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   return (
     <div
       className={cn(
-        'flex items-center rounded-lg cursor-pointer transition-all duration-150',
-        'hover:bg-gray-200 dark:hover:bg-gray-800/40',
+        'relative flex items-center rounded-lg cursor-pointer transition-colors duration-150',
+        'hover:bg-accent/60',
         // Compact mode responsive padding and spacing
         {
           'gap-3 px-4 py-3': !compactMode,
           'gap-2 px-3 py-2': compactMode,
           // Active state styling for both themes
-          'bg-gray-300 text-gray-900 border border-gray-400 dark:bg-gray-600/40 dark:text-gray-100 dark:border-gray-500/50': active,
-          'text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white': !active,
+          'bg-accent text-accent-foreground before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2px] before:bg-ring': active,
+          'text-foreground/80 hover:text-foreground': !active,
           'justify-center': !children, // Center icon when no text
         },
         className
@@ -99,7 +96,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
       onClick={onClick}
     >
       {icon && (
-        <div className="flex-shrink-0 w-5 h-5">
+        <div className="flex-shrink-0 w-4 h-4">
           {icon}
         </div>
       )}
@@ -125,7 +122,7 @@ const SidebarSection: React.FC<{
       className
     )}>
       <h3 className={cn(
-        'text-xs font-semibold text-gray-400 uppercase tracking-wider',
+        'text-xs font-semibold text-muted-foreground uppercase tracking-wider',
         // Compact mode responsive spacing
         {
           'px-4 mb-3': !compactMode,

@@ -7,6 +7,7 @@ import { SQLiteAdapter } from '../adapters/SQLiteAdapter';
 import { SQLiteTaskQueries } from '../queries/sqlite/tasks';
 import { SQLiteProjectQueries } from '../queries/sqlite/projects';
 import { SQLiteJournalQueries } from '../queries/sqlite/journal';
+import { SQLiteAIQueries } from '../queries/sqlite/ai';
 import { Task, Project, JournalEntry } from '@serenity/core';
 
 export class SQLiteService {
@@ -14,6 +15,7 @@ export class SQLiteService {
   private tasks: SQLiteTaskQueries | null = null;
   private projects: SQLiteProjectQueries | null = null;
   private journal: SQLiteJournalQueries | null = null;
+  private ai: SQLiteAIQueries | null = null;
   private initialized = false;
 
   constructor(adapter?: SQLiteAdapter) {
@@ -34,6 +36,7 @@ export class SQLiteService {
       this.tasks = new SQLiteTaskQueries(db);
       this.projects = new SQLiteProjectQueries(db);
       this.journal = new SQLiteJournalQueries(db);
+      this.ai = new SQLiteAIQueries(db);
 
       this.initialized = true;
       console.log('✅ SQLite service initialized successfully');
@@ -158,6 +161,48 @@ export class SQLiteService {
   async getProject(id: string): Promise<Project | null> {
     this.ensureInitialized();
     return this.projects!.getProjectById(id);
+  }
+
+  // ===== AI INSIGHTS/RECAPS =====
+
+  async addAIInsights(insights: Array<{ provider: string; type: string; title: string; description: string; confidence: number; category: string; actionable?: boolean; metadata?: any }>): Promise<void> {
+    this.ensureInitialized();
+    const rows = insights.map(i => ({
+      provider: (i.provider as any) || 'local',
+      type: i.type as any,
+      title: i.title,
+      description: i.description,
+      confidence: i.confidence ?? 0.5,
+      category: i.category as any,
+      actionable: !!i.actionable,
+      metadata: JSON.stringify(i.metadata || {}),
+    }));
+    await this.ai!.addInsights(rows as any);
+  }
+
+  async listAIInsights(limit = 200) {
+    this.ensureInitialized();
+    return this.ai!.listInsights(limit);
+  }
+
+  async addAIRecap(recap: { provider: string; type: 'weekly' | 'monthly'; title: string; summary: string; highlights?: any[]; challenges?: any[]; recommendations?: any[]; period: { start: string; end: string }; metadata?: any }) {
+    this.ensureInitialized();
+    await this.ai!.addRecap({
+      provider: (recap.provider as any) || 'local',
+      type: recap.type,
+      title: recap.title,
+      summary: recap.summary,
+      highlights: JSON.stringify(recap.highlights || []),
+      challenges: JSON.stringify(recap.challenges || []),
+      recommendations: JSON.stringify(recap.recommendations || []),
+      period: JSON.stringify(recap.period),
+      metadata: JSON.stringify(recap.metadata || {}),
+    } as any);
+  }
+
+  async listAIRecaps(limit = 50) {
+    this.ensureInitialized();
+    return this.ai!.listRecaps(limit);
   }
 
   /**

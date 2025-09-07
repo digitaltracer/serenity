@@ -4,11 +4,11 @@
   "private": true,
   "description": "Cross-platform productivity application with ActionHub and Journal",
   "scripts": {
-    "build": "turbo build",
-    "dev": "turbo dev",
-    "lint": "turbo lint",
-    "test": "turbo test",
-    "clean": "turbo clean",
+    "build": "npm -w @serenity/core run build && npm -w @serenity/database run build && npm -w @serenity/ui run build && npm -w @serenity/desktop run build",
+    "dev": "turbo run dev --no-daemon",
+    "lint": "turbo run lint --no-daemon",
+    "test": "turbo run test --no-daemon",
+    "clean": "turbo run clean --no-daemon",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "type-check": "tsc --noEmit"
   },

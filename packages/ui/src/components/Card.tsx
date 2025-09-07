@@ -13,15 +13,8 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={cn(
-          // Premium card design with subtle gradients and elegant shadows
-          'rounded-xl border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm',
-          'shadow-lg shadow-gray-200/40',
-          'dark:border-gray-700/40 dark:from-gray-800/80 dark:to-gray-900/60 dark:shadow-black/25',
-          'transition-all duration-300 ease-out',
-          'hover:shadow-xl hover:shadow-gray-300/50 hover:border-gray-300/80',
-          'dark:hover:shadow-black/40 dark:hover:border-gray-600/60',
-          'hover:-translate-y-0.5 hover:scale-[1.005] transform-gpu',
-          'ring-1 ring-gray-100/80 dark:ring-gray-800/60',
+          // Tokenized card styles
+          'rounded-xl border bg-card text-card-foreground border-border shadow-sm transition-colors duration-200',
           className
         )}
         {...props}
@@ -41,7 +34,7 @@ const CardHeader = React.forwardRef<HTMLDivElement, CardProps>(
         ref={ref}
         className={cn(
           'flex flex-col space-y-2',
-          'border-b border-gray-200 dark:border-gray-700/20',
+          'border-b border-border',
           // Compact mode responsive padding
           {
             'p-8 pb-6': !compactMode,
@@ -63,8 +56,7 @@ const CardTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTML
       <h3
         ref={ref}
         className={cn(
-          'text-xl font-semibold leading-tight tracking-tight text-gray-900 truncate',
-          'dark:text-white',
+          'text-xl font-semibold leading-tight tracking-tight truncate',
           className
         )}
         title={typeof children === 'string' ? children : undefined}
@@ -82,7 +74,7 @@ const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttribu
       <p
         ref={ref}
         className={cn(
-          'text-sm text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-3',
+          'text-sm text-muted-foreground leading-relaxed line-clamp-3',
           className
         )}
         title={typeof children === 'string' ? children : undefined}

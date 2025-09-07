@@ -144,6 +144,37 @@ CREATE INDEX IF NOT EXISTS idx_goals_priority ON goals(priority);
 
 CREATE INDEX IF NOT EXISTS idx_encrypted_integrations_type ON encrypted_integrations(type);
 
+-- AI insights and recaps persistence
+CREATE TABLE IF NOT EXISTS ai_insights (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    provider VARCHAR(20) NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic', 'local')),
+    type VARCHAR(20) NOT NULL CHECK (type IN ('productivity', 'behavior', 'recommendation', 'warning')),
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    confidence DECIMAL(3,2) DEFAULT 0.5,
+    category VARCHAR(20) NOT NULL CHECK (category IN ('tasks', 'journal', 'habits', 'goals')),
+    actionable BOOLEAN DEFAULT FALSE,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS ai_recaps (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    provider VARCHAR(20) NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic', 'local')),
+    type VARCHAR(10) NOT NULL CHECK (type IN ('weekly', 'monthly')),
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    highlights JSONB DEFAULT '[]',
+    challenges JSONB DEFAULT '[]',
+    recommendations JSONB DEFAULT '[]',
+    period JSONB NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_insights_created_at ON ai_insights(created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_recaps_created_at ON ai_recaps(created_at);
+
 -- Triggers for updated_at timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$

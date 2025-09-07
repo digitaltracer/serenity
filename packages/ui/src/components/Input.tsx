@@ -37,20 +37,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <div className="relative">
           <input
             className={cn(
-              // Premium input styling with elegant gradients and shadows
-              'flex h-12 w-full rounded-lg border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm px-4 py-3 text-base',
-              'text-gray-900 transition-all duration-200 ease-out',
-              'shadow-sm shadow-gray-200/30 ring-1 ring-gray-100/50',
-              'focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400/60',
-              'focus:shadow-md focus:shadow-blue-200/40',
-              'dark:border-gray-600/60 dark:from-gray-800 dark:to-gray-900 dark:text-gray-100',
-              'dark:shadow-black/20 dark:ring-gray-800/40',
-              'dark:focus:ring-gray-400/40 dark:focus:border-gray-400/60',
-              'dark:focus:shadow-black/40',
+              // Tokenized, minimal input styling
+              'flex h-12 w-full rounded-lg border px-4 py-3 text-base',
+              'bg-background text-foreground border-border',
+              'transition-colors duration-200 ease-out',
+              'focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring',
               'disabled:cursor-not-allowed disabled:opacity-50',
               'placeholder:text-transparent',
               {
-                'border-red-500/60 focus:ring-red-500/40 focus:border-red-500/60': error,
+                'border-destructive focus:ring-destructive focus:border-destructive': error,
               },
               className
             )}
@@ -65,9 +60,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           <label
             className={cn(
               'absolute left-4 transition-all duration-200 pointer-events-none',
-              'text-gray-600 dark:text-gray-400',
+              'text-muted-foreground',
               {
-                '-top-2 text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 px-1': isFocused || hasValue,
+                '-top-2 text-xs text-foreground bg-background px-1': isFocused || hasValue,
                 'top-1/2 -translate-y-1/2 text-base': !isFocused && !hasValue,
                 'text-red-400': error,
               }
@@ -96,19 +91,14 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         )}
         <input
           className={cn(
-            // Premium input styling with elegant gradients and shadows
-            'flex h-12 w-full rounded-lg border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm px-4 py-3 text-base',
-            'text-gray-900 placeholder:text-gray-500 transition-all duration-200 ease-out',
-            'shadow-sm shadow-gray-200/30 ring-1 ring-gray-100/50',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400/60',
-            'focus:shadow-md focus:shadow-blue-200/40',
-            'dark:border-gray-600/60 dark:from-gray-800 dark:to-gray-900 dark:text-gray-100 dark:placeholder:text-gray-400',
-            'dark:shadow-black/20 dark:ring-gray-800/40',
-            'dark:focus:ring-gray-400/40 dark:focus:border-gray-400/60',
-            'dark:focus:shadow-black/40',
+            // Tokenized, minimal input styling
+            'flex h-12 w-full rounded-lg border px-4 py-3 text-base',
+            'bg-background text-foreground placeholder:text-muted-foreground border-border',
+            'transition-colors duration-200 ease-out',
+            'focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring',
             'disabled:cursor-not-allowed disabled:opacity-50',
             {
-              'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50': error,
+              'border-destructive focus:ring-destructive focus:border-destructive': error,
             },
             className
           )}

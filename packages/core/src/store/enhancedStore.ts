@@ -17,6 +17,7 @@ import dragDropReducer from './slices/dragDropSlice';
 import goalsReducer from './slices/goalsSlice';
 import integrationsReducer from './slices/integrationsSlice';
 import aiAssistantReducer from './slices/aiAssistantSlice';
+import { restoreInsights, restoreRecaps } from './slices/aiAssistantSlice';
 import { simplifiedPersistenceMiddleware, initializeSQLitePersistence } from './middleware/simplifiedPersistenceMiddleware';
 
 /**
@@ -211,6 +212,20 @@ export async function initializeStoreData() {
   } catch (error) {
     console.error('❌ Failed to initialize store data:', error);
     return false;
+  }
+
+  // Load AI insights/recaps from localStorage (persisted in middleware)
+  try {
+    const insightsStr = (localStorage.getItem('serenity_ai_insights') ?? '');
+    const recapsStr = (localStorage.getItem('serenity_ai_recaps') ?? '');
+    if (insightsStr) {
+      store.dispatch(restoreInsights(JSON.parse(insightsStr)));
+    }
+    if (recapsStr) {
+      store.dispatch(restoreRecaps(JSON.parse(recapsStr)));
+    }
+  } catch (e) {
+    console.warn('⚠️ Failed to restore AI insights/recaps:', e);
   }
 }
 

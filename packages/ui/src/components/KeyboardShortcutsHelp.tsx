@@ -25,6 +25,7 @@ import {
 import { Modal } from './Modal';
 import { Input } from './Input';
 import { Button } from './Button';
+import { CustomSelect } from './CustomSelect';
 
 // Component for displaying individual shortcut keys with proper styling
 const ShortcutKey: React.FC<{ shortcut: KeyboardShortcut }> = ({ shortcut }) => {
@@ -184,33 +185,36 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
                 placeholder="Search shortcuts..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-12"
               />
             </div>
           </div>
           
           <div className="sm:w-48">
-            <select
+            <CustomSelect
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value as ShortcutCategory | 'all')}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Categories</option>
-              {availableCategories.map(category => (
-                <option key={category} value={category}>
-                  {categoryNames[category]}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setSelectedCategory(value as ShortcutCategory | 'all')}
+              options={[
+                { value: 'all', label: 'All Categories' },
+                ...availableCategories.map(category => ({
+                  value: category,
+                  label: categoryNames[category]
+                }))
+              ]}
+              placeholder="Select Category"
+            />
           </div>
         </div>
 
         {/* Shortcuts list */}
         <div className="max-h-96 overflow-y-auto">
           {Object.keys(groupedShortcuts).length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              <KeyboardIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No shortcuts found matching your criteria.</p>
+            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
+                <KeyboardIcon className="w-8 h-8 opacity-50" />
+              </div>
+              <p className="text-sm font-medium">No shortcuts found matching your criteria.</p>
+              <p className="text-xs mt-1 opacity-75">Try adjusting your search or category filter.</p>
             </div>
           ) : (
             <div className="space-y-6">
@@ -228,11 +232,11 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
                   </div>
                   
                   {/* Shortcuts in this category */}
-                  <div className="grid gap-2">
+                  <div className="grid gap-3">
                     {categoryShortcuts.map(shortcut => (
                       <div
                         key={shortcut.id}
-                        className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="flex items-center justify-between py-3 px-4 rounded-xl bg-gradient-to-br from-gray-50/80 to-white/60 dark:from-gray-800/60 dark:to-gray-900/40 hover:from-gray-100/80 hover:to-gray-50/60 dark:hover:from-gray-700/60 dark:hover:to-gray-800/40 transition-all duration-200 border border-gray-200/40 dark:border-gray-700/40 shadow-sm shadow-gray-200/30 dark:shadow-black/20"
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 dark:text-gray-100">

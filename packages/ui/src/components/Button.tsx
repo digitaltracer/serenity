@@ -12,49 +12,40 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         className={cn(
-          // Base styles - professional and subtle
-          'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-150 text-center',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900',
+          // Base styles
+          'inline-flex items-center justify-center rounded-lg font-medium transition-colors duration-150 text-center',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
           'disabled:pointer-events-none disabled:opacity-50',
-          'transform active:scale-98',
-          
-          // Premium button variants with elegant gradients and shadows
+          'whitespace-nowrap leading-none',
+
+          // Variants aligned to design tokens
           {
-            // Primary: Premium dark button with subtle gradients
-            'bg-gradient-to-br from-gray-900 to-gray-800 text-white border border-gray-700/60 shadow-md shadow-gray-900/25': variant === 'primary',
-            'hover:from-gray-800 hover:to-gray-700 hover:shadow-lg hover:shadow-gray-900/40 hover:-translate-y-0.5': variant === 'primary',
-            'dark:from-gray-700 dark:to-gray-800 dark:border-gray-600/60 dark:shadow-black/30': variant === 'primary',
-            'dark:hover:from-gray-600 dark:hover:to-gray-700 dark:hover:shadow-black/50': variant === 'primary',
-            'ring-1 ring-gray-800/20 dark:ring-gray-600/30': variant === 'primary',
-            
-            // Secondary: Light elegant button with gradients
-            'bg-gradient-to-br from-gray-50 to-gray-100 text-gray-900 border border-gray-200/80 shadow-sm shadow-gray-200/40': variant === 'secondary',
-            'hover:from-gray-100 hover:to-gray-150 hover:shadow-md hover:shadow-gray-300/50 hover:-translate-y-0.5': variant === 'secondary',
-            'dark:from-gray-800/80 dark:to-gray-900/60 dark:text-gray-100 dark:border-gray-700/50 dark:shadow-black/20': variant === 'secondary',
-            'dark:hover:from-gray-700/90 dark:hover:to-gray-800/80 dark:hover:shadow-black/40': variant === 'secondary',
-            'ring-1 ring-gray-100/60 dark:ring-gray-800/40': variant === 'secondary',
-            
-            // Ghost: Minimal with subtle hover effects
-            'text-gray-700 border border-transparent hover:bg-gradient-to-br hover:from-gray-100 hover:to-gray-50': variant === 'ghost',
-            'hover:shadow-sm hover:shadow-gray-200/30 hover:-translate-y-0.5': variant === 'ghost',
-            'dark:text-gray-300 dark:hover:from-gray-800/50 dark:hover:to-gray-900/30 dark:hover:shadow-black/20': variant === 'ghost',
-            
-            // Destructive: Premium red styling
-            'bg-gradient-to-br from-red-600 to-red-700 text-white border border-red-500/60 shadow-md shadow-red-600/25': variant === 'destructive',
-            'hover:from-red-500 hover:to-red-600 hover:shadow-lg hover:shadow-red-600/40 hover:-translate-y-0.5': variant === 'destructive',
-            'ring-1 ring-red-500/30': variant === 'destructive',
+            // Primary
+            'bg-primary text-primary-foreground border border-border hover:bg-primary/90': variant === 'primary',
+
+            // Secondary
+            'bg-secondary text-secondary-foreground border border-border hover:bg-secondary/80': variant === 'secondary',
+
+            // Ghost
+            'bg-transparent text-foreground/80 border border-transparent hover:bg-accent/50 hover:text-foreground': variant === 'ghost',
+
+            // Destructive
+            'bg-destructive text-destructive-foreground border border-border hover:bg-destructive/90': variant === 'destructive',
 
             // Outline variant
-            'bg-transparent border border-current text-inherit hover:bg-gray-50 dark:hover:bg-gray-800': variant === 'outline',
+            'bg-transparent border border-border text-foreground hover:bg-accent/40': variant === 'outline',
           },
           
-          // Sizes - professional and balanced
+          // Sizes - bounded by min/max to avoid scaling with viewport
           {
-            'h-10 px-3 text-sm min-w-[2.5rem]': size === 'sm',
-            'h-12 px-4 text-base min-w-[3rem]': size === 'md',
-            'h-14 px-6 text-lg min-w-[3.5rem]': size === 'lg',
+            // Small: ~32–40px height
+            'h-auto min-h-[32px] max-h-[40px] px-3 py-2 text-sm min-w-[2.5rem] max-w-full': size === 'sm',
+            // Medium: ~40–44px height
+            'h-auto min-h-[40px] max-h-[44px] px-4 py-2.5 text-sm min-w-[3rem] max-w-full': size === 'md',
+            // Large: ~44–48px height
+            'h-auto min-h-[44px] max-h-[48px] px-5 py-3 text-base min-w-[3.5rem] max-w-full': size === 'lg',
           },
-          
+
           className
         )}
         ref={ref}

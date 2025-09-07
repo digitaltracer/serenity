@@ -67,6 +67,112 @@ export class AIAssistantService {
   }
 
   /**
+   * Generate basic, local insights without calling external providers.
+   * Provides a sensible fallback when no provider is configured.
+   */
+  static generateLocalInsights(tasks: Task[], journalEntries: JournalEntry[]) {
+    const insights: Array<{
+      type: 'productivity' | 'behavior' | 'recommendation' | 'warning';
+      title: string;
+      description: string;
+      category: 'tasks' | 'journal' | 'habits' | 'goals';
+      actionable?: boolean;
+      confidence: number;
+      metadata?: any;
+    }> = [];
+
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(t => t.completed);
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
+
+    // Insight: completion rate
+    insights.push({
+      type: 'productivity',
+      title: `Completion rate is ${completionRate}%`,
+      description: totalTasks > 0
+        ? `You have completed ${completedTasks.length} of ${totalTasks} tasks. Consider limiting work-in-progress to improve throughput.`
+        : 'No tasks yet. Create a few tasks to kickstart your workflow.',
+      category: 'tasks',
+      actionable: totalTasks > 0,
+      confidence: 0.7,
+      metadata: { totalTasks, completed: completedTasks.length, completionRate }
+    });
+
+    // Insight: overdue tasks
+    const now = new Date();
+    const overdue = tasks.filter(t => t.dueDate && !t.completed && new Date(t.dueDate) < now);
+    if (overdue.length > 0) {
+      insights.push({
+        type: 'warning',
+        title: `${overdue.length} overdue ${overdue.length === 1 ? 'task' : 'tasks'}`,
+        description: 'Review due dates and reschedule or complete overdue work to reduce stress.',
+        category: 'tasks',
+        actionable: true,
+        confidence: 0.8,
+        metadata: { overdueCount: overdue.length }
+      });
+    }
+
+    // Insight: weekly activity (created/completed)
+    const startOfWeek = new Date();
+    startOfWeek.setHours(0,0,0,0);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    const createdThisWeek = tasks.filter(t => new Date(t.createdAt) >= startOfWeek).length;
+    const completedThisWeek = tasks.filter(t => t.completed && new Date(t.completedAt || t.updatedAt || t.createdAt) >= startOfWeek).length;
+    insights.push({
+      type: 'behavior',
+      title: `This week: ${createdThisWeek} created, ${completedThisWeek} completed`,
+      description: 'Balance task intake and completion to maintain steady progress.',
+      category: 'tasks',
+      actionable: false,
+      confidence: 0.6,
+      metadata: { createdThisWeek, completedThisWeek }
+    });
+
+    // Insight: journaling frequency
+    const entriesThisWeek = journalEntries.filter(j => new Date(j.date) >= startOfWeek);
+    if (entriesThisWeek.length === 0) {
+      insights.push({
+        type: 'recommendation',
+        title: 'No journal entries this week',
+        description: 'Try a short daily reflection to capture insights and reduce mental load.',
+        category: 'journal',
+        actionable: true,
+        confidence: 0.6,
+        metadata: { entriesThisWeek: 0 }
+      });
+    } else if (entriesThisWeek.length >= 3) {
+      insights.push({
+        type: 'behavior',
+        title: `Consistent journaling (${entriesThisWeek.length} this week)`,
+        description: 'Great job building a reflection habit. Keep it up for better clarity and focus.',
+        category: 'journal',
+        actionable: false,
+        confidence: 0.7,
+        metadata: { entriesThisWeek: entriesThisWeek.length }
+      });
+    }
+
+    // Insight: top tags/themes
+    const tagCounts = new Map<string, number>();
+    tasks.forEach(t => (t.tags || []).forEach(tag => tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1)));
+    journalEntries.forEach(e => (e.tags || []).forEach(tag => tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1)));
+    const topTags = Array.from(tagCounts.entries()).sort((a,b) => b[1]-a[1]).slice(0, 2).map(([tag]) => tag);
+    if (topTags.length > 0) {
+      insights.push({
+        type: 'productivity',
+        title: `Frequent themes: ${topTags.join(', ')}`,
+        description: 'Consider time-blocking for your top themes to reduce context switching.',
+        category: 'habits',
+        actionable: true,
+        confidence: 0.55,
+        metadata: { topTags }
+      });
+    }
+
+    return insights;
+  }
+  /**
    * Preprocess journal entries for AI analysis
    * Removes sensitive information and structures data
    */

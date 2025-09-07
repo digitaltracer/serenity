@@ -209,7 +209,15 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
         console.warn('⚠️ Failed to trigger AI settings save:', e);
       }
     }
-    
+
+    // Persist AI insights/recaps to localStorage when updated
+    if (action.type === 'aiAssistant/analyzeUserData/fulfilled' || action.type === 'aiAssistant/clearInsights' || action.type === 'aiAssistant/removeInsight') {
+      try { localStorage.setItem('serenity_ai_insights', JSON.stringify(state.aiAssistant.insights)); } catch {}
+    }
+    if (action.type === 'aiAssistant/generateRecap/fulfilled' || action.type === 'aiAssistant/removeRecap') {
+      try { localStorage.setItem('serenity_ai_recaps', JSON.stringify(state.aiAssistant.recaps)); } catch {}
+    }
+
     // For data operations, use SQLite if available, otherwise localStorage as temporary fallback
     if (sqliteInitialized && window.electronAPI?.sqlite) {
       await persistToSQLite(action, state);

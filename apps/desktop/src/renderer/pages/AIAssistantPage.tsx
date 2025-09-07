@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLoadAISettings } from './AIAssistant/hooks/useLoadAISettings';
 import { useListProviderModels } from './AIAssistant/hooks/useListProviderModels';
 import { usePersistActiveProviderSettings } from './AIAssistant/hooks/usePersistActiveProviderSettings';
+import { useLoadPersistedAIData } from './AIAssistant/hooks/useLoadPersistedAIData';
 import { useSelector, useDispatch } from 'react-redux';
 // Types are provided via ambient declarations in core; fall back to any where needed for stability
 import {
@@ -10,6 +11,7 @@ import {
   selectIsAnalyzing,
   selectAnalysisProgress,
   selectAnalysisStatus,
+  selectLastAnalysis,
   selectAIInsights,
   selectAIRecaps,
   selectAIConfiguration,
@@ -31,6 +33,9 @@ import {
   testApiKey,
   analyzeUserData,
   generateRecap,
+  restoreInsights,
+  restoreRecaps,
+  recordUsage,
   selectAllTasks,
   selectAllEntries,
 } from '@serenity/core';
@@ -86,6 +91,7 @@ export const AIAssistantPage: React.FC = () => {
   const isAnalyzing = useSelector(selectIsAnalyzing);
   const analysisProgress = useSelector(selectAnalysisProgress);
   const analysisStatus = useSelector(selectAnalysisStatus);
+  const lastAnalysisAt = useSelector(selectLastAnalysis) as unknown as string | undefined;
   const insights = useSelector(selectAIInsights);
   const recaps = useSelector(selectAIRecaps);
   const configuration = useSelector(selectAIConfiguration);
@@ -125,6 +131,13 @@ export const AIAssistantPage: React.FC = () => {
     updateProvidersWithModelInfo,
     updateProvidersWithApiKeys,
     setActiveProvider,
+  });
+
+  // Load persisted AI data (insights, recaps, usage)
+  useLoadPersistedAIData(dispatch as any, {
+    restoreInsights,
+    restoreRecaps,
+    recordUsage,
   });
 
   // Load available models per provider when they have keys
@@ -856,7 +869,14 @@ export const AIAssistantPage: React.FC = () => {
                     <div className="text-sm text-muted-foreground space-y-1">
                       <p>Tasks available: {tasks.length}</p>
                       <p>Journal entries: {journalEntries.length}</p>
-                      <p>Last analysis: {analysisTracker.lastTaskAnalysis ? new Date(analysisTracker.lastTaskAnalysis).toLocaleDateString() : 'Never'}</p>
+                      <p>
+                        Last analysis: {
+                          (() => {
+                            const d = lastAnalysisAt || analysisTracker.lastTaskAnalysis || analysisTracker.lastJournalAnalysis;
+                            return d ? new Date(d as any).toLocaleDateString() : 'Never';
+                          })()
+                        }
+                      </p>
                     </div>
                     <Button
                       onClick={handleAnalyzeData}

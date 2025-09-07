@@ -175,6 +175,19 @@ CREATE TABLE IF NOT EXISTS ai_recaps (
 CREATE INDEX IF NOT EXISTS idx_ai_insights_created_at ON ai_insights(created_at);
 CREATE INDEX IF NOT EXISTS idx_ai_recaps_created_at ON ai_recaps(created_at);
 
+-- AI token usage persistence (per operation)
+CREATE TABLE IF NOT EXISTS ai_usage (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    provider VARCHAR(20) NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic')),
+    operation VARCHAR(10) NOT NULL CHECK (operation IN ('analyze', 'recap')),
+    prompt_tokens INTEGER DEFAULT 0,
+    completion_tokens INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_usage_timestamp ON ai_usage(timestamp);
+
 -- Triggers for updated_at timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$

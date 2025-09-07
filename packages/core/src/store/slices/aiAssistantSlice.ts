@@ -219,8 +219,8 @@ export const analyzeUserData = createAsyncThunk(
     // Fallback: generate local insights so the user sees value without an API
     const safeTasks = (tasks as Task[] | undefined) || [];
     const safeJournal = (journalEntries as JournalEntry[] | undefined) || [];
-    const local = AIAssistantService.generateLocalInsights(safeTasks, safeJournal);
-    const nowIso = new Date().toISOString();
+  const local = AIAssistantService.generateLocalInsights(safeTasks, safeJournal);
+  const nowIso = new Date().toISOString();
     const insights = local.map((i, idx) => ({
       id: `local_${Date.now()}_${idx}`,
       type: i.type,
@@ -233,14 +233,16 @@ export const analyzeUserData = createAsyncThunk(
       actionable: i.actionable,
       metadata: { ...(i.metadata || {}), fallback: true },
     }));
-    return {
-      insights,
-      processedData: {
-        processedTaskIds: safeTasks.map(t => t.id),
-        processedJournalIds: safeJournal.map(j => j.id),
-        totalTasksAnalyzed: safeTasks.length,
-        totalJournalEntriesAnalyzed: safeJournal.length,
-      },
+  return {
+    insights,
+    processedData: {
+      processedTaskIds: safeTasks.map(t => t.id),
+      processedJournalIds: safeJournal.map(j => j.id),
+      lastTaskAnalysis: safeTasks.length > 0 ? nowIso : undefined,
+      lastJournalAnalysis: safeJournal.length > 0 ? nowIso : undefined,
+      totalTasksAnalyzed: safeTasks.length,
+      totalJournalEntriesAnalyzed: safeJournal.length,
+    },
       usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
       provider,
       operation: 'analyze' as const,
@@ -571,6 +573,7 @@ export const selectActiveProvider = (state: { aiAssistant: AIAssistantState }) =
 export const selectIsAnalyzing = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.isAnalyzing;
 export const selectAnalysisProgress = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.analysisProgress;
 export const selectAnalysisStatus = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.analysisStatus;
+export const selectLastAnalysis = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.lastAnalysis;
 export const selectAIInsights = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.insights;
 export const selectAIRecaps = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.recaps;
 export const selectAnalysisTracker = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.analysisTracker;

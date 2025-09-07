@@ -15,7 +15,9 @@ import {
   setEntries,
   addUsedTags,
   initializeDatabaseConfig,
-  initializeIntegrations
+  initializeIntegrations,
+  restoreInsights,
+  restoreRecaps
 } from '@serenity/core';
 import { AuthenticatedApp, ToastProvider, useToast, LoadingScreen } from '@serenity/ui';
 import { Layout } from './components/Layout';
@@ -191,6 +193,31 @@ function AppContent() {
         } catch (error) {
           console.error('❌ Store data initialization failed:', error);
           // Continue with app initialization
+        }
+        
+        setInitializationStatus('Loading AI insights...');
+        
+        // Load AI insights and recaps from database
+        console.log('🧠 Loading AI insights and recaps from database...');
+        try {
+          if (window.electronAPI?.aiAssistant?.getInsights) {
+            const insightsResult = await window.electronAPI.aiAssistant.getInsights();
+            if (insightsResult.success && Array.isArray(insightsResult.insights)) {
+              console.log(`📊 Loaded ${insightsResult.insights.length} AI insights from database`);
+              dispatch(restoreInsights(insightsResult.insights));
+            }
+          }
+          
+          if (window.electronAPI?.aiAssistant?.getRecaps) {
+            const recapsResult = await window.electronAPI.aiAssistant.getRecaps();
+            if (recapsResult.success && Array.isArray(recapsResult.recaps)) {
+              console.log(`📚 Loaded ${recapsResult.recaps.length} AI recaps from database`);
+              dispatch(restoreRecaps(recapsResult.recaps));
+            }
+          }
+        } catch (error) {
+          console.error('❌ Failed to load AI insights:', error);
+          // Continue with app initialization even if AI insights fail to load
         }
         
         setInitializationStatus('Finalizing...');

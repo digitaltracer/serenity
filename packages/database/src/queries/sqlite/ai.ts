@@ -44,7 +44,7 @@ export class SQLiteAIQueries {
           i.confidence,
           i.category,
           i.actionable ? 1 : 0,
-          i.metadata || '{}'
+          typeof i.metadata === 'string' ? i.metadata : JSON.stringify(i.metadata || {})
         );
       }
     });
@@ -67,11 +67,11 @@ export class SQLiteAIQueries {
       recap.type,
       recap.title,
       recap.summary,
-      recap.highlights || '[]',
-      recap.challenges || '[]',
-      recap.recommendations || '[]',
-      recap.period,
-      recap.metadata || '{}'
+      typeof recap.highlights === 'string' ? recap.highlights : JSON.stringify(recap.highlights || []),
+      typeof recap.challenges === 'string' ? recap.challenges : JSON.stringify(recap.challenges || []),
+      typeof recap.recommendations === 'string' ? recap.recommendations : JSON.stringify(recap.recommendations || []),
+      typeof recap.period === 'string' ? recap.period : JSON.stringify(recap.period),
+      typeof recap.metadata === 'string' ? recap.metadata : JSON.stringify(recap.metadata || {})
     );
   }
 
@@ -80,5 +80,26 @@ export class SQLiteAIQueries {
     const stmt = this.db.prepare(sql);
     const rows = stmt.all(limit) as AIRecapRow[];
     return rows;
+  }
+
+  // ===== Usage =====
+  async addUsage(entries: Array<{ timestamp?: string; provider: 'openai' | 'gemini' | 'anthropic'; operation: 'analyze' | 'recap'; promptTokens: number; completionTokens: number; totalTokens: number }>): Promise<void> {
+    if (!entries || entries.length === 0) return;
+    const sql = `INSERT INTO ai_usage (id, timestamp, provider, operation, prompt_tokens, completion_tokens, total_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+    const stmt = this.db.prepare(sql);
+    const insertMany = this.db.transaction((rows: typeof entries) => {
+      for (const r of rows) {
+        const id = `usage_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const ts = r.timestamp || new Date().toISOString();
+        stmt.run(id, ts, r.provider, r.operation, Math.floor(r.promptTokens||0), Math.floor(r.completionTokens||0), Math.floor(r.totalTokens||0));
+      }
+    });
+    insertMany(entries);
+  }
+
+  async listUsage(limit = 500): Promise<Array<{ id: string; timestamp: string; provider: string; operation: string; prompt_tokens: number; completion_tokens: number; total_tokens: number }>> {
+    const sql = `SELECT * FROM ai_usage ORDER BY timestamp DESC LIMIT ?`;
+    const stmt = this.db.prepare(sql);
+    return stmt.all(limit) as any;
   }
 }

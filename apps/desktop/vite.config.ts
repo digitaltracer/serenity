@@ -13,6 +13,34 @@ export default defineConfig({
   build: {
     outDir: 'dist/renderer',
     emptyOutDir: true,
+    chunkSizeWarningLimit: 1000, // Increase limit to 1MB
+    rollupOptions: {
+      external: [
+        // Externalize Node.js modules that shouldn't be bundled for renderer
+        'pg',
+        'pg-pool', 
+        'pg-connection-string',
+        'pgpass',
+        'split2',
+      ],
+      output: {
+        // Optimize chunking to reduce bundle size warnings
+        manualChunks: {
+          // Separate vendor libraries
+          vendor: ['react', 'react-dom', 'react-redux', '@reduxjs/toolkit'],
+          // Separate UI components
+          ui: ['lucide-react'],
+          // Separate core business logic
+          core: ['@serenity/core'],
+          // Separate database layer (should be minimal in renderer)
+          database: ['@serenity/database'],
+        },
+        // Reduce chunk names for cleaner builds
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
+      }
+    }
   },
   resolve: {
     alias: {

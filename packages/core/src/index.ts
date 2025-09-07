@@ -10,7 +10,7 @@ export * from './services/googleCalendarService';
 export * from './services/githubService';
 export * from './services/integrationSyncService';
 export * from './services/encryptedIntegrationService';
-export * from './services/biometricAuthService';
+// biometricAuthService is only used dynamically to avoid bundle conflicts
 export * from './services/aiAssistantService';
 // Export secure storage functions
 export { 

@@ -54,6 +54,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getStats: (id: string) => ipcRenderer.invoke('projects:get-stats', id),
   },
 
+  // Goal operations (business logic)
+  goals: {
+    get: () => ipcRenderer.invoke('goals:get'),
+    createWithId: (goal: any) => ipcRenderer.invoke('goals:create-with-id', goal),
+    update: (id: string, updates: any) => ipcRenderer.invoke('goals:update', id, updates),
+    delete: (id: string) => ipcRenderer.invoke('goals:delete', id),
+  },
+
   // Journal operations (business logic)
   journal: {
     get: () => ipcRenderer.invoke('journal:get'),
@@ -202,6 +210,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     hasApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => ipcRenderer.invoke('ai-assistant:has-api-key', provider),
     removeApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => ipcRenderer.invoke('ai-assistant:remove-api-key', provider),
     listModels: (provider: 'openai' | 'gemini' | 'anthropic') => ipcRenderer.invoke('ai-assistant:list-models', provider),
+    listInsights: () => ipcRenderer.invoke('ai-assistant:list-insights'),
+    listRecaps: () => ipcRenderer.invoke('ai-assistant:list-recaps'),
+    listUsage: () => ipcRenderer.invoke('ai-assistant:list-usage'),
+    saveInsights: (provider: 'openai' | 'gemini' | 'anthropic' | 'local', insights: any[]) => ipcRenderer.invoke('ai-assistant:save-insights', { provider, insights }),
+    saveUsage: (entry: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; operation: 'analyze' | 'recap'; promptTokens: number; completionTokens: number; totalTokens: number; timestamp?: string }) => ipcRenderer.invoke('ai-assistant:save-usage', entry),
   },
 
 });
@@ -211,7 +224,7 @@ export interface ElectronAPI {
   database: {
     testConnection: (connectionUrl: string) => Promise<{ success: boolean; error?: string }>;
   };
-  
+
   // System operations (secure business logic layer)
   system: {
     initialize: () => Promise<{ success: boolean; error?: string }>;
@@ -267,6 +280,14 @@ export interface ElectronAPI {
     getProductivityInsights: () => Promise<{ success: boolean; data?: any; error?: string }>;
   };
 
+  // Goal operations (business logic)
+  goals: {
+    get: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
+    createWithId: (goal: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+    update: (id: string, updates: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+    delete: (id: string) => Promise<{ success: boolean; data?: boolean; error?: string }>;
+  };
+
   // Legacy SQLite operations (DEPRECATED - maintained for backward compatibility)
   sqlite: {
     // Database management - DEPRECATED
@@ -301,6 +322,24 @@ export interface ElectronAPI {
     createJournalEntryWithId: (entry: any) => Promise<{ success: boolean; data?: any; error?: string }>;
     updateJournalEntry: (id: string, updates: any) => Promise<{ success: boolean; data?: any; error?: string }>;
     deleteJournalEntry: (id: string) => Promise<{ success: boolean; data?: boolean; error?: string }>;
+  };
+
+  // AI Assistant operations (typed)
+  aiAssistant: {
+    setApiKey: (provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => Promise<{ success: boolean; modelInfo?: any; usage?: any; error?: string }>;
+    testApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; error?: string }>;
+    analyzeData: (options: { provider: 'openai' | 'gemini' | 'anthropic'; dataTypes: string[]; forceReAnalyze?: boolean }) => Promise<{ success: boolean; insights?: any[]; processedData?: any; usage?: any; error?: string }>;
+    generateRecap: (options: { provider: 'openai' | 'gemini' | 'anthropic'; type: 'weekly' | 'monthly'; period: { start: string; end: string } }) => Promise<{ success: boolean; recap?: any; usage?: any; error?: string }>;
+    getSettings: () => Promise<{ success: boolean; settings?: any; error?: string }>;
+    saveSettings: (settings: any) => Promise<{ success: boolean; skipped?: boolean; error?: string }>;
+    hasApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; hasKey?: boolean; error?: string }>;
+    removeApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; error?: string }>;
+    listModels: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; models?: any[]; error?: string }>;
+    listInsights: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
+    listRecaps: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
+    listUsage: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
+    saveInsights: (provider: 'openai' | 'gemini' | 'anthropic' | 'local', insights: any[]) => Promise<{ success: boolean; error?: string }>;
+    saveUsage: (entry: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; operation: 'analyze' | 'recap'; promptTokens: number; completionTokens: number; totalTokens: number; timestamp?: string }) => Promise<{ success: boolean; error?: string }>;
   };
   window: {
     minimize: () => Promise<void>;
@@ -348,6 +387,6 @@ export interface ElectronAPI {
 
 declare global {
   interface Window {
-    electronAPI: ElectronAPI;
+    electronAPI?: ElectronAPI;
   }
 }

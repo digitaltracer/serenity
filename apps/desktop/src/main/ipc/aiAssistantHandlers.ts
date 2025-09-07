@@ -846,13 +846,14 @@ async function callGemini(apiKey: string, prompt: string): Promise<any> {
     const detected = geminiModelInfo ? geminiModelInfo.model : 'gemini-2.5-flash';
     const modelName = await resolveModelForProvider('gemini', detected);
     
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         contents: [{
+          role: 'user',
           parts: [{
             text: `You are a productivity and well-being assistant. Analyze user data and provide helpful, actionable insights in JSON format.\n\n${prompt}`
           }]
@@ -870,16 +871,28 @@ async function callGemini(apiKey: string, prompt: string): Promise<any> {
     }
 
     const data = await response.json() as any;
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    const textParts = Array.isArray(parts) ? parts.map((p: any) => p?.text).filter(Boolean) : [];
+    const content = textParts.join('\n').trim();
+
+    if (!content) {
+      const finish = data?.candidates?.[0]?.finishReason || data?.promptFeedback?.blockReason;
+      const reason = typeof finish === 'string' ? finish : 'no_text';
+      return {
+        success: false,
+        error: `Empty response from Gemini (reason: ${reason})`,
+      };
+    }
+
+    const um = (data as any)?.usageMetadata || {};
+    const promptTokens = Number(um.promptTokenCount || 0);
+    const completionTokens = Number(um.candidatesTokenCount || 0);
+    const totalTokens = Number(um.totalTokenCount || (promptTokens + completionTokens));
+
     return {
       success: true,
       content,
-      usage: {
-        promptTokens: 0, // Gemini doesn't provide detailed usage stats
-        completionTokens: 0,
-        totalTokens: 0,
-      },
+      usage: { promptTokens, completionTokens, totalTokens },
     };
   } catch (error) {
     console.error('❌ Gemini API call failed:', error);
@@ -1212,7 +1225,7 @@ export function registerAIAssistantHandlers(): void {
       );
       
       console.log(`✅ Analysis complete: ${allInsights.length} insights generated`);
-      // Persist insights to SQLite for durability
+      // Persist insights and usage to SQLite for durability
       try {
         const { sqliteService } = await import('@serenity/database');
         await sqliteService.initialize();
@@ -1230,6 +1243,23 @@ export function registerAIAssistantHandlers(): void {
             }))
           );
           console.log(`💾 Persisted ${allInsights.length} AI insights to database`);
+          try {
+            const sample = allInsights.slice(0,3).map((i: any) => ({ title: i.title, type: i.type, confidence: i.confidence }));
+            console.log('🧪 Persisted insights sample (first 3):', sample);
+          } catch {}
+        }
+        // Persist aggregate usage for this analyze operation
+        try {
+          await sqliteService.addAIUsage([{ 
+            provider: options.provider, 
+            operation: 'analyze', 
+            promptTokens: usageTotals.promptTokens, 
+            completionTokens: usageTotals.completionTokens, 
+            totalTokens: usageTotals.totalTokens 
+          }]);
+          console.log('💾 Persisted AI analyze usage to database');
+        } catch (e) {
+          console.warn('⚠️ Failed to persist AI analyze usage to database:', e);
         }
       } catch (persistError) {
         console.warn('⚠️ Failed to persist AI insights to database:', persistError);
@@ -1337,7 +1367,7 @@ export function registerAIAssistantHandlers(): void {
           recap.source = options.provider;
           
           console.log(`✅ ${options.type} recap generated successfully`);
-          // Persist recap to SQLite for durability
+          // Persist recap and usage to SQLite for durability
           try {
             const { sqliteService } = await import('@serenity/database');
             await sqliteService.initialize();
@@ -1353,6 +1383,23 @@ export function registerAIAssistantHandlers(): void {
               metadata: recap.metadata || {},
             });
             console.log('💾 Persisted AI recap to database');
+            try {
+              console.log('🧪 Recap persisted summary:', { title: recap.title, type: recap.type, period: recap.period });
+            } catch {}
+            // Persist usage for recap
+            try {
+              const u = normalizeUsage(result.usage);
+              await sqliteService.addAIUsage([{ 
+                provider: options.provider, 
+                operation: 'recap', 
+                promptTokens: u.promptTokens, 
+                completionTokens: u.completionTokens, 
+                totalTokens: u.totalTokens 
+              }]);
+              console.log('💾 Persisted AI recap usage to database');
+            } catch (e) {
+              console.warn('⚠️ Failed to persist AI recap usage to database:', e);
+            }
           } catch (persistError) {
             console.warn('⚠️ Failed to persist AI recap to database:', persistError);
           }
@@ -1469,6 +1516,102 @@ export function registerAIAssistantHandlers(): void {
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to save settings' 
       };
+    }
+  });
+
+  // List persisted AI insights
+  ipcMain.handle('ai-assistant:list-insights', async () => {
+    try {
+      console.log('🔎 Fetching AI insights from SQLite...');
+      const { sqliteService } = await import('@serenity/database');
+      await sqliteService.initialize();
+      const rows = await sqliteService.listAIInsights(500);
+      console.log(`✅ Retrieved ${rows?.length || 0} AI insights from SQLite`);
+      if (rows && rows.length > 0) {
+        const sample = rows.slice(0, 3).map(r => ({ id: r.id, title: r.title, type: r.type, created_at: r.created_at }));
+        console.log('🧪 Insights sample (first 3):', sample);
+      }
+      return { success: true, data: rows };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to list insights' };
+    }
+  });
+
+  // List persisted AI recaps
+  ipcMain.handle('ai-assistant:list-recaps', async () => {
+    try {
+      console.log('🔎 Fetching AI recaps from SQLite...');
+      const { sqliteService } = await import('@serenity/database');
+      await sqliteService.initialize();
+      const rows = await sqliteService.listAIRecaps(200);
+      console.log(`✅ Retrieved ${rows?.length || 0} AI recaps from SQLite`);
+      if (rows && rows.length > 0) {
+        const sample = rows.slice(0, 3).map(r => ({ id: r.id, title: r.title, type: r.type, created_at: r.created_at }));
+        console.log('🧪 Recaps sample (first 3):', sample);
+      }
+      return { success: true, data: rows };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to list recaps' };
+    }
+  });
+
+  // List persisted AI usage
+  ipcMain.handle('ai-assistant:list-usage', async () => {
+    try {
+      const { sqliteService } = await import('@serenity/database');
+      await sqliteService.initialize();
+      console.log('🔎 Fetching AI token usage from SQLite...');
+      const rows = await sqliteService.listAIUsage(500);
+      console.log(`✅ Retrieved ${rows?.length || 0} AI usage rows from SQLite`);
+      if (rows && rows.length > 0) {
+        const sample = rows.slice(0, 3);
+        console.log('🧪 Usage sample (first 3):', sample);
+      }
+      return { success: true, data: rows };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to list usage' };
+    }
+  });
+
+  // Persist insights from renderer (used when renderer falls back to local analysis)
+  ipcMain.handle('ai-assistant:save-insights', async (_event, payload: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; insights: any[] }) => {
+    try {
+      const { sqliteService } = await import('@serenity/database');
+      await sqliteService.initialize();
+      const rows = (payload.insights || []).map(i => ({
+        provider: (payload.provider as any) || 'local',
+        type: i.type,
+        title: i.title,
+        description: i.description,
+        confidence: i.confidence ?? 0.5,
+        category: i.category,
+        actionable: !!i.actionable,
+        metadata: i.metadata || {},
+      }));
+      if (rows.length > 0) {
+        console.log(`💾 Saving ${rows.length} insights via IPC to SQLite...`);
+        await sqliteService.addAIInsights(rows as any);
+        console.log('✅ Insights saved via IPC');
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Failed to save insights via IPC:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to save insights' };
+    }
+  });
+
+  // Persist usage from renderer
+  ipcMain.handle('ai-assistant:save-usage', async (_event, payload: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; operation: 'analyze' | 'recap'; promptTokens: number; completionTokens: number; totalTokens: number; timestamp?: string }) => {
+    try {
+      const { sqliteService } = await import('@serenity/database');
+      await sqliteService.initialize();
+      console.log('💾 Saving usage via IPC:', payload);
+      await sqliteService.addAIUsage([{ ...payload } as any]);
+      console.log('✅ Usage saved via IPC');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Failed to save usage via IPC:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to save usage' };
     }
   });
 

@@ -22,6 +22,10 @@ const PERSISTENT_ACTIONS = [
   'journal/updateEntry',
   'journal/deleteEntry',
   'journal/togglePin',
+  // Goals
+  'goals/addGoal',
+  'goals/updateGoal',
+  'goals/deleteGoal',
   // Projects
   'projects/addProject',
   'projects/updateProject',
@@ -182,13 +186,14 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
           analysisFrequency: state.aiAssistant.analysisFrequency,
           dataTypes: state.aiAssistant.dataTypes,
         };
-        if (window.electronAPI?.aiAssistant?.saveSettings) {
+        const anyWindow: any = window as any;
+        if (anyWindow.electronAPI?.aiAssistant?.saveSettings) {
           const signature = JSON.stringify(aiSettings);
           if (signature !== lastAISentSignature) {
             lastAISentSignature = signature;
             if (aiSettingsTimer) clearTimeout(aiSettingsTimer);
             aiSettingsTimer = setTimeout(() => {
-              try { window.electronAPI!.aiAssistant!.saveSettings(aiSettings); } catch {}
+              try { anyWindow.electronAPI!.aiAssistant!.saveSettings(aiSettings); } catch {}
             }, 300);
           }
         }
@@ -210,12 +215,45 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
       }
     }
 
-    // Persist AI insights/recaps to localStorage when updated
+    // Persist AI insights/recaps and usage to localStorage when updated
     if (action.type === 'aiAssistant/analyzeUserData/fulfilled' || action.type === 'aiAssistant/clearInsights' || action.type === 'aiAssistant/removeInsight') {
-      try { localStorage.setItem('serenity_ai_insights', JSON.stringify(state.aiAssistant.insights)); } catch {}
+      try { 
+        localStorage.setItem('serenity_ai_insights', JSON.stringify(state.aiAssistant.insights)); 
+        localStorage.setItem('serenity_ai_usage', JSON.stringify(state.aiAssistant.usage));
+      } catch {}
+
+      // Also persist to DB via IPC when available (supports local-analysis fallback)
+      try {
+        const anyWindow: any = window as any;
+        if (anyWindow.electronAPI?.aiAssistant?.saveInsights && action.type === 'aiAssistant/analyzeUserData/fulfilled') {
+          const provider = action.payload?.provider || state.aiAssistant.activeProvider || 'local';
+          const insights = action.payload?.insights || [];
+          console.log(`[AI Persist] analyze fulfilled: provider=${provider}, insights=${insights.length}`);
+          if (Array.isArray(insights) && insights.length > 0) {
+            await anyWindow.electronAPI.aiAssistant.saveInsights(provider, insights);
+          }
+          const usage = action.payload?.usage;
+          if (usage && anyWindow.electronAPI?.aiAssistant?.saveUsage) {
+            console.log('[AI Persist] saving usage via IPC:', usage);
+            await anyWindow.electronAPI.aiAssistant.saveUsage({
+              provider,
+              operation: 'analyze',
+              promptTokens: Number(usage.promptTokens || 0),
+              completionTokens: Number(usage.completionTokens || 0),
+              totalTokens: Number(usage.totalTokens || 0),
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ Failed to persist AI insights/usage via IPC:', e);
+      }
     }
     if (action.type === 'aiAssistant/generateRecap/fulfilled' || action.type === 'aiAssistant/removeRecap') {
-      try { localStorage.setItem('serenity_ai_recaps', JSON.stringify(state.aiAssistant.recaps)); } catch {}
+      try { 
+        localStorage.setItem('serenity_ai_recaps', JSON.stringify(state.aiAssistant.recaps)); 
+        localStorage.setItem('serenity_ai_usage', JSON.stringify(state.aiAssistant.usage));
+      } catch {}
     }
 
     // For data operations, use SQLite if available, otherwise localStorage as temporary fallback
@@ -248,6 +286,8 @@ async function persistToSQLite(action: any, state: any): Promise<void> {
       await handleProjectPersistence(type, payload, state.projects);
     } else if (type.startsWith('journal/')) {
       await handleJournalPersistence(type, payload, state.journal);
+    } else if (type.startsWith('goals/')) {
+      await handleGoalPersistence(type, payload, state.goals);
     }
   } catch (error) {
     console.error('❌ SQLite persistence failed:', error);
@@ -349,6 +389,39 @@ async function handleJournalPersistence(actionType: string, payload: any, journa
 }
 
 /**
+ * Handle goal persistence via IPC
+ */
+async function handleGoalPersistence(actionType: string, payload: any, goalsState: any): Promise<void> {
+  switch (actionType) {
+    case 'goals/addGoal': {
+      // After reducer, the new goal is appended to state.goals.goals
+      const createdGoal = goalsState.goals[goalsState.goals.length - 1];
+      const anyWindow: any = window as any;
+      if (createdGoal && anyWindow.electronAPI?.goals?.createWithId) {
+        await anyWindow.electronAPI.goals.createWithId(createdGoal);
+      }
+      break;
+    }
+    case 'goals/updateGoal': {
+      const { id, updates } = payload;
+      const anyWindow: any = window as any;
+      if (id && anyWindow.electronAPI?.goals?.update) {
+        await anyWindow.electronAPI.goals.update(id, updates || {});
+      }
+      break;
+    }
+    case 'goals/deleteGoal': {
+      const goalId = payload;
+      const anyWindow: any = window as any;
+      if (anyWindow.electronAPI?.goals?.delete) {
+        await anyWindow.electronAPI.goals.delete(goalId);
+      }
+      break;
+    }
+  }
+}
+
+/**
  * Fallback persistence to localStorage (temporary, should be rare)
  */
 function persistToLocalStorage(action: any, state: any): void {
@@ -361,6 +434,8 @@ function persistToLocalStorage(action: any, state: any): void {
       localStorage.setItem('serenity_projects', JSON.stringify(state.projects.projects));
     } else if (type.startsWith('journal/')) {
       localStorage.setItem('serenity_journal', JSON.stringify(state.journal.entries));
+    } else if (type.startsWith('goals/')) {
+      localStorage.setItem('serenity_goals', JSON.stringify(state.goals.goals));
     }
     
     console.log('📄 Fallback: Data persisted to localStorage');

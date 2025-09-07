@@ -3,7 +3,7 @@
  * Only performs expensive crypto when actually needed
  */
 
-import { SECURE_KEYS } from './secureStorage';
+import { getPrivacySettingsSecure } from './secureStorage';
 
 /**
  * Safely parse JSON data that might be Base64 encoded
@@ -44,10 +44,10 @@ export interface CryptoSettings {
  * Check if encryption features are enabled without triggering expensive crypto operations
  */
 export const checkCryptoSettings = (): CryptoSettings => {
-  // Check if we have any encrypted data
-  const hasEncryptedPrivacySettings = localStorage.getItem(`encrypted_${SECURE_KEYS.PRIVACY_SETTINGS}`) !== null;
-  const hasEncryptedMasterPassword = localStorage.getItem(`encrypted_${SECURE_KEYS.MASTER_PASSWORD_HASH}`) !== null;
-  const hasEncryptedDatabaseConnection = localStorage.getItem(`encrypted_${SECURE_KEYS.DATABASE_CONNECTION}`) !== null;
+  // Check if we have any encrypted data (using hardcoded keys to avoid circular imports)
+  const hasEncryptedPrivacySettings = localStorage.getItem('encrypted_privacy_settings') !== null;
+  const hasEncryptedMasterPassword = localStorage.getItem('encrypted_master_password_hash') !== null;
+  const hasEncryptedDatabaseConnection = localStorage.getItem('encrypted_database_connection') !== null;
   
   const hasEncryptedData = hasEncryptedPrivacySettings || hasEncryptedMasterPassword || hasEncryptedDatabaseConnection;
   
@@ -104,9 +104,6 @@ export const initializeCrypto = async (
     // Simulate progressive loading stages
     await new Promise(resolve => setTimeout(resolve, 100));
     onProgress?.(30, 'deriving-key', 'Preparing security keys...');
-    
-    // Import crypto functions only when needed
-    const { getPrivacySettingsSecure } = await import('./secureStorage');
     
     await new Promise(resolve => setTimeout(resolve, 100));
     onProgress?.(60, 'deriving-key', 'Deriving encryption keys...');

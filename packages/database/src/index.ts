@@ -8,3 +8,4 @@ export * from './sqlite/SQLiteService';
 export * from './queries/sqlite/tasks';
 export * from './queries/sqlite/projects';
 export * from './queries/sqlite/journal';
+export * from './queries/sqlite/goals';

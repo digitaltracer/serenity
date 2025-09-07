@@ -37,6 +37,9 @@ const goalsSlice = createSlice({
   name: 'goals',
   initialState,
   reducers: {
+    setGoals: (state, action: PayloadAction<Goal[]>) => {
+      state.goals = action.payload || [];
+    },
     // Goal CRUD operations
     addGoal: (state, action: PayloadAction<Omit<Goal, 'id' | 'createdAt' | 'updatedAt' | 'progress'>>) => {
       const now = new Date();
@@ -180,6 +183,7 @@ const goalsSlice = createSlice({
 });
 
 export const {
+  setGoals,
   addGoal,
   updateGoal,
   deleteGoal,

@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { validateMasterPasswordSecure, saveMasterPasswordHashSecure } from '../../utils/secureStorage';
 import { getPrivacySettingsSecure, savePrivacySettingsSecure, getSecureStorage, SECURE_KEYS } from '../../utils/secureStorage';
 import { secureSessionManager } from '../../utils/secureSessionManager';
+import { initializeIntegrations } from './integrationsSlice';
 
 export interface AuthState {
   isLocked: boolean;
@@ -100,7 +101,6 @@ export const validatePassword = createAsyncThunk(
       // Password is valid - load encrypted integrations
       try {
         console.log('🔓 Master password validated, loading encrypted integrations...');
-        const { initializeIntegrations } = await import('./integrationsSlice');
         await dispatch(initializeIntegrations(password));
         console.log('✅ Encrypted integrations loaded successfully');
       } catch (error) {
@@ -204,7 +204,6 @@ export const authenticateWithBiometric = createAsyncThunk(
       
       // Load encrypted integrations with the retrieved master password (best-effort)
       try {
-        const { initializeIntegrations } = await import('./integrationsSlice');
         // Dispatch returns an action; ignore its type to avoid TS mismatch in callers
         await (dispatch as any)(initializeIntegrations(result.masterPassword));
         console.log('✅ Encrypted integrations loaded successfully after biometric auth');

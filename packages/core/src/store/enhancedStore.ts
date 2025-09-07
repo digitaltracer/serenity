@@ -144,6 +144,101 @@ export async function initializeStoreData() {
             }
           }
           
+          // Load goals via IPC
+          try {
+            const anyWindow: any = window as any;
+            const goalsResult = await anyWindow.electronAPI?.goals?.get();
+            if (goalsResult?.success && Array.isArray(goalsResult.data)) {
+              store.dispatch({ type: 'goals/setGoals', payload: goalsResult.data });
+              console.log(`✅ Loaded ${goalsResult.data.length} goals from SQLite`);
+            } else {
+              console.warn('⚠️ No goals loaded from SQLite');
+            }
+          } catch (e) {
+            console.warn('⚠️ Failed to load goals from SQLite:', e);
+          }
+
+          // Load AI insights/recaps/usage from SQLite and hydrate Redux
+          try {
+            const anyWindow: any = window as any;
+            console.log('🔄 Loading AI insights/recaps/usage from SQLite...');
+            const [insightsRes, recapsRes, usageRes] = await Promise.all([
+              anyWindow.electronAPI?.aiAssistant?.listInsights?.(),
+              anyWindow.electronAPI?.aiAssistant?.listRecaps?.(),
+              anyWindow.electronAPI?.aiAssistant?.listUsage?.(),
+            ]);
+
+            // Map and restore insights
+            if (insightsRes?.success && Array.isArray(insightsRes.data)) {
+              const insights = insightsRes.data.map((row: any) => ({
+                id: row.id,
+                type: row.type,
+                title: row.title,
+                description: row.description,
+                confidence: Number(row.confidence ?? 0.5),
+                createdAt: row.created_at,
+                source: row.provider,
+                category: row.category,
+                actionable: !!row.actionable,
+                metadata: (() => { try { return JSON.parse(row.metadata || '{}'); } catch { return {}; } })(),
+              }));
+              store.dispatch({ type: 'aiAssistant/restoreInsights', payload: insights });
+              console.log(`✅ Loaded ${insights.length} AI insights from SQLite`);
+              try { console.log('🧪 Insights hydration sample (first 3):', insights.slice(0,3)); } catch {}
+              try { localStorage.setItem('serenity_ai_insights', JSON.stringify(insights)); } catch {}
+            }
+
+            // Map and restore recaps
+            if (recapsRes?.success && Array.isArray(recapsRes.data)) {
+              const recaps = recapsRes.data.map((row: any) => ({
+                id: row.id,
+                type: row.type,
+                title: row.title,
+                summary: row.summary,
+                highlights: (() => { try { return JSON.parse(row.highlights || '[]'); } catch { return []; } })(),
+                challenges: (() => { try { return JSON.parse(row.challenges || '[]'); } catch { return []; } })(),
+                recommendations: (() => { try { return JSON.parse(row.recommendations || '[]'); } catch { return []; } })(),
+                period: (() => { try { return JSON.parse(row.period || '{}'); } catch { return {}; } })(),
+                createdAt: row.created_at,
+                source: row.provider,
+                metadata: (() => { try { return JSON.parse(row.metadata || '{}'); } catch { return {}; } })(),
+              }));
+              store.dispatch({ type: 'aiAssistant/restoreRecaps', payload: recaps });
+              console.log(`✅ Loaded ${recaps.length} AI recaps from SQLite`);
+              try { console.log('🧪 Recaps hydration sample (first 2):', recaps.slice(0,2).map((r:any)=>({title:r.title,type:r.type,period:r.period}))); } catch {}
+              try { localStorage.setItem('serenity_ai_recaps', JSON.stringify(recaps)); } catch {}
+            }
+
+            // Map and restore usage
+            if (usageRes?.success && Array.isArray(usageRes.data)) {
+              console.log(`📊 Hydrating ${usageRes.data.length} AI usage rows from SQLite`);
+              // Clear and repopulate usage entries
+              store.dispatch({ type: 'aiAssistant/clearUsage' });
+              usageRes.data.forEach((u: any) => {
+                store.dispatch({
+                  type: 'aiAssistant/recordUsage',
+                  payload: {
+                    id: u.id,
+                    timestamp: u.timestamp,
+                    provider: u.provider,
+                    operation: u.operation,
+                    promptTokens: Number(u.prompt_tokens || 0),
+                    completionTokens: Number(u.completion_tokens || 0),
+                    totalTokens: Number(u.total_tokens || 0),
+                  },
+                });
+              });
+              try {
+                const hydratedUsage = (store.getState() as any).aiAssistant.usage;
+                console.log('🧪 Usage hydration sample (first 3):', hydratedUsage.slice(0, 3));
+              } catch {}
+              console.log(`✅ Loaded ${usageRes.data.length} AI usage rows from SQLite`);
+              try { localStorage.setItem('serenity_ai_usage', JSON.stringify((store.getState() as any).aiAssistant.usage)); } catch {}
+            }
+          } catch (e) {
+            console.warn('⚠️ Failed to load AI insights/recaps/usage from SQLite:', e);
+          }
+
           console.log('✅ SQLite data initialization completed successfully');
           return true;
         } else {
@@ -178,6 +273,18 @@ export async function initializeStoreData() {
           store.dispatch({ type: 'tags/addUsedTags', payload: taskTags });
           console.log(`✅ Loaded ${taskTags.length} tags from tasks`);
         }
+      }
+
+      // Goals (optional fallback key)
+      try {
+        const goalsStr = localStorage.getItem('serenity_goals');
+        if (goalsStr) {
+          const goals = JSON.parse(goalsStr);
+          store.dispatch({ type: 'goals/setGoals', payload: goals });
+          console.log(`✅ Loaded ${goals.length} goals from localStorage`);
+        }
+      } catch (e) {
+        console.warn('⚠️ Failed to load goals from localStorage:', e);
       }
       
       if (localData.projects.length > 0) {

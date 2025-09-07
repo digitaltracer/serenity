@@ -126,7 +126,6 @@ export class IntegrationSyncService {
       
       if (!githubProject) {
         // Create Github project
-        const { generateId } = await import('../utils');
         githubProjectId = generateId();
         githubProject = {
           id: githubProjectId,

@@ -8,13 +8,15 @@ import { SQLiteTaskQueries } from '../queries/sqlite/tasks';
 import { SQLiteProjectQueries } from '../queries/sqlite/projects';
 import { SQLiteJournalQueries } from '../queries/sqlite/journal';
 import { SQLiteAIQueries } from '../queries/sqlite/ai';
-import { Task, Project, JournalEntry } from '@serenity/core';
+import { SQLiteGoalQueries } from '../queries/sqlite/goals';
+import { Task, Project, JournalEntry, Goal } from '@serenity/core';
 
 export class SQLiteService {
   private adapter: SQLiteAdapter;
   private tasks: SQLiteTaskQueries | null = null;
   private projects: SQLiteProjectQueries | null = null;
   private journal: SQLiteJournalQueries | null = null;
+  private goals: SQLiteGoalQueries | null = null;
   private ai: SQLiteAIQueries | null = null;
   private initialized = false;
 
@@ -37,6 +39,7 @@ export class SQLiteService {
       this.projects = new SQLiteProjectQueries(db);
       this.journal = new SQLiteJournalQueries(db);
       this.ai = new SQLiteAIQueries(db);
+      this.goals = new SQLiteGoalQueries(db);
 
       this.initialized = true;
       console.log('✅ SQLite service initialized successfully');
@@ -203,6 +206,43 @@ export class SQLiteService {
   async listAIRecaps(limit = 50) {
     this.ensureInitialized();
     return this.ai!.listRecaps(limit);
+  }
+
+  async addAIUsage(entries: Array<{ timestamp?: string; provider: 'openai' | 'gemini' | 'anthropic'; operation: 'analyze' | 'recap'; promptTokens: number; completionTokens: number; totalTokens: number }>): Promise<void> {
+    this.ensureInitialized();
+    return this.ai!.addUsage(entries);
+  }
+
+  async listAIUsage(limit = 500) {
+    this.ensureInitialized();
+    return this.ai!.listUsage(limit);
+  }
+
+  // ===== GOAL OPERATIONS =====
+
+  async getGoals(): Promise<Goal[]> {
+    this.ensureInitialized();
+    return this.goals!.listGoals();
+  }
+
+  async createGoal(goal: Omit<Goal, 'id'>): Promise<Goal> {
+    this.ensureInitialized();
+    return this.goals!.createGoal(goal as any);
+  }
+
+  async createGoalWithId(goal: Goal): Promise<Goal> {
+    this.ensureInitialized();
+    return this.goals!.createGoalWithId(goal);
+  }
+
+  async updateGoal(id: string, updates: Partial<Goal>): Promise<Goal | null> {
+    this.ensureInitialized();
+    return this.goals!.updateGoal(id, updates);
+  }
+
+  async deleteGoal(id: string): Promise<boolean> {
+    this.ensureInitialized();
+    return this.goals!.deleteGoal(id);
   }
 
   /**
@@ -392,6 +432,7 @@ export class SQLiteService {
     tasks?: Task[];
     projects?: Project[];
     journalEntries?: JournalEntry[];
+    goals?: Goal[];
   }): Promise<{ imported: number; errors: string[] }> {
     this.ensureInitialized();
     
@@ -456,6 +497,18 @@ export class SQLiteService {
           }
         }
 
+        // Import goals
+        if (data.goals) {
+          for (const goal of data.goals) {
+            try {
+              this.goals!.createGoalWithId(goal as any);
+              imported++;
+            } catch (error) {
+              errors.push(`Failed to import goal "${goal.title}": ${error}`);
+            }
+          }
+        }
+
         return { imported, errors };
       });
     } catch (error) {
@@ -470,16 +523,18 @@ export class SQLiteService {
     tasks: Task[];
     projects: Project[];
     journalEntries: JournalEntry[];
+    goals: Goal[];
   }> {
     this.ensureInitialized();
     
-    const [tasks, projects, journalEntries] = await Promise.all([
+    const [tasks, projects, journalEntries, goals] = await Promise.all([
       this.getTasks(),
       this.getProjects(),
-      this.getJournalEntries()
+      this.getJournalEntries(),
+      this.getGoals(),
     ]);
 
-    return { tasks, projects, journalEntries };
+    return { tasks, projects, journalEntries, goals };
   }
 
   /**

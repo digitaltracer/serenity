@@ -216,10 +216,13 @@ import { BarChart3, TrendingUp, Calendar, Target, Zap, Clock, BookOpen, Activity
 // Import interfaces from analyticsUtils to ensure consistency
 import { Task, JournalEntry, Project } from '../utils/analyticsUtils';
 
+// AI insights are now passed as props from the Analytics page
+
 interface AdvancedAnalyticsProps {
   tasks: Task[];
   journalEntries: JournalEntry[];
   projects: Project[];
+  aiInsights?: any[];
 }
 
 // Simple analytics calculations without external dependencies
@@ -291,10 +294,14 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
   tasks,
   journalEntries,
   projects,
+  aiInsights = [],
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'charts' | 'insights' | 'heatmap'>('overview');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [heatmapLoading, setHeatmapLoading] = useState(false);
+  
+  // Use AI insights passed as prop
+  const storedAIInsights = aiInsights || [];
   
   // Simulate loading when switching to heatmap tab or when data changes
   React.useEffect(() => {
@@ -795,16 +802,117 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
       {activeTab === 'insights' && (
         <div className="space-y-6">
           {/* AI-Powered Insights Header */}
-          <div className="flex items-center space-x-2 mb-6">
-            <Brain className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Smart Insights</h3>
-            <div className="px-2 py-1 bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-full text-xs">
-              AI-Powered
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-2">
+              <Brain className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Smart Insights</h3>
+              <div className="px-2 py-1 bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-full text-xs">
+                AI-Powered
+              </div>
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              {Array.isArray(storedAIInsights) && storedAIInsights.length > 0 ? `${storedAIInsights.length} stored insights` : 'No stored insights'}
             </div>
           </div>
 
-          {/* Enhanced Insights Grid */}
+          {/* Merged Insights Grid - Stored AI insights first, then computed insights */}
           <div className="grid gap-4">
+            {/* Display stored AI insights from the database */}
+            {Array.isArray(storedAIInsights) && storedAIInsights.map((insight: any) => {
+              const getInsightIcon = (type: string) => {
+                switch (type) {
+                  case 'productivity': return <TrendingUp className="w-5 h-5 text-green-500" />;
+                  case 'behavior': return <Brain className="w-5 h-5 text-blue-500" />;
+                  case 'recommendation': return <Lightbulb className="w-5 h-5 text-blue-500" />;
+                  case 'warning': return <AlertTriangle className="w-5 h-5 text-orange-500" />;
+                  default: return <Star className="w-5 h-5 text-purple-500" />;
+                }
+              };
+              
+              const getInsightColors = (type: string) => {
+                switch (type) {
+                  case 'productivity':
+                    return {
+                      card: 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20',
+                      badge: 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200',
+                      confidence: 'text-green-600 dark:text-green-400',
+                      bar: 'bg-green-500'
+                    };
+                  case 'warning':
+                    return {
+                      card: 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20',
+                      badge: 'bg-orange-200 dark:bg-orange-800 text-orange-800 dark:text-orange-200',
+                      confidence: 'text-orange-600 dark:text-orange-400',
+                      bar: 'bg-orange-500'
+                    };
+                  case 'recommendation':
+                    return {
+                      card: 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20',
+                      badge: 'bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200',
+                      confidence: 'text-blue-600 dark:text-blue-400',
+                      bar: 'bg-blue-500'
+                    };
+                  default:
+                    return {
+                      card: 'border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-900/20',
+                      badge: 'bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200',
+                      confidence: 'text-purple-600 dark:text-purple-400',
+                      bar: 'bg-purple-500'
+                    };
+                }
+              };
+              
+              const colors = getInsightColors(insight.type);
+              const confidencePercent = Math.round((insight.confidence || 0.8) * 100);
+              
+              return (
+                <Card key={insight.id} className={colors.card}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 mt-0.5">
+                        {getInsightIcon(insight.type)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h4 className="font-medium text-gray-900 dark:text-white">{insight.title}</h4>
+                          <div className={`px-2 py-0.5 rounded text-xs ${colors.badge}`}>
+                            {insight.type === 'productivity' ? 'AI Analysis' : 
+                             insight.type === 'warning' ? 'Warning' :
+                             insight.type === 'recommendation' ? 'AI Recommendation' : 'AI Insight'}
+                          </div>
+                          <div className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-xs">
+                            {insight.source?.toUpperCase() || 'AI'}
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {insight.description}
+                        </p>
+                        <div className="mt-2 flex items-center justify-between">
+                          <div className={`flex items-center space-x-1 text-xs ${colors.confidence}`}>
+                            <div className={`w-8 h-1 rounded-full ${colors.bar}`} style={{ width: `${Math.max(confidencePercent / 10, 2)}px` }} />
+                            <span>{confidencePercent}% confidence</span>
+                          </div>
+                          <div className="text-xs text-gray-400 dark:text-gray-500">
+                            {new Date(insight.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            
+            {/* Separator if both stored and computed insights exist */}
+            {Array.isArray(storedAIInsights) && storedAIInsights.length > 0 && (
+              <div className="flex items-center space-x-4 my-6">
+                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">Computed Insights</div>
+                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+              </div>
+            )}
+
+            {/* Enhanced Computed Insights Grid (existing logic) */}
             {/* Achievement Insights */}
             {analytics.completionRate >= 80 && (
               <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20">
@@ -1009,7 +1117,7 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-1">
                       <h4 className="font-medium text-gray-900 dark:text-white">Smart Recommendations</h4>
-                      <div className="px-2 py-0.5 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded text-xs">Recommendation</div>
+                      <div className="px-2 py-0.5 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded text-xs">Computed</div>
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
                       <p>• Schedule demanding tasks on {advancedAnalytics.bestDay}s for optimal performance</p>
@@ -1024,6 +1132,19 @@ export const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
                 </div>
               </CardContent>
             </Card>
+            
+            {/* Show message if no insights are available */}
+            {(!Array.isArray(storedAIInsights) || storedAIInsights.length === 0) && analytics.completionRate < 80 && analytics.streak < 7 && advancedAnalytics.overdueTasks === 0 && (
+              <Card className="border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-800/50">
+                <CardContent className="p-6 text-center">
+                  <Brain className="w-12 h-12 mx-auto mb-3 text-gray-400 dark:text-gray-500" />
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">No AI Insights Available</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+                    Complete more tasks and create journal entries to unlock AI-powered insights about your productivity patterns and habits.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       )}

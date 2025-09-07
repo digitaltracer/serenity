@@ -200,6 +200,49 @@ export class SQLiteAdapter {
         updated_at TEXT NOT NULL
       );
 
+      -- AI insights and recaps persistence (SQLite-compatible)
+      CREATE TABLE IF NOT EXISTS ai_insights (
+        id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic', 'local')),
+        type TEXT NOT NULL CHECK (type IN ('productivity', 'behavior', 'recommendation', 'warning')),
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        confidence REAL DEFAULT 0.5,
+        category TEXT NOT NULL CHECK (category IN ('tasks', 'journal', 'habits', 'goals')),
+        actionable INTEGER DEFAULT 0,
+        metadata TEXT DEFAULT '{}',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS ai_recaps (
+        id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic', 'local')),
+        type TEXT NOT NULL CHECK (type IN ('weekly', 'monthly')),
+        title TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        highlights TEXT DEFAULT '[]',
+        challenges TEXT DEFAULT '[]',
+        recommendations TEXT DEFAULT '[]',
+        period TEXT NOT NULL,
+        metadata TEXT DEFAULT '{}',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ai_insights_created_at ON ai_insights (created_at);
+      CREATE INDEX IF NOT EXISTS idx_ai_recaps_created_at ON ai_recaps (created_at);
+
+      -- AI token usage persistence (per operation)
+      CREATE TABLE IF NOT EXISTS ai_usage (
+        id TEXT PRIMARY KEY,
+        timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        provider TEXT NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic')),
+        operation TEXT NOT NULL CHECK (operation IN ('analyze', 'recap')),
+        prompt_tokens INTEGER DEFAULT 0,
+        completion_tokens INTEGER DEFAULT 0,
+        total_tokens INTEGER DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_ai_usage_timestamp ON ai_usage (timestamp);
+
       -- Indexes for better performance
       CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks (project_id);
       CREATE INDEX IF NOT EXISTS idx_tasks_parent_task_id ON tasks (parent_task_id);

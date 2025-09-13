@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect x="6" y="6" width="88" height="88" rx="16" fill="#eff6ff" stroke="rgba(59,130,246,0.35)" stroke-width="1.5"/>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <!-- Checkmark at bottom -->
+    <path d="M20 78 L30 90 L46 72" stroke="#60a5fa" stroke-width="3" fill="none"/>
+    <!-- Feather body: tapered silhouette from checkmark midpoint to top-right -->
+    <path d="M30 88 Q 50 58 90 20 Q 76 34 58 48 Q 42 62 30 88 Z" fill="#60a5fa" fill-opacity="0.45"/>
+    <!-- Feather outline and inner curve for definition -->
+    <path d="M30 88 Q 50 58 90 20" stroke="#3b82f6" stroke-width="2.2" fill="none"/>
+    <path d="M30 88 Q 42 62 58 48 Q 76 34 90 20" stroke="#3b82f6" stroke-width="1.4" stroke-opacity="0.85" fill="none"/>
+    <!-- A few barbs for detail -->
+    <path d="M46 66 L56 58" stroke="#3b82f6" stroke-width="1.4" stroke-opacity="0.85"/>
+    <path d="M52 60 L64 52" stroke="#3b82f6" stroke-width="1.4" stroke-opacity="0.85"/>
+    <path d="M58 54 L72 44" stroke="#3b82f6" stroke-width="1.4" stroke-opacity="0.85"/>
+  </g>
+</svg>

@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import logo from '../../../assets/logo.png';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
@@ -87,6 +86,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isSubtaskModalOpen = useSelector(selectSubtaskModalOpen);
   const shortcuts = useSelector(selectShortcuts);
   
+  // Resolve theme for logo (handles 'system')
+  const resolvedTheme = useMemo(() => {
+    if (currentTheme === 'system') {
+      if (typeof window !== 'undefined' && window.matchMedia) {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      return 'light';
+    }
+    return currentTheme;
+  }, [currentTheme]);
+
   // Find relevant shortcuts for buttons
   const searchShortcut = shortcuts.find(s => s.action === 'OPEN_GLOBAL_SEARCH');
   const helpShortcut = shortcuts.find(s => s.action === 'SHOW_SHORTCUTS_HELP');
@@ -208,9 +218,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <SidebarHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 justify-center w-full">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
-                <img src={logo} alt="Serenity Logo" className="w-6 h-6 object-contain" />
-              </div>
+              {/* Theme-aware raster logo from public/ */}
+              <LogoMark size={36} />
               {!sidebarCollapsed && (
                 <h1 className="font-semibold text-gray-900 dark:text-gray-100">
                   Serenity Notes
@@ -375,5 +384,46 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         onSelectResult={handleSearchResultSelect}
       />
     </div>
+  );
+};
+
+// Small component: picks dark/light raster logo from public/ with graceful fallback
+const LogoMark: React.FC<{ size?: number }> = ({ size = 36 }) => {
+  const theme = useSelector(selectTheme);
+  const [src, setSrc] = useState<string>('');
+  const [triedFallback, setTriedFallback] = useState<boolean>(false);
+
+  useEffect(() => {
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
+    const base = (import.meta as any).env?.BASE_URL ?? './';
+    const preferred = isDark ? `${base}logo-dark.png` : `${base}logo-light.png`;
+    setSrc(preferred);
+  }, [theme]);
+
+  const onError = () => {
+    // Try the opposite theme once as a fallback, then give up
+    const base = (import.meta as any).env?.BASE_URL ?? './';
+    if (!triedFallback) {
+      setTriedFallback(true);
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
+      setSrc(isDark ? `${base}logo-light.png` : `${base}logo-dark.png`);
+      return;
+    }
+    setSrc('');
+  };
+
+  const base = (import.meta as any).env?.BASE_URL ?? './';
+  return (
+    <img
+      src={src || `${base}logo-light.png`}
+      onError={onError}
+      alt="Serenity Logo"
+      width={size}
+      height={size}
+      className="block object-contain shrink-0"
+      style={{ width: size, height: size }}
+    />
   );
 };

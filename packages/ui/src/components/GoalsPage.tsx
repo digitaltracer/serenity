@@ -143,7 +143,7 @@ export const GoalsPage: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                Goals & Progress
+                Goal and Progress
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
                 Set and track your personal and professional goals
@@ -310,7 +310,7 @@ export const GoalsPage: React.FC = () => {
 
           {/* Goals Grid */}
           {safeFilteredGoals.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 lg:gap-8">
               {safeFilteredGoals.map(goal => goal && (
                 <GoalCard
                   key={goal.id}

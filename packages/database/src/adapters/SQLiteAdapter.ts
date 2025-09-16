@@ -261,8 +261,83 @@ export class SQLiteAdapter {
     try {
       this.db.exec(schema);
       console.log('✅ Database schema created successfully');
+
+      // Migration: Recreate ai_usage table with correct quickadd operation support
+      await this.migrateAIUsageTable();
     } catch (error) {
       console.error('Failed to create database schema:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Migrate ai_usage table to support quickadd operation
+   */
+  private async migrateAIUsageTable(): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      // Check if ai_usage table has quickadd support by trying an insert
+      const testQuickAdd = this.db.prepare(`
+        INSERT INTO ai_usage (id, provider, operation, prompt_tokens, completion_tokens, total_tokens)
+        VALUES ('test_quickadd', 'openai', 'quickadd', 0, 0, 0)
+      `);
+
+      try {
+        testQuickAdd.run();
+        // If successful, clean up the test record and we're good
+        this.db.prepare('DELETE FROM ai_usage WHERE id = ?').run('test_quickadd');
+        console.log('✅ ai_usage table already supports quickadd operation');
+        return;
+      } catch (constraintError: any) {
+        if (constraintError.code === 'SQLITE_CONSTRAINT_CHECK') {
+          console.log('🔄 Migrating ai_usage table to support quickadd operation...');
+
+          // Backup existing data
+          const existingData = this.db.prepare('SELECT * FROM ai_usage').all();
+
+          // Drop and recreate table with correct constraint
+          this.db.exec(`
+            DROP TABLE IF EXISTS ai_usage;
+            CREATE TABLE ai_usage (
+              id TEXT PRIMARY KEY,
+              timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              provider TEXT NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic')),
+              operation TEXT NOT NULL CHECK (operation IN ('analyze', 'recap', 'quickadd')),
+              prompt_tokens INTEGER DEFAULT 0,
+              completion_tokens INTEGER DEFAULT 0,
+              total_tokens INTEGER DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_ai_usage_timestamp ON ai_usage (timestamp);
+          `);
+
+          // Restore existing data
+          if (existingData.length > 0) {
+            const insertStmt = this.db.prepare(`
+              INSERT INTO ai_usage (id, timestamp, provider, operation, prompt_tokens, completion_tokens, total_tokens)
+              VALUES (?, ?, ?, ?, ?, ?, ?)
+            `);
+
+            const transaction = this.db.transaction((rows: any[]) => {
+              for (const row of rows) {
+                insertStmt.run(row.id, row.timestamp, row.provider, row.operation, row.prompt_tokens, row.completion_tokens, row.total_tokens);
+              }
+            });
+
+            transaction(existingData);
+            console.log(`✅ Restored ${existingData.length} existing ai_usage records`);
+          }
+
+          console.log('✅ ai_usage table migration completed successfully');
+        } else {
+          // Some other error, re-throw
+          throw constraintError;
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to migrate ai_usage table:', error);
       throw error;
     }
   }

@@ -793,7 +793,7 @@ async function callOpenAI(apiKey: string, prompt: string): Promise<any> {
             content: prompt
           }
         ],
-        max_tokens: 1500,
+        max_tokens: 4000,
         temperature: 0.7,
       }),
     });
@@ -874,7 +874,7 @@ async function callGemini(apiKey: string, prompt: string): Promise<any> {
           }]
         }],
         generationConfig: {
-          maxOutputTokens: 1500,
+          maxOutputTokens: 4000,
           temperature: 0.7,
         },
       }),
@@ -933,7 +933,7 @@ async function callAnthropic(apiKey: string, prompt: string): Promise<any> {
       },
       body: JSON.stringify({
         model: modelName,
-        max_tokens: 1500,
+        max_tokens: 4000,
         temperature: 0.7,
         system: 'You are a productivity and well-being assistant. Analyze user data and provide helpful, actionable insights in JSON format.',
         messages: [
@@ -1111,6 +1111,82 @@ export function registerAIAssistantHandlers(): void {
     }
   });
 
+  /**
+   * Apply intelligent data limiting for analysis to prevent token overflow and ensure quality insights
+   */
+  function applyDataLimitsForAnalysis(tasks: any[], journalEntries: any[]): { limitedTasks: any[], limitedJournalEntries: any[] } {
+    // Define limits based on typical token usage per item
+    const MAX_TASKS = 50;        // ~1000-1500 tokens for preprocessing 50 tasks
+    const MAX_JOURNAL_ENTRIES = 30;  // ~1200-1800 tokens for preprocessing 30 entries
+
+    let limitedTasks = tasks;
+    let limitedJournalEntries = journalEntries;
+
+    // Intelligent task sampling: prioritize recent, high-priority, and incomplete tasks
+    if (tasks.length > MAX_TASKS) {
+      console.log(`📊 Applying intelligent task sampling: ${tasks.length} → ${MAX_TASKS} tasks`);
+
+      // Sort tasks by priority and recency for better analysis
+      const sortedTasks = [...tasks].sort((a, b) => {
+        // Priority weighting: high=3, medium=2, low=1
+        const priorityWeight: { [key: string]: number } = { high: 3, medium: 2, low: 1 };
+        const aWeight = priorityWeight[a.priority as string] || 1;
+        const bWeight = priorityWeight[b.priority as string] || 1;
+
+        // Combine priority and recency (more weight to priority)
+        const aPriorityScore = aWeight * 2;
+        const bPriorityScore = bWeight * 2;
+
+        // Recent tasks get bonus points (within 30 days)
+        const now = new Date().getTime();
+        const aRecency = a.createdAt ? Math.max(0, 30 - Math.floor((now - new Date(a.createdAt).getTime()) / (24 * 60 * 60 * 1000))) : 0;
+        const bRecency = b.createdAt ? Math.max(0, 30 - Math.floor((now - new Date(b.createdAt).getTime()) / (24 * 60 * 60 * 1000))) : 0;
+
+        // Incomplete tasks get slight bonus
+        const aIncompleteBonus = !a.completed ? 5 : 0;
+        const bIncompleteBonus = !b.completed ? 5 : 0;
+
+        const aScore = aPriorityScore + aRecency + aIncompleteBonus;
+        const bScore = bPriorityScore + bRecency + bIncompleteBonus;
+
+        return bScore - aScore; // Higher score first
+      });
+
+      // Take top tasks, ensuring we include some from different categories
+      limitedTasks = sortedTasks.slice(0, MAX_TASKS);
+    }
+
+    // Intelligent journal sampling: prioritize recent entries and those with tags
+    if (journalEntries.length > MAX_JOURNAL_ENTRIES) {
+      console.log(`📝 Applying intelligent journal sampling: ${journalEntries.length} → ${MAX_JOURNAL_ENTRIES} entries`);
+
+      // Sort journal entries by recency and content richness
+      const sortedEntries = [...journalEntries].sort((a, b) => {
+        // Recency score (within 60 days)
+        const now = new Date().getTime();
+        const aRecency = a.date ? Math.max(0, 60 - Math.floor((now - new Date(a.date).getTime()) / (24 * 60 * 60 * 1000))) : 0;
+        const bRecency = b.date ? Math.max(0, 60 - Math.floor((now - new Date(b.date).getTime()) / (24 * 60 * 60 * 1000))) : 0;
+
+        // Content richness (longer entries, entries with tags)
+        const aRichness = (a.content ? a.content.length / 100 : 0) + (a.tags?.length || 0) * 2;
+        const bRichness = (b.content ? b.content.length / 100 : 0) + (b.tags?.length || 0) * 2;
+
+        // Pinned entries get priority
+        const aPinnedBonus = a.pinned ? 10 : 0;
+        const bPinnedBonus = b.pinned ? 10 : 0;
+
+        const aScore = aRecency + Math.min(aRichness, 10) + aPinnedBonus;
+        const bScore = bRecency + Math.min(bRichness, 10) + bPinnedBonus;
+
+        return bScore - aScore; // Higher score first
+      });
+
+      limitedJournalEntries = sortedEntries.slice(0, MAX_JOURNAL_ENTRIES);
+    }
+
+    return { limitedTasks, limitedJournalEntries };
+  }
+
   // Analyze Data
   ipcMain.handle('ai-assistant:analyze-data', async (event, options: {
     provider: 'openai' | 'gemini' | 'anthropic';
@@ -1189,10 +1265,14 @@ export function registerAIAssistantHandlers(): void {
           message: 'No new data to analyze'
         };
       }
-      
-      // Preprocess data for AI analysis
-      const preprocessedTasks = AIAssistantService.preprocessTasks(analyzeTasks);
-      const preprocessedJournalEntries = AIAssistantService.preprocessJournalEntries(analyzeJournalEntries);
+
+      // Apply intelligent data limiting to prevent token overflow and ensure quality analysis
+      const { limitedTasks, limitedJournalEntries } = applyDataLimitsForAnalysis(analyzeTasks, analyzeJournalEntries);
+      console.log(`📊 Data limiting: ${analyzeTasks.length} → ${limitedTasks.length} tasks, ${analyzeJournalEntries.length} → ${limitedJournalEntries.length} journal entries`);
+
+      // Preprocess the limited data for AI analysis
+      const preprocessedTasks = AIAssistantService.preprocessTasks(limitedTasks);
+      const preprocessedJournalEntries = AIAssistantService.preprocessJournalEntries(limitedJournalEntries);
       
       // Generate prompts
       const prompts = AIAssistantService.generateInsightPrompts({
@@ -1825,34 +1905,101 @@ The JSON object must have two top-level keys:
         });
         if (!r.ok) return { success: false, error: `Provider error ${r.status}` };
         const data: any = await r.json();
-        const content = data?.choices?.[0]?.message?.content || '';
 
-        console.log(`📥 [QuickAdd][${provider}] Raw LLM response:`);
-        console.log('---START RESPONSE---');
+        console.log(`📥 [QuickAdd][${provider}] COMPLETE API RESPONSE:`);
+        console.log('---START FULL RESPONSE---');
+        console.log(JSON.stringify(data, null, 2));
+        console.log('---END FULL RESPONSE---');
+
+        const content = data?.choices?.[0]?.message?.content || '';
+        console.log(`📥 [QuickAdd][${provider}] EXTRACTED CONTENT:`);
+        console.log('---START CONTENT---');
         console.log(content);
-        console.log('---END RESPONSE---');
+        console.log('---END CONTENT---');
+
+        console.log(`📥 [QuickAdd][${provider}] RESPONSE ANALYSIS:`);
+        console.log('- data exists:', !!data);
+        console.log('- data.choices exists:', !!data?.choices);
+        console.log('- data.choices is array:', Array.isArray(data?.choices));
+        console.log('- data.choices length:', data?.choices?.length || 0);
+        console.log('- first choice exists:', !!data?.choices?.[0]);
+        console.log('- message exists:', !!data?.choices?.[0]?.message);
+        console.log('- content exists:', !!data?.choices?.[0]?.message?.content);
+        console.log('- content type:', typeof content);
+        console.log('- content length:', content?.length || 0);
+
+        console.log(`🔍 [QuickAdd][${provider}] STARTING JSON PARSING:`);
+        console.log('- Raw content to parse:', JSON.stringify(content));
+        console.log('- Trimmed content:', JSON.stringify(content.trim()));
 
         let parsed: any = null;
+        let parseMethod = '';
+
         try {
+          console.log(`🔍 [QuickAdd][${provider}] Attempting direct JSON.parse...`);
           parsed = JSON.parse(content.trim());
-        } catch {
-          const m = content.match(/\{[\s\S]*\}/);
-          if (m) {
+          parseMethod = 'direct';
+          console.log(`✅ [QuickAdd][${provider}] Direct JSON.parse succeeded`);
+        } catch (directError) {
+          console.log(`❌ [QuickAdd][${provider}] Direct JSON.parse failed:`, directError);
+
+          // Try to extract from markdown code blocks first
+          console.log(`🔍 [QuickAdd][${provider}] Attempting markdown extraction...`);
+          const markdownMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+
+          if (markdownMatch && markdownMatch[1]) {
+            console.log(`🔍 [QuickAdd][${provider}] Found markdown-wrapped content:`, JSON.stringify(markdownMatch[1]));
             try {
-              parsed = JSON.parse(m[0]);
-              console.log(`🔧 [QuickAdd][${provider}] Extracted JSON from response`);
-            } catch {
-              console.error(`❌ [QuickAdd][${provider}] Failed to parse extracted JSON`);
+              parsed = JSON.parse(markdownMatch[1].trim());
+              parseMethod = 'markdown';
+              console.log(`✅ [QuickAdd][${provider}] Markdown JSON.parse succeeded`);
+            } catch (markdownError) {
+              console.error(`❌ [QuickAdd][${provider}] Markdown JSON.parse failed:`, markdownError);
+            }
+          }
+
+          // Fallback to regex extraction if markdown didn't work
+          if (!parsed) {
+            console.log(`🔍 [QuickAdd][${provider}] Attempting regex extraction...`);
+            const m = content.match(/\{[\s\S]*\}/);
+            console.log(`🔍 [QuickAdd][${provider}] Regex match result:`, m ? 'found' : 'not found');
+
+            if (m) {
+              console.log(`🔍 [QuickAdd][${provider}] Extracted JSON string:`, JSON.stringify(m[0]));
+              try {
+                parsed = JSON.parse(m[0]);
+                parseMethod = 'regex';
+                console.log(`✅ [QuickAdd][${provider}] Regex JSON.parse succeeded`);
+              } catch (regexError) {
+                console.error(`❌ [QuickAdd][${provider}] Regex JSON.parse failed:`, regexError);
+              }
             }
           }
         }
 
-        if (!parsed || !parsed.intent || !parsed.data) {
-          console.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, parsed);
-          return { success: false, error: 'Malformed LLM response', debug: { provider, model, contentSample: content?.slice?.(0, 1000) } } as any;
+        console.log(`🔍 [QuickAdd][${provider}] PARSING RESULTS:`);
+        console.log('- Parse method used:', parseMethod);
+        console.log('- Parsed result exists:', !!parsed);
+        console.log('- Parsed result type:', typeof parsed);
+        console.log('- Parsed result:', parsed);
+
+        if (!parsed) {
+          console.error(`❌ [QuickAdd][${provider}] No parsed result - both direct and regex parsing failed`);
+          return { success: false, error: 'Failed to parse JSON response', debug: { provider, model, contentSample: content?.slice?.(0, 1000) } } as any;
         }
 
-        console.log(`✅ [QuickAdd][${provider}] Successfully parsed:`, parsed);
+        console.log(`🔍 [QuickAdd][${provider}] VALIDATION CHECKS:`);
+        console.log('- parsed.intent exists:', !!parsed.intent);
+        console.log('- parsed.intent value:', parsed.intent);
+        console.log('- parsed.data exists:', !!parsed.data);
+        console.log('- parsed.data value:', parsed.data);
+
+        if (!parsed.intent || !parsed.data) {
+          console.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, parsed);
+          return { success: false, error: 'Malformed LLM response structure', debug: { provider, model, contentSample: content?.slice?.(0, 1000), parsed } } as any;
+        }
+
+        console.log(`✅ [QuickAdd][${provider}] Successfully parsed and validated:`, parsed);
 
         // Convert new format to old format for backwards compatibility
         const result = {
@@ -1869,21 +2016,39 @@ The JSON object must have two top-level keys:
 
         // Record token usage (map to 'analyze' channel for now)
         try {
+          console.log(`💾 [QuickAdd][${provider}] USAGE TRACKING ANALYSIS:`);
+          console.log('- data exists:', !!data);
+          console.log('- data.usage exists:', !!data?.usage);
+          console.log('- data.usage value:', data?.usage);
+          console.log('- data.usage type:', typeof data?.usage);
+
           const u = normalizeUsage(data?.usage);
+          console.log(`💾 [QuickAdd][${provider}] NORMALIZED USAGE:`, u);
+          console.log('- promptTokens:', u.promptTokens);
+          console.log('- completionTokens:', u.completionTokens);
+          console.log('- totalTokens:', u.totalTokens);
+          console.log('- totalTokens > 0:', u.totalTokens > 0);
+
           if (u.totalTokens > 0) {
-            const { sqliteService } = await import('@serenity/database');
-            await sqliteService.initialize();
-            await sqliteService.addAIUsage([{
-              provider: 'openai',
-              operation: 'quickadd',
+            const usageEntry = {
+              provider: 'openai' as const,
+              operation: 'quickadd' as const,
               promptTokens: u.promptTokens,
               completionTokens: u.completionTokens,
               totalTokens: u.totalTokens,
               timestamp: new Date().toISOString(),
-            }]);
+            };
+            console.log(`💾 [QuickAdd][${provider}] Saving usage entry:`, usageEntry);
+
+            const { sqliteService } = await import('@serenity/database');
+            await sqliteService.initialize();
+            await sqliteService.addAIUsage([usageEntry]);
+            console.log(`✅ [QuickAdd][${provider}] Usage saved successfully to database`);
+          } else {
+            console.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`);
           }
         } catch (e) {
-          console.warn('⚠️ Failed to save quick-add usage:', e);
+          console.warn(`⚠️ [QuickAdd][${provider}] Failed to save quick-add usage:`, e);
         }
 
         return { success: true, data: result, debug: debug ? { provider, model, contentSample: content?.slice?.(0, 500) } : undefined } as any;
@@ -1921,13 +2086,32 @@ The JSON object must have two top-level keys:
         }
 
         const data: any = await r.json();
+
+        console.log(`📥 [QuickAdd][${provider}] COMPLETE API RESPONSE:`);
+        console.log('---START FULL RESPONSE---');
+        console.log(JSON.stringify(data, null, 2));
+        console.log('---END FULL RESPONSE---');
+
         const parts = data?.candidates?.[0]?.content?.parts || [];
         const content = (Array.isArray(parts) ? parts.map((p: any) => p?.text).filter(Boolean) : []).join('\n');
 
-        console.log(`📥 [QuickAdd][${provider}] Raw LLM response:`);
-        console.log('---START RESPONSE---');
+        console.log(`📥 [QuickAdd][${provider}] EXTRACTED CONTENT:`);
+        console.log('---START CONTENT---');
         console.log(content);
-        console.log('---END RESPONSE---');
+        console.log('---END CONTENT---');
+
+        console.log(`📥 [QuickAdd][${provider}] RESPONSE ANALYSIS:`);
+        console.log('- data exists:', !!data);
+        console.log('- data.candidates exists:', !!data?.candidates);
+        console.log('- data.candidates is array:', Array.isArray(data?.candidates));
+        console.log('- data.candidates length:', data?.candidates?.length || 0);
+        console.log('- first candidate exists:', !!data?.candidates?.[0]);
+        console.log('- candidate.content exists:', !!data?.candidates?.[0]?.content);
+        console.log('- candidate.content.parts exists:', !!data?.candidates?.[0]?.content?.parts);
+        console.log('- parts is array:', Array.isArray(parts));
+        console.log('- parts length:', parts?.length || 0);
+        console.log('- content type:', typeof content);
+        console.log('- content length:', content?.length || 0);
 
         let parsed: any = null;
         try {
@@ -1964,17 +2148,35 @@ The JSON object must have two top-level keys:
 
         console.log(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, result);
         try {
+          console.log(`💾 [QuickAdd][${provider}] USAGE TRACKING ANALYSIS:`);
+          console.log('- data exists:', !!data);
+          console.log('- data.usageMetadata exists:', !!data?.usageMetadata);
+          console.log('- data.usageMetadata value:', data?.usageMetadata);
+
           const um = data?.usageMetadata || {};
           const promptTokens = Number(um.promptTokenCount || 0);
           const completionTokens = Number(um.candidatesTokenCount || 0);
           const totalTokens = Number(um.totalTokenCount || (promptTokens + completionTokens));
+
+          console.log(`💾 [QuickAdd][${provider}] EXTRACTED USAGE VALUES:`);
+          console.log('- promptTokens:', promptTokens);
+          console.log('- completionTokens:', completionTokens);
+          console.log('- totalTokens:', totalTokens);
+          console.log('- totalTokens > 0:', totalTokens > 0);
+
           if (totalTokens > 0) {
+            const usageEntry = { provider: 'gemini' as const, operation: 'quickadd' as const, promptTokens, completionTokens, totalTokens, timestamp: new Date().toISOString() };
+            console.log(`💾 [QuickAdd][${provider}] Saving usage entry:`, usageEntry);
+
             const { sqliteService } = await import('@serenity/database');
             await sqliteService.initialize();
-            await sqliteService.addAIUsage([{ provider: 'gemini', operation: 'quickadd', promptTokens, completionTokens, totalTokens, timestamp: new Date().toISOString() }]);
+            await sqliteService.addAIUsage([usageEntry]);
+            console.log(`✅ [QuickAdd][${provider}] Usage saved successfully to database`);
+          } else {
+            console.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`);
           }
         } catch (e) {
-          console.warn('⚠️ Failed to save quick-add usage (gemini):', e);
+          console.warn(`⚠️ [QuickAdd][${provider}] Failed to save quick-add usage:`, e);
         }
         return { success: true, data: result, debug: debug ? { provider, model, contentSample: content?.slice?.(0, 500) } : undefined } as any;
       } else if (provider === 'anthropic') {
@@ -1993,12 +2195,28 @@ The JSON object must have two top-level keys:
         });
         if (!r.ok) return { success: false, error: `Provider error ${r.status}` };
         const data: any = await r.json();
+
+        console.log(`📥 [QuickAdd][${provider}] COMPLETE API RESPONSE:`);
+        console.log('---START FULL RESPONSE---');
+        console.log(JSON.stringify(data, null, 2));
+        console.log('---END FULL RESPONSE---');
+
         const content = data?.content?.[0]?.text || '';
 
-        console.log(`📥 [QuickAdd][${provider}] Raw LLM response:`);
-        console.log('---START RESPONSE---');
+        console.log(`📥 [QuickAdd][${provider}] EXTRACTED CONTENT:`);
+        console.log('---START CONTENT---');
         console.log(content);
-        console.log('---END RESPONSE---');
+        console.log('---END CONTENT---');
+
+        console.log(`📥 [QuickAdd][${provider}] RESPONSE ANALYSIS:`);
+        console.log('- data exists:', !!data);
+        console.log('- data.content exists:', !!data?.content);
+        console.log('- data.content is array:', Array.isArray(data?.content));
+        console.log('- data.content length:', data?.content?.length || 0);
+        console.log('- first content exists:', !!data?.content?.[0]);
+        console.log('- content.text exists:', !!data?.content?.[0]?.text);
+        console.log('- content type:', typeof content);
+        console.log('- content length:', content?.length || 0);
 
         let parsed: any = null;
         try {
@@ -2035,14 +2253,32 @@ The JSON object must have two top-level keys:
 
         console.log(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, result);
         try {
+          console.log(`💾 [QuickAdd][${provider}] USAGE TRACKING ANALYSIS:`);
+          console.log('- data exists:', !!data);
+          console.log('- data.usage exists:', !!data?.usage);
+          console.log('- data.usage value:', data?.usage);
+          console.log('- data.usage type:', typeof data?.usage);
+
           const u = normalizeUsage(data?.usage);
+          console.log(`💾 [QuickAdd][${provider}] NORMALIZED USAGE:`, u);
+          console.log('- promptTokens:', u.promptTokens);
+          console.log('- completionTokens:', u.completionTokens);
+          console.log('- totalTokens:', u.totalTokens);
+          console.log('- totalTokens > 0:', u.totalTokens > 0);
+
           if (u.totalTokens > 0) {
+            const usageEntry = { provider: 'anthropic' as const, operation: 'quickadd' as const, promptTokens: u.promptTokens, completionTokens: u.completionTokens, totalTokens: u.totalTokens, timestamp: new Date().toISOString() };
+            console.log(`💾 [QuickAdd][${provider}] Saving usage entry:`, usageEntry);
+
             const { sqliteService } = await import('@serenity/database');
             await sqliteService.initialize();
-            await sqliteService.addAIUsage([{ provider: 'anthropic', operation: 'quickadd', promptTokens: u.promptTokens, completionTokens: u.completionTokens, totalTokens: u.totalTokens, timestamp: new Date().toISOString() }]);
+            await sqliteService.addAIUsage([usageEntry]);
+            console.log(`✅ [QuickAdd][${provider}] Usage saved successfully to database`);
+          } else {
+            console.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`);
           }
         } catch (e) {
-          console.warn('⚠️ Failed to save quick-add usage (anthropic):', e);
+          console.warn(`⚠️ [QuickAdd][${provider}] Failed to save quick-add usage:`, e);
         }
         return { success: true, data: result, debug: debug ? { provider, model, contentSample: content?.slice?.(0, 500) } : undefined } as any;
       }

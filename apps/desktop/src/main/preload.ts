@@ -201,6 +201,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // AI Assistant operations
   aiAssistant: {
+    quickAdd: (text: string, provider?: 'openai' | 'gemini' | 'anthropic', debug?: boolean) => ipcRenderer.invoke('ai-assistant:quick-add', { text, provider, debug }),
     setApiKey: (provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => ipcRenderer.invoke('ai-assistant:set-api-key', provider, apiKey),
     testApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => ipcRenderer.invoke('ai-assistant:test-api-key', provider),
     analyzeData: (options: { provider: 'openai' | 'gemini' | 'anthropic'; dataTypes: string[]; forceReAnalyze?: boolean }) => ipcRenderer.invoke('ai-assistant:analyze-data', options),
@@ -214,7 +215,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     listRecaps: () => ipcRenderer.invoke('ai-assistant:list-recaps'),
     listUsage: () => ipcRenderer.invoke('ai-assistant:list-usage'),
     saveInsights: (provider: 'openai' | 'gemini' | 'anthropic' | 'local', insights: any[]) => ipcRenderer.invoke('ai-assistant:save-insights', { provider, insights }),
-    saveUsage: (entry: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; operation: 'analyze' | 'recap'; promptTokens: number; completionTokens: number; totalTokens: number; timestamp?: string }) => ipcRenderer.invoke('ai-assistant:save-usage', entry),
+    saveUsage: (entry: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; operation: 'analyze' | 'recap' | 'quickadd'; promptTokens: number; completionTokens: number; totalTokens: number; timestamp?: string }) => ipcRenderer.invoke('ai-assistant:save-usage', entry),
   },
 
 });

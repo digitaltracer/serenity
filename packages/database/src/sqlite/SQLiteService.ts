@@ -208,7 +208,7 @@ export class SQLiteService {
     return this.ai!.listRecaps(limit);
   }
 
-  async addAIUsage(entries: Array<{ timestamp?: string; provider: 'openai' | 'gemini' | 'anthropic'; operation: 'analyze' | 'recap'; promptTokens: number; completionTokens: number; totalTokens: number }>): Promise<void> {
+  async addAIUsage(entries: Array<{ timestamp?: string; provider: 'openai' | 'gemini' | 'anthropic'; operation: 'analyze' | 'recap' | 'quickadd'; promptTokens: number; completionTokens: number; totalTokens: number }>): Promise<void> {
     this.ensureInitialized();
     return this.ai!.addUsage(entries);
   }

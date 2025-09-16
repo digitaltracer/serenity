@@ -1227,7 +1227,7 @@ export const AIAssistantPage: React.FC = () => {
             {(usage?.length || 0) === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Zap className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No usage yet. Run an analysis or generate a recap to see token usage.</p>
+                <p>No usage yet. Run an analysis, use Quick Add, or generate a recap to see token usage.</p>
               </div>
             ) : (
               <div className="space-y-3">

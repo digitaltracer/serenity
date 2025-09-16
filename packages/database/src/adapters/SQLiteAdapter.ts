@@ -236,7 +236,7 @@ export class SQLiteAdapter {
         id TEXT PRIMARY KEY,
         timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         provider TEXT NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic')),
-        operation TEXT NOT NULL CHECK (operation IN ('analyze', 'recap')),
+        operation TEXT NOT NULL CHECK (operation IN ('analyze', 'recap', 'quickadd')),
         prompt_tokens INTEGER DEFAULT 0,
         completion_tokens INTEGER DEFAULT 0,
         total_tokens INTEGER DEFAULT 0

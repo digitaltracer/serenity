@@ -293,8 +293,23 @@ async function loadAISettingsFromDatabase(): Promise<AISettings | null> {
  * Get current AI settings from DB or file (DB preferred)
  */
 async function getCurrentAISettings(): Promise<AISettings> {
+  console.log('🔍 [getCurrentAISettings] Loading AI settings...');
+
   const db = await loadAISettingsFromDatabase();
-  return db || loadAISettings();
+  console.log('🔍 [getCurrentAISettings] Database settings:', db);
+  console.log('🔍 [getCurrentAISettings] Database activeProvider:', db?.activeProvider);
+
+  if (db) {
+    console.log('✅ [getCurrentAISettings] Using database settings');
+    return db;
+  }
+
+  const file = loadAISettings();
+  console.log('🔍 [getCurrentAISettings] File settings:', file);
+  console.log('🔍 [getCurrentAISettings] File activeProvider:', file?.activeProvider);
+  console.log('⚠️ [getCurrentAISettings] Using file settings (no database)');
+
+  return file;
 }
 
 /**
@@ -1432,13 +1447,23 @@ export function registerAIAssistantHandlers(): void {
   // Get AI Settings
   ipcMain.handle('ai-assistant:get-settings', async (event) => {
     try {
-      console.log('⚙️ Loading AI Assistant settings...');
+      console.log('🔍 [get-settings] AI Assistant settings request received');
+
       // Prefer DB if present, fallback to file defaults
       const dbSettings = await loadAISettingsFromDatabase();
-      const settings = dbSettings || loadAISettings();
+      console.log('🔍 [get-settings] Database settings loaded:', dbSettings);
+      console.log('🔍 [get-settings] Database activeProvider:', dbSettings?.activeProvider);
+
+      const fileSettings = loadAISettings();
+      console.log('🔍 [get-settings] File settings loaded:', fileSettings);
+      console.log('🔍 [get-settings] File activeProvider:', fileSettings?.activeProvider);
+
+      const settings = dbSettings || fileSettings;
+      console.log('🔍 [get-settings] Final settings chosen:', settings);
+      console.log('🔍 [get-settings] Final activeProvider:', settings?.activeProvider);
+
       const apiKeys = getApiKeys();
       let modelInfo = getModelInfo();
-      console.log('⚙️ get-settings current persisted settings:', settings);
       
       // Check which providers have API keys without exposing the keys
       const providersWithKeys = {
@@ -1681,6 +1706,351 @@ export function registerAIAssistantHandlers(): void {
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to remove API key' 
       };
+    }
+  });
+
+  // Quick Add (LLM) — parse natural language into Task or Journal structure
+  ipcMain.handle('ai-assistant:quick-add', async (_event, payload: { text: string; provider?: 'openai' | 'gemini' | 'anthropic'; debug?: boolean }) => {
+    const text = (payload?.text || '').trim();
+    if (!text) return { success: false, error: 'Empty input' };
+    try {
+      const settings = await getCurrentAISettings();
+      const provider = payload?.provider || settings.activeProvider || 'openai';
+      const keys = getApiKeys();
+      const apiKey = (keys as any)[provider];
+      const debug = !!payload?.debug;
+
+      console.log(`🤖 [QuickAdd] Using provider: ${provider}, hasKey: ${!!apiKey}`);
+
+      if (!apiKey) return { success: false, error: `Missing API key for ${provider}`, debug: { stage: 'no_api_key', provider } } as any;
+
+      // Get current date for prompt context
+      const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+
+      const instruction = `You are an intelligent assistant for an application called "Serenity Notes". Your job is to analyze the user's input and convert it into a structured JSON object. Do not respond with conversational text, only the JSON object.
+
+The current date is: **${currentDate}**.
+
+The JSON object must have two top-level keys:
+1. "intent": Can be either "CREATE_TASK" or "CREATE_JOURNAL".
+2. "data": An object containing the extracted information.
+
+### JSON Schema
+- For "CREATE_TASK", the "data" object can contain:
+    - "title": (string) The name of the task.
+    - "dueDate": (string, ISO 8601 format YYYY-MM-DD) The calculated due date.
+    - "priority": (string) Can be "low", "medium", or "high". Defaults to null if not mentioned.
+    - "tags": (array of strings) Any tags mentioned, without the '#' symbol.
+    - "project": (string) Project name if mentioned, otherwise null.
+- For "CREATE_JOURNAL", the "data" object will contain:
+    - "content": (string) The full text of the journal entry.
+    - "tags": (array of strings) Any tags mentioned, without the '#' symbol.
+
+### Examples
+
+**User Input:** Remind me to call the accountant tomorrow #finance
+**Your Output:**
+{
+  "intent": "CREATE_TASK",
+  "data": {
+    "title": "Call the accountant",
+    "dueDate": "${new Date(Date.now() + 24*60*60*1000).toISOString().split('T')[0]}",
+    "priority": null,
+    "tags": ["finance"],
+    "project": null
+  }
+}
+
+**User Input:** add "Finalize the presentation slides" to my list for this Friday, it's very important
+**Your Output:**
+{
+  "intent": "CREATE_TASK",
+  "data": {
+    "title": "Finalize the presentation slides",
+    "dueDate": "2025-09-15",
+    "priority": "high",
+    "tags": [],
+    "project": null
+  }
+}
+
+**User Input:** Journal: Today was a long day. We finally kicked off the new project and I'm feeling optimistic about the direction we're heading. #work
+**Your Output:**
+{
+  "intent": "CREATE_JOURNAL",
+  "data": {
+    "content": "Today was a long day. We finally kicked off the new project and I'm feeling optimistic about the direction we're heading.",
+    "tags": ["work"]
+  }
+}
+
+**User Input:** Buy groceries for project dinner party tomorrow #shopping
+**Your Output:**
+{
+  "intent": "CREATE_TASK",
+  "data": {
+    "title": "Buy groceries",
+    "dueDate": "${new Date(Date.now() + 24*60*60*1000).toISOString().split('T')[0]}",
+    "priority": null,
+    "tags": ["shopping"],
+    "project": "dinner party"
+  }
+}
+
+---
+
+**User Input:** ${text}
+**Your Output:**`;
+
+      console.log(`🎯 [QuickAdd] Prompt being sent to ${provider}:`);
+      console.log('---START PROMPT---');
+      console.log(instruction);
+      console.log('---END PROMPT---');
+
+      if (provider === 'openai') {
+        const model = await resolveModelForProvider('openai', 'gpt-4o-mini');
+        if (debug) console.log('[QuickAdd][openai] model=', model);
+        const r = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: instruction },
+              { role: 'user', content: text }
+            ],
+            temperature: 0.2,
+            max_tokens: 1000,
+          }),
+        });
+        if (!r.ok) return { success: false, error: `Provider error ${r.status}` };
+        const data: any = await r.json();
+        const content = data?.choices?.[0]?.message?.content || '';
+
+        console.log(`📥 [QuickAdd][${provider}] Raw LLM response:`);
+        console.log('---START RESPONSE---');
+        console.log(content);
+        console.log('---END RESPONSE---');
+
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(content.trim());
+        } catch {
+          const m = content.match(/\{[\s\S]*\}/);
+          if (m) {
+            try {
+              parsed = JSON.parse(m[0]);
+              console.log(`🔧 [QuickAdd][${provider}] Extracted JSON from response`);
+            } catch {
+              console.error(`❌ [QuickAdd][${provider}] Failed to parse extracted JSON`);
+            }
+          }
+        }
+
+        if (!parsed || !parsed.intent || !parsed.data) {
+          console.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, parsed);
+          return { success: false, error: 'Malformed LLM response', debug: { provider, model, contentSample: content?.slice?.(0, 1000) } } as any;
+        }
+
+        console.log(`✅ [QuickAdd][${provider}] Successfully parsed:`, parsed);
+
+        // Convert new format to old format for backwards compatibility
+        const result = {
+          kind: parsed.intent === 'CREATE_TASK' ? 'task' : 'journal',
+          title: parsed.data.title || null,
+          description: parsed.data.content || null,
+          tags: parsed.data.tags || [],
+          priority: parsed.data.priority || null,
+          dueDate: parsed.data.dueDate || null,
+          project: parsed.data.project || null
+        };
+
+        console.log(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, result);
+
+        // Record token usage (map to 'analyze' channel for now)
+        try {
+          const u = normalizeUsage(data?.usage);
+          if (u.totalTokens > 0) {
+            const { sqliteService } = await import('@serenity/database');
+            await sqliteService.initialize();
+            await sqliteService.addAIUsage([{
+              provider: 'openai',
+              operation: 'quickadd',
+              promptTokens: u.promptTokens,
+              completionTokens: u.completionTokens,
+              totalTokens: u.totalTokens,
+              timestamp: new Date().toISOString(),
+            }]);
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to save quick-add usage:', e);
+        }
+
+        return { success: true, data: result, debug: debug ? { provider, model, contentSample: content?.slice?.(0, 500) } : undefined } as any;
+      } else if (provider === 'gemini') {
+        const modelInfo = getModelInfo();
+        const defaultModel = (modelInfo?.gemini?.model) || 'gemini-2.5-flash';
+        const model = await resolveModelForProvider('gemini', defaultModel);
+        if (debug) console.log('[QuickAdd][gemini] model=', model);
+
+        console.log(`📡 [QuickAdd][${provider}] Making API call to Gemini...`);
+        console.log(`📡 [QuickAdd][${provider}] URL: https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`);
+        console.log(`📡 [QuickAdd][${provider}] API key available: ${!!apiKey}`);
+
+        let r: Response;
+        try {
+          r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: `${instruction}\n\n${text}` }]}],
+              generationConfig: { temperature: 0.2, maxOutputTokens: 1000 }
+            }),
+          });
+
+          console.log(`📡 [QuickAdd][${provider}] API response status: ${r.status} ${r.statusText}`);
+
+          if (!r.ok) {
+            const errorText = await r.text().catch(() => 'Failed to read error response');
+            console.error(`❌ [QuickAdd][${provider}] API error response:`, errorText);
+            return { success: false, error: `Provider error ${r.status}: ${errorText}` };
+          }
+        } catch (fetchError) {
+          console.error(`❌ [QuickAdd][${provider}] Fetch error:`, fetchError);
+          return { success: false, error: `Network error: ${fetchError instanceof Error ? fetchError.message : 'Unknown fetch error'}` };
+        }
+
+        const data: any = await r.json();
+        const parts = data?.candidates?.[0]?.content?.parts || [];
+        const content = (Array.isArray(parts) ? parts.map((p: any) => p?.text).filter(Boolean) : []).join('\n');
+
+        console.log(`📥 [QuickAdd][${provider}] Raw LLM response:`);
+        console.log('---START RESPONSE---');
+        console.log(content);
+        console.log('---END RESPONSE---');
+
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(content.trim());
+        } catch {
+          const m = content?.match?.(/\{[\s\S]*\}/);
+          if (m) {
+            try {
+              parsed = JSON.parse(m[0]);
+              console.log(`🔧 [QuickAdd][${provider}] Extracted JSON from response`);
+            } catch {
+              console.error(`❌ [QuickAdd][${provider}] Failed to parse extracted JSON`);
+            }
+          }
+        }
+
+        if (!parsed || !parsed.intent || !parsed.data) {
+          console.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, parsed);
+          return { success: false, error: 'Malformed LLM response', debug: { provider, model, contentSample: content?.slice?.(0, 1000) } } as any;
+        }
+
+        console.log(`✅ [QuickAdd][${provider}] Successfully parsed:`, parsed);
+
+        // Convert new format to old format for backwards compatibility
+        const result = {
+          kind: parsed.intent === 'CREATE_TASK' ? 'task' : 'journal',
+          title: parsed.data.title || null,
+          description: parsed.data.content || null,
+          tags: parsed.data.tags || [],
+          priority: parsed.data.priority || null,
+          dueDate: parsed.data.dueDate || null,
+          project: parsed.data.project || null
+        };
+
+        console.log(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, result);
+        try {
+          const um = data?.usageMetadata || {};
+          const promptTokens = Number(um.promptTokenCount || 0);
+          const completionTokens = Number(um.candidatesTokenCount || 0);
+          const totalTokens = Number(um.totalTokenCount || (promptTokens + completionTokens));
+          if (totalTokens > 0) {
+            const { sqliteService } = await import('@serenity/database');
+            await sqliteService.initialize();
+            await sqliteService.addAIUsage([{ provider: 'gemini', operation: 'quickadd', promptTokens, completionTokens, totalTokens, timestamp: new Date().toISOString() }]);
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to save quick-add usage (gemini):', e);
+        }
+        return { success: true, data: result, debug: debug ? { provider, model, contentSample: content?.slice?.(0, 500) } : undefined } as any;
+      } else if (provider === 'anthropic') {
+        const model = await resolveModelForProvider('anthropic', 'claude-3-5-sonnet-latest');
+        if (debug) console.log('[QuickAdd][anthropic] model=', model);
+        const r = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({
+            model,
+            max_tokens: 1000,
+            temperature: 0.2,
+            system: instruction,
+            messages: [{ role: 'user', content: text }],
+          }),
+        });
+        if (!r.ok) return { success: false, error: `Provider error ${r.status}` };
+        const data: any = await r.json();
+        const content = data?.content?.[0]?.text || '';
+
+        console.log(`📥 [QuickAdd][${provider}] Raw LLM response:`);
+        console.log('---START RESPONSE---');
+        console.log(content);
+        console.log('---END RESPONSE---');
+
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(content.trim());
+        } catch {
+          const m = content?.match?.(/\{[\s\S]*\}/);
+          if (m) {
+            try {
+              parsed = JSON.parse(m[0]);
+              console.log(`🔧 [QuickAdd][${provider}] Extracted JSON from response`);
+            } catch {
+              console.error(`❌ [QuickAdd][${provider}] Failed to parse extracted JSON`);
+            }
+          }
+        }
+
+        if (!parsed || !parsed.intent || !parsed.data) {
+          console.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, parsed);
+          return { success: false, error: 'Malformed LLM response', debug: { provider, model, contentSample: content?.slice?.(0, 1000) } } as any;
+        }
+
+        console.log(`✅ [QuickAdd][${provider}] Successfully parsed:`, parsed);
+
+        // Convert new format to old format for backwards compatibility
+        const result = {
+          kind: parsed.intent === 'CREATE_TASK' ? 'task' : 'journal',
+          title: parsed.data.title || null,
+          description: parsed.data.content || null,
+          tags: parsed.data.tags || [],
+          priority: parsed.data.priority || null,
+          dueDate: parsed.data.dueDate || null,
+          project: parsed.data.project || null
+        };
+
+        console.log(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, result);
+        try {
+          const u = normalizeUsage(data?.usage);
+          if (u.totalTokens > 0) {
+            const { sqliteService } = await import('@serenity/database');
+            await sqliteService.initialize();
+            await sqliteService.addAIUsage([{ provider: 'anthropic', operation: 'quickadd', promptTokens: u.promptTokens, completionTokens: u.completionTokens, totalTokens: u.totalTokens, timestamp: new Date().toISOString() }]);
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to save quick-add usage (anthropic):', e);
+        }
+        return { success: true, data: result, debug: debug ? { provider, model, contentSample: content?.slice?.(0, 500) } : undefined } as any;
+      }
+
+      return { success: false, error: `Provider ${provider} not supported for quick-add`, debug: { stage: 'unsupported_provider', provider } } as any;
+    } catch (e) {
+      console.error('[QuickAdd] error:', e);
+      return { success: false, error: (e as Error)?.message || 'LLM error' } as any;
     }
   });
 

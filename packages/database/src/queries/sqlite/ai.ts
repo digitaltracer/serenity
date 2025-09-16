@@ -83,7 +83,7 @@ export class SQLiteAIQueries {
   }
 
   // ===== Usage =====
-  async addUsage(entries: Array<{ timestamp?: string; provider: 'openai' | 'gemini' | 'anthropic'; operation: 'analyze' | 'recap'; promptTokens: number; completionTokens: number; totalTokens: number }>): Promise<void> {
+  async addUsage(entries: Array<{ timestamp?: string; provider: 'openai' | 'gemini' | 'anthropic'; operation: 'analyze' | 'recap' | 'quickadd'; promptTokens: number; completionTokens: number; totalTokens: number }>): Promise<void> {
     if (!entries || entries.length === 0) return;
     const sql = `INSERT INTO ai_usage (id, timestamp, provider, operation, prompt_tokens, completion_tokens, total_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)`;
     const stmt = this.db.prepare(sql);

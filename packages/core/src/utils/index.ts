@@ -93,3 +93,5 @@ export * from './goalProgress';
 
 // Export standardized error handling
 export * from './errorHandler';
+// Natural language quick-add
+export * from './nlpQuickAdd';

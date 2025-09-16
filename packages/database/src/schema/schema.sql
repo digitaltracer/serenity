@@ -180,7 +180,7 @@ CREATE TABLE IF NOT EXISTS ai_usage (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     provider VARCHAR(20) NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic')),
-    operation VARCHAR(10) NOT NULL CHECK (operation IN ('analyze', 'recap')),
+    operation VARCHAR(10) NOT NULL CHECK (operation IN ('analyze', 'recap', 'quickadd')),
     prompt_tokens INTEGER DEFAULT 0,
     completion_tokens INTEGER DEFAULT 0,
     total_tokens INTEGER DEFAULT 0

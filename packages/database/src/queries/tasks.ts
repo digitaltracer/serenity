@@ -3,10 +3,10 @@ import { Task, Subtask } from '@serenity/core';
 
 export const createTask = async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> => {
   const db = getDatabase();
-  
+
   const result = await db.one(`
-    INSERT INTO tasks (user_id, project_id, title, description, completed, priority, due_date, tags, recurring_pattern)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    INSERT INTO tasks (user_id, project_id, title, description, completed, completed_at, priority, due_date, tags, recurring_pattern)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING *
   `, [
     task.userId || null,
@@ -14,6 +14,7 @@ export const createTask = async (task: Omit<Task, 'id' | 'createdAt' | 'updatedA
     task.title,
     task.description || null,
     task.completed,
+    task.completedAt || null,
     task.priority,
     task.dueDate || null,
     task.tags,
@@ -64,6 +65,10 @@ export const updateTask = async (taskId: string, userId: string, updates: Partia
   if (updates.completed !== undefined) {
     setClause.push(`completed = $${paramIndex++}`);
     values.push(updates.completed);
+  }
+  if (updates.completedAt !== undefined) {
+    setClause.push(`completed_at = $${paramIndex++}`);
+    values.push(updates.completedAt);
   }
   if (updates.priority !== undefined) {
     setClause.push(`priority = $${paramIndex++}`);
@@ -169,6 +174,7 @@ const mapTaskFromDB = (row: any): Task => {
     title: row.title || '',
     description: row.description || '',
     completed: Boolean(row.completed),
+    completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
     priority: row.priority || 'medium',
     dueDate: row.due_date ? new Date(row.due_date) : undefined,
     projectId: row.project_id || undefined,

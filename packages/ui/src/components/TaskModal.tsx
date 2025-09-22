@@ -8,7 +8,7 @@ import { CustomSelect } from './CustomSelect';
 import { ProjectComboBox } from './ProjectComboBox';
 import { TagInput } from './TagInput';
 import { DatePicker } from './DatePicker';
-import { Calendar, Flag, Folder, Trash2, Archive, Plus, Pencil, X } from 'lucide-react';
+import { Calendar, Flag, Folder, Trash2, Archive, Plus, Pencil, X, CheckSquare } from 'lucide-react';
 
 export interface TaskModalProps {
   isOpen: boolean;
@@ -173,6 +173,42 @@ const TaskModal: React.FC<TaskModalProps> = ({
           onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
           rows={3}
         />
+
+        {/* Task Status Information */}
+        {task && (
+          <div className="space-y-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Task Information</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              {/* Created Date */}
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-gray-500" />
+                <span className="text-gray-600 dark:text-gray-400">
+                  Created: {new Date(task.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+
+              {/* Completed Date */}
+              {task.completed && task.completedAt && (
+                <div className="flex items-center gap-2">
+                  <CheckSquare className="w-4 h-4 text-green-500" />
+                  <span className="text-green-600 dark:text-green-400">
+                    Completed: {new Date(task.completedAt).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+
+              {/* Last Updated */}
+              {task.updatedAt && (
+                <div className="flex items-center gap-2">
+                  <Pencil className="w-4 h-4 text-gray-500" />
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Updated: {new Date(task.updatedAt).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Priority and Due Date */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

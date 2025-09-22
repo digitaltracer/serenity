@@ -18,6 +18,7 @@ interface TaskUpdate {
   title?: string;
   description?: string;
   completed?: boolean;
+  completedAt?: Date | string | null;
   priority?: 'low' | 'medium' | 'high';
   tags?: string[];
   dueDate?: Date | string | null;
@@ -206,6 +207,35 @@ export class TaskService {
         }
       }
 
+      // Handle completedAt - convert string to Date if necessary
+      if (updates.completedAt !== undefined) {
+        if (updates.completedAt === null) {
+          sanitizedUpdates.completedAt = null;
+        } else if (typeof updates.completedAt === 'string') {
+          // Convert string to Date object
+          const dateValue = new Date(updates.completedAt);
+          if (isNaN(dateValue.getTime())) {
+            return { success: false, error: 'Invalid completed date format' };
+          }
+          sanitizedUpdates.completedAt = dateValue;
+        } else if (updates.completedAt instanceof Date) {
+          sanitizedUpdates.completedAt = updates.completedAt;
+        } else {
+          return { success: false, error: 'Completed date must be a valid date' };
+        }
+      }
+
+      // Business logic: Handle completion state changes
+      if (updates.completed !== undefined) {
+        if (updates.completed === true && updates.completedAt === undefined) {
+          // If marking as completed but no completedAt provided, set it to now
+          sanitizedUpdates.completedAt = new Date();
+        } else if (updates.completed === false) {
+          // If marking as incomplete, clear the completedAt
+          sanitizedUpdates.completedAt = null;
+        }
+      }
+
       const service = await this.getSqliteService();
       const updatedTask = await service.updateTask(id, sanitizedUpdates);
       
@@ -263,7 +293,10 @@ export class TaskService {
    */
   async completeTask(id: string) {
     console.log('✅ TaskService: Completing task:', id);
-    return this.updateTask(id, { completed: true });
+    return this.updateTask(id, {
+      completed: true,
+      completedAt: new Date().toISOString()
+    });
   }
 
   /**

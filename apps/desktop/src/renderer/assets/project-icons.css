@@ -1,0 +1,54 @@
+/* Project Icon Theme Variables */
+:root {
+  /* Light theme project icons */
+  --project-icon-16: url('./project-icons-light/project-icon-light-16.png');
+  --project-icon-20: url('./project-icons-light/project-icon-light-20.png');
+  --project-icon-24: url('./project-icons-light/project-icon-light-24.png');
+  --project-icon-32: url('./project-icons-light/project-icon-light-32.png');
+  --project-icon-48: url('./project-icons-light/project-icon-light-48.png');
+  --project-icon-64: url('./project-icons-light/project-icon-light-64.png');
+  --project-icon-default: var(--project-icon-24);
+}
+
+/* Dark theme project icons */
+[data-theme="dark"] {
+  --project-icon-16: url('./project-icons-dark/project-icon-dark-16.png');
+  --project-icon-20: url('./project-icons-dark/project-icon-dark-20.png');
+  --project-icon-24: url('./project-icons-dark/project-icon-dark-24.png');
+  --project-icon-32: url('./project-icons-dark/project-icon-dark-32.png');
+  --project-icon-48: url('./project-icons-dark/project-icon-dark-48.png');
+  --project-icon-64: url('./project-icons-dark/project-icon-dark-64.png');
+}
+
+/* Utility classes for project icons */
+.project-icon {
+  background-image: var(--project-icon-default);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  display: inline-block;
+}
+
+.project-icon-sm {
+  width: 16px;
+  height: 16px;
+  background-image: var(--project-icon-16);
+}
+
+.project-icon-md {
+  width: 24px;
+  height: 24px;
+  background-image: var(--project-icon-24);
+}
+
+.project-icon-lg {
+  width: 32px;
+  height: 32px;
+  background-image: var(--project-icon-32);
+}
+
+.project-icon-xl {
+  width: 48px;
+  height: 48px;
+  background-image: var(--project-icon-48);
+}

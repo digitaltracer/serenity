@@ -64,8 +64,8 @@ function calculateWeeklyTasksProgress(goal: Goal, data: ProgressCalculationData)
   const target = goal.config.targetCount || 0;
   
   const completedTasks = data.tasks.filter(task => {
-    if (!task.completed || !task.updatedAt) return false;
-    const completionDate = new Date(task.updatedAt);
+    if (!task.completed || !(task.completedAt || task.updatedAt)) return false;
+    const completionDate = new Date(task.completedAt || task.updatedAt!);
     return completionDate >= start && completionDate <= end;
   });
   
@@ -91,9 +91,9 @@ function calculateProjectTasksProgress(goal: Goal, data: ProgressCalculationData
   const projectId = goal.config.projectId;
   
   const completedTasks = data.tasks.filter(task => {
-    if (!task.completed || !task.updatedAt) return false;
+    if (!task.completed || !(task.completedAt || task.updatedAt)) return false;
     if (projectId && task.projectId !== projectId) return false;
-    const completionDate = new Date(task.updatedAt);
+    const completionDate = new Date(task.completedAt || task.updatedAt!);
     return completionDate >= start && completionDate <= end;
   });
   
@@ -124,8 +124,8 @@ function calculatePriorityTasksProgress(goal: Goal, data: ProgressCalculationDat
   });
   
   const completedPriorityTasks = priorityTasks.filter(task => {
-    if (!task.completed || !task.updatedAt) return false;
-    const completionDate = new Date(task.updatedAt);
+    if (!task.completed || !(task.completedAt || task.updatedAt)) return false;
+    const completionDate = new Date(task.completedAt || task.updatedAt!);
     return completionDate >= start && completionDate <= end;
   });
   
@@ -158,8 +158,8 @@ function calculateDailyStreakProgress(goal: Goal, data: ProgressCalculationData)
     const dateKey = checkDate.toISOString().split('T')[0];
     
     const hasTasksOnDay = data.tasks.some(task => {
-      if (!task.completed || !task.updatedAt) return false;
-      const completionDate = new Date(task.updatedAt);
+      if (!task.completed || !(task.completedAt || task.updatedAt)) return false;
+      const completionDate = new Date(task.completedAt || task.updatedAt!);
       return completionDate.toISOString().split('T')[0] === dateKey;
     });
     

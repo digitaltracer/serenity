@@ -490,7 +490,7 @@ export const IntegrationsPage: React.FC = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent>
           <div className="space-y-4">
             {/* Sync Action */}
             <div className="bg-gradient-to-r from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-800/20 rounded-xl p-6 border border-green-200/50 dark:border-green-700/30">
@@ -574,7 +574,7 @@ export const IntegrationsPage: React.FC = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent>
 
         {googleCalendar.connected ? (
           <div className="space-y-6">
@@ -728,7 +728,7 @@ export const IntegrationsPage: React.FC = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent>
 
         {github.connected ? (
           <div className="space-y-6">

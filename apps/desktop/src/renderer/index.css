@@ -1,3 +1,4 @@
+@import './assets/project-icons.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -107,3 +108,4 @@
 .dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.45);
 }
+

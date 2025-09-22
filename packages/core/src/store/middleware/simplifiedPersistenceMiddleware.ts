@@ -317,9 +317,10 @@ async function handleTaskPersistence(actionType: string, payload: any, tasksStat
       // We need to get the updated task from state
       const toggledTask = tasksState.tasks.find((t: any) => t.id === payload);
       if (toggledTask) {
-        await window.electronAPI?.sqlite?.updateTask(payload, { 
+        await window.electronAPI?.sqlite?.updateTask(payload, {
           completed: toggledTask.completed,
-          updatedAt: toggledTask.updatedAt 
+          completedAt: toggledTask.completedAt,
+          updatedAt: toggledTask.updatedAt
         });
       }
       break;

@@ -218,6 +218,7 @@ function loadAISettings(): AISettings {
   
   // Return default settings
   return {
+    activeProvider: undefined, // No provider selected by default
     autoAnalyze: false,
     analysisFrequency: 'manual',
     dataTypes: {
@@ -272,19 +273,29 @@ async function loadAISettingsFromDatabase(): Promise<AISettings | null> {
   try {
     const { sqliteService } = await import('@serenity/database');
     await sqliteService.initialize();
+    console.log('🔍 [loadAISettingsFromDatabase] Querying secure_settings for ai_settings...');
     const result = await sqliteService.executeRawQuery(
       `SELECT value FROM secure_settings WHERE key = ? ORDER BY updated_at DESC LIMIT 1`,
       ['ai_settings']
     );
+    console.log('🔍 [loadAISettingsFromDatabase] Query result:', result);
+    console.log('🔍 [loadAISettingsFromDatabase] Result type:', typeof result, 'isArray:', Array.isArray(result));
+
     const row = Array.isArray(result) ? result[0] : (result && (result as any)[0]);
+    console.log('🔍 [loadAISettingsFromDatabase] Extracted row:', row);
+
     if (row && (row.value || row["value"])) {
       const value = row.value ?? row["value"];
+      console.log('🔍 [loadAISettingsFromDatabase] Raw value from DB:', value);
       const parsed = JSON.parse(value);
-      console.log('💾 Loaded AI settings from database');
+      console.log('💾 [loadAISettingsFromDatabase] Parsed AI settings:', parsed);
+      console.log('💾 [loadAISettingsFromDatabase] Parsed activeProvider:', parsed?.activeProvider);
       return parsed;
+    } else {
+      console.log('⚠️ [loadAISettingsFromDatabase] No ai_settings found in secure_settings table');
     }
   } catch (error) {
-    console.warn('⚠️ Failed to load AI settings from database:', error);
+    console.warn('⚠️ [loadAISettingsFromDatabase] Failed to load AI settings from database:', error);
   }
   return null;
 }
@@ -296,18 +307,15 @@ async function getCurrentAISettings(): Promise<AISettings> {
   console.log('🔍 [getCurrentAISettings] Loading AI settings...');
 
   const db = await loadAISettingsFromDatabase();
-  console.log('🔍 [getCurrentAISettings] Database settings:', db);
-  console.log('🔍 [getCurrentAISettings] Database activeProvider:', db?.activeProvider);
 
   if (db) {
-    console.log('✅ [getCurrentAISettings] Using database settings');
+    console.log('✅ [getCurrentAISettings] Using database settings - activeProvider:', db?.activeProvider);
     return db;
   }
 
+  console.log('⚠️ [getCurrentAISettings] No database settings found, falling back to file settings');
   const file = loadAISettings();
-  console.log('🔍 [getCurrentAISettings] File settings:', file);
-  console.log('🔍 [getCurrentAISettings] File activeProvider:', file?.activeProvider);
-  console.log('⚠️ [getCurrentAISettings] Using file settings (no database)');
+  console.log('📁 [getCurrentAISettings] Using file settings - activeProvider:', file?.activeProvider);
 
   return file;
 }

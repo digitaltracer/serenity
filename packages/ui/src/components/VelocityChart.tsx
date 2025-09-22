@@ -11,6 +11,7 @@ interface Task {
   id: string;
   title: string;
   completed: boolean;
+  completedAt?: Date;
   createdAt: Date;
   updatedAt?: Date;
   priority?: 'low' | 'medium' | 'high';
@@ -65,9 +66,9 @@ export const VelocityChart: React.FC<VelocityChartProps> = ({
 
     // Filter tasks
     let filteredTasks = tasks.filter(task => {
-      if (!task.completed || !task.updatedAt) return false;
-      
-      const completedDate = new Date(task.updatedAt);
+      if (!task.completed || !(task.completedAt || task.updatedAt)) return false;
+
+      const completedDate = new Date(task.completedAt || task.updatedAt!);
       if (completedDate < startDate || completedDate > endDate) return false;
       
       if (filterBy?.priority && task.priority !== filterBy.priority) return false;
@@ -107,7 +108,7 @@ export const VelocityChart: React.FC<VelocityChartProps> = ({
 
       // Count tasks completed in this period
       const periodTasks = filteredTasks.filter(task => {
-        const completedDate = new Date(task.updatedAt!);
+        const completedDate = new Date(task.completedAt || task.updatedAt!);
         return completedDate >= periodStart && completedDate <= periodEnd;
       });
 

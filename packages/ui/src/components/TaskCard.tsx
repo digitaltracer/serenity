@@ -2,7 +2,8 @@ import React, { useMemo } from 'react';
 import { Task, selectCompactMode } from '@serenity/core';
 import { useSelector } from 'react-redux';
 import { cn } from '../utils/cn';
-import { CheckCircle2, Circle, Calendar, Flag, RefreshCw, ListTodo, Trash2, Pencil } from 'lucide-react';
+import { CheckCircle2, Circle, Calendar, Flag, RefreshCw, ListTodo, Trash2, Pencil, CheckSquare, Clock } from 'lucide-react';
+import { ProjectIcon } from './ProjectIcon';
 
 export interface TaskCardProps {
   task: Task;
@@ -171,6 +172,12 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
                 'mt-2': compactMode,
               }
             )}>
+              {/* Created Date - always show */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 dark:text-gray-400 dark:bg-gray-800 dark:border-gray-600">
+                <Clock className="w-3 h-3" />
+                Created {new Date(task.createdAt).toLocaleDateString()}
+              </div>
+
               {/* Due Date */}
               {task.dueDate && (
                 <div
@@ -184,7 +191,15 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
                   )}
                 >
                   <Calendar className="w-3 h-3" />
-                  {new Date(task.dueDate).toLocaleDateString()}
+                  Due {new Date(task.dueDate).toLocaleDateString()}
+                </div>
+              )}
+
+              {/* Completed Date */}
+              {task.completed && task.completedAt && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-green-700 bg-green-50 border border-green-200 dark:text-green-300 dark:bg-green-900/20 dark:border-green-700">
+                  <CheckSquare className="w-3 h-3" />
+                  Completed {new Date(task.completedAt).toLocaleDateString()}
                 </div>
               )}
 
@@ -250,7 +265,8 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
             {/* Project */}
             {projectName && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 dark:text-gray-400 dark:bg-gray-800 dark:border-gray-600">
-                📁 {projectName}
+                <ProjectIcon size={16} alt={`${projectName} project`} />
+                {projectName}
               </div>
             )}
 

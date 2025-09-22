@@ -120,6 +120,7 @@ export class SQLiteAdapter {
         title TEXT NOT NULL,
         description TEXT,
         completed BOOLEAN DEFAULT FALSE,
+        completed_at DATETIME,
         priority TEXT DEFAULT 'medium',
         project_id TEXT,
         parent_task_id TEXT,
@@ -264,6 +265,9 @@ export class SQLiteAdapter {
 
       // Migration: Recreate ai_usage table with correct quickadd operation support
       await this.migrateAIUsageTable();
+
+      // Migration: Add completed_at column to tasks table if it doesn't exist
+      await this.migrateTasksCompletedAt();
     } catch (error) {
       console.error('Failed to create database schema:', error);
       throw error;
@@ -338,6 +342,44 @@ export class SQLiteAdapter {
       }
     } catch (error) {
       console.error('❌ Failed to migrate ai_usage table:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Migrate tasks table to add completed_at column if it doesn't exist
+   */
+  private async migrateTasksCompletedAt(): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      // Check if completed_at column exists by querying PRAGMA table_info
+      const tableInfo = this.db.prepare('PRAGMA table_info(tasks)').all() as Array<{
+        cid: number;
+        name: string;
+        type: string;
+        notnull: number;
+        dflt_value: any;
+        pk: number;
+      }>;
+
+      const hasCompletedAtColumn = tableInfo.some(column => column.name === 'completed_at');
+
+      if (hasCompletedAtColumn) {
+        console.log('✅ tasks table already has completed_at column');
+        return;
+      }
+
+      console.log('🔄 Adding completed_at column to tasks table...');
+
+      // Add the completed_at column
+      this.db.exec('ALTER TABLE tasks ADD COLUMN completed_at DATETIME;');
+
+      console.log('✅ completed_at column added to tasks table successfully');
+    } catch (error) {
+      console.error('❌ Failed to migrate tasks table for completed_at column:', error);
       throw error;
     }
   }

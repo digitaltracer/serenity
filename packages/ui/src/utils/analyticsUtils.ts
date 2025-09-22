@@ -278,10 +278,15 @@ export class ProductivityAnalyzer {
   }
 
   static calculateCompletionStreaks(tasks: Task[]): { current: number; longest: number } {
-    const completedByDay = TimeAnalyzer.groupByDay(
-      tasks.filter(task => task.completed && task.updatedAt),
-      'updatedAt'
-    );
+    // Use completedAt for completed tasks, falling back to updatedAt
+    const completedTasks = tasks
+      .filter(task => task.completed && (task.completedAt || task.updatedAt))
+      .map(task => ({
+        ...task,
+        completionDate: task.completedAt || task.updatedAt!
+      }));
+
+    const completedByDay = TimeAnalyzer.groupByDay(completedTasks, 'completionDate');
 
     const today = new Date();
     let current = 0;
@@ -322,14 +327,14 @@ export class ProductivityAnalyzer {
 
   static calculateTrend(tasks: Task[], timeRange: AnalyticsTimeRange): { trend: 'up' | 'down' | 'stable'; trendPercentage: number } {
     const midPoint = new Date((timeRange.start.getTime() + timeRange.end.getTime()) / 2);
-    
+
     const firstHalf = tasks.filter(task => {
-      const date = task.updatedAt || task.createdAt;
+      const date = task.completedAt || task.updatedAt || task.createdAt;
       return date && task.completed && date >= timeRange.start && date < midPoint;
     });
 
     const secondHalf = tasks.filter(task => {
-      const date = task.updatedAt || task.createdAt;
+      const date = task.completedAt || task.updatedAt || task.createdAt;
       return date && task.completed && date >= midPoint && date <= timeRange.end;
     });
 
@@ -387,12 +392,18 @@ export class ProductivityAnalyzer {
 // Velocity Analysis
 export class VelocityAnalyzer {
   static calculateVelocity(tasks: Task[], timeRange: AnalyticsTimeRange): VelocityAnalytics {
-    const completedTasks = tasks.filter(task => task.completed && task.updatedAt);
-    
+    // Use completedAt for completed tasks, falling back to updatedAt
+    const completedTasks = tasks
+      .filter(task => task.completed && (task.completedAt || task.updatedAt))
+      .map(task => ({
+        ...task,
+        completionDate: task.completedAt || task.updatedAt!
+      }));
+
     // Group by different time periods
-    const dailyGroups = TimeAnalyzer.groupByDay(completedTasks, 'updatedAt');
-    const weeklyGroups = TimeAnalyzer.groupByWeek(completedTasks, 'updatedAt');
-    const monthlyGroups = TimeAnalyzer.groupByMonth(completedTasks, 'updatedAt');
+    const dailyGroups = TimeAnalyzer.groupByDay(completedTasks, 'completionDate');
+    const weeklyGroups = TimeAnalyzer.groupByWeek(completedTasks, 'completionDate');
+    const monthlyGroups = TimeAnalyzer.groupByMonth(completedTasks, 'completionDate');
 
     const daily = Array.from(dailyGroups.values()).map(group => group.length);
     const weekly = Array.from(weeklyGroups.values()).map(group => group.length);
@@ -458,7 +469,10 @@ export class HabitAnalyzer {
   static analyzeHabits(tasks: Task[], journalEntries: JournalEntry[]): HabitAnalytics {
     // Combine task and journal activities for habit analysis
     const activities = [
-      ...tasks.filter(t => t.completed && t.updatedAt).map(t => ({ date: t.updatedAt!, type: 'task' })),
+      ...tasks.filter(t => t.completed && (t.completedAt || t.updatedAt)).map(t => ({
+        date: t.completedAt || t.updatedAt!,
+        type: 'task'
+      })),
       ...journalEntries.map(e => ({ date: e.date, type: 'journal' }))
     ].sort((a, b) => a.date.getTime() - b.date.getTime());
 

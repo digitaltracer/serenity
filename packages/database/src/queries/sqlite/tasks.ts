@@ -153,9 +153,9 @@ export class SQLiteTaskQueries {
 
     const stmt = this.db.prepare(`
       INSERT INTO tasks (
-        id, title, description, completed, priority, due_date, project_id, 
+        id, title, description, completed, completed_at, priority, due_date, project_id,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertResult = stmt.run(
@@ -163,6 +163,7 @@ export class SQLiteTaskQueries {
       task.title,
       task.description || null,
       task.completed ? 1 : 0,
+      task.completedAt ? task.completedAt.toISOString() : null,
       task.priority,
       task.dueDate ? task.dueDate.toISOString() : null,
       projectId,
@@ -211,9 +212,9 @@ export class SQLiteTaskQueries {
       }
       const stmt = this.db.prepare(`
         INSERT INTO tasks (
-          id, title, description, completed, priority, due_date, project_id, 
+          id, title, description, completed, completed_at, priority, due_date, project_id,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const insertResult = stmt.run(
@@ -221,6 +222,7 @@ export class SQLiteTaskQueries {
         task.title,
         task.description || null,
         task.completed ? 1 : 0,
+        task.completedAt ? (task.completedAt instanceof Date ? task.completedAt.toISOString() : new Date(task.completedAt).toISOString()) : null,
         task.priority,
         task.dueDate ? (task.dueDate instanceof Date ? task.dueDate.toISOString() : new Date(task.dueDate).toISOString()) : null,
         projectId,
@@ -278,6 +280,10 @@ export class SQLiteTaskQueries {
     if (updates.completed !== undefined) {
       fields.push('completed = ?');
       values.push(updates.completed ? 1 : 0);
+    }
+    if (updates.completedAt !== undefined) {
+      fields.push('completed_at = ?');
+      values.push(updates.completedAt ? updates.completedAt.toISOString() : null);
     }
     if (updates.priority !== undefined) {
       fields.push('priority = ?');
@@ -449,6 +455,7 @@ export class SQLiteTaskQueries {
       title: row.title,
       description: row.description || undefined,
       completed: Boolean(row.completed),
+      completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
       priority: row.priority || 'medium',
       projectId: row.project_id || undefined,
       dueDate: row.due_date ? new Date(row.due_date) : undefined,
@@ -475,6 +482,7 @@ export class SQLiteTaskQueries {
       title: row.title,
       description: row.description || undefined,
       completed: Boolean(row.completed),
+      completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
       priority: row.priority || 'medium',
       projectId: row.project_id || undefined,
       dueDate: row.due_date ? new Date(row.due_date) : undefined,

@@ -36,6 +36,7 @@ export const ActionHubPage: React.FC = () => {
   const [showCreateProjectForm, setShowCreateProjectForm] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectColor, setNewProjectColor] = useState('#8B5CF6');
+  const [progressView, setProgressView] = useState<'overall' | 'weekly'>('overall');
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -48,11 +49,35 @@ export const ActionHubPage: React.FC = () => {
   }, [dispatch]);
 
   const taskStatistics = useMemo(() => {
-    const completedTasks = tasks.filter(task => task.completed);
-    const totalTasks = tasks.length;
-    const progressPercentage = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
-    return { completedTasks, totalTasks, progressPercentage };
-  }, [tasks]);
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
+    weekStart.setHours(0, 0, 0, 0);
+
+    if (progressView === 'weekly') {
+      // Filter tasks for current week
+      const weeklyTasks = tasks.filter(task => {
+        const taskDate = new Date(task.createdAt);
+        return taskDate >= weekStart;
+      });
+
+      const weeklyCompletedTasks = weeklyTasks.filter(task => task.completed);
+      const weeklyTotalTasks = weeklyTasks.length;
+      const weeklyProgressPercentage = weeklyTotalTasks > 0 ? Math.round((weeklyCompletedTasks.length / weeklyTotalTasks) * 100) : 0;
+
+      return {
+        completedTasks: weeklyCompletedTasks,
+        totalTasks: weeklyTotalTasks,
+        progressPercentage: weeklyProgressPercentage
+      };
+    } else {
+      // Overall statistics
+      const completedTasks = tasks.filter(task => task.completed);
+      const totalTasks = tasks.length;
+      const progressPercentage = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
+      return { completedTasks, totalTasks, progressPercentage };
+    }
+  }, [tasks, progressView]);
   
   // Projects calculations - memoized for performance
   const projectStatistics = useMemo(() => {
@@ -333,9 +358,36 @@ export const ActionHubPage: React.FC = () => {
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                          Overall Progress
+                          {progressView === 'weekly' ? 'This Week Progress' : 'Overall Progress'}
                         </h3>
-                        <Info className="w-4 h-4 text-gray-400" />
+                        <div className="flex items-center gap-2">
+                          {/* Progress View Toggle */}
+                          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                            <button
+                              onClick={() => setProgressView('overall')}
+                              className={cn(
+                                'px-2 py-1 text-xs font-medium rounded transition-all duration-200',
+                                progressView === 'overall'
+                                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                              )}
+                            >
+                              All
+                            </button>
+                            <button
+                              onClick={() => setProgressView('weekly')}
+                              className={cn(
+                                'px-2 py-1 text-xs font-medium rounded transition-all duration-200',
+                                progressView === 'weekly'
+                                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                              )}
+                            >
+                              Week
+                            </button>
+                          </div>
+                          <Info className="w-4 h-4 text-gray-400" />
+                        </div>
                       </div>
                       
                       {/* Circular Progress */}
@@ -383,18 +435,28 @@ export const ActionHubPage: React.FC = () => {
                           <span className="text-sm text-gray-700 dark:text-gray-300">Remaining</span>
                           <span className="ml-auto font-semibold text-orange-600 dark:text-orange-400">{totalTasks - completedTasks.length}</span>
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
                           <List className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">Total Tasks</span>
+                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                            {progressView === 'weekly' ? 'This Week' : 'Total Tasks'}
+                          </span>
                           <span className="ml-auto font-semibold text-blue-600 dark:text-blue-400">{totalTasks}</span>
                         </div>
                       </div>
                       
                       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {totalTasks - completedTasks.length} tasks left to complete
+                          {progressView === 'weekly'
+                            ? `${totalTasks - completedTasks.length} tasks left this week`
+                            : `${totalTasks - completedTasks.length} tasks left to complete`
+                          }
                         </p>
+                        {progressView === 'weekly' && (
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                            Week starting {new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).toLocaleDateString()}
+                          </p>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

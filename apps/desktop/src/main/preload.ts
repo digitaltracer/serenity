@@ -340,7 +340,7 @@ export interface ElectronAPI {
     listRecaps: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
     listUsage: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
     saveInsights: (provider: 'openai' | 'gemini' | 'anthropic' | 'local', insights: any[]) => Promise<{ success: boolean; error?: string }>;
-    saveUsage: (entry: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; operation: 'analyze' | 'recap'; promptTokens: number; completionTokens: number; totalTokens: number; timestamp?: string }) => Promise<{ success: boolean; error?: string }>;
+    saveUsage: (entry: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; operation: 'analyze' | 'recap' | 'quickadd'; promptTokens: number; completionTokens: number; totalTokens: number; timestamp?: string }) => Promise<{ success: boolean; error?: string }>;
   };
   window: {
     minimize: () => Promise<void>;

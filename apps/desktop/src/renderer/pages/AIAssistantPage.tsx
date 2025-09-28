@@ -35,7 +35,7 @@ import {
   generateRecap,
   restoreInsights,
   restoreRecaps,
-  recordUsage,
+  restoreUsage,
   selectAllTasks,
   selectAllEntries,
 } from '@serenity/core';
@@ -137,7 +137,7 @@ export const AIAssistantPage: React.FC = () => {
   useLoadPersistedAIData(dispatch as any, {
     restoreInsights,
     restoreRecaps,
-    recordUsage,
+    restoreUsage,
   });
 
   // Load available models per provider when they have keys

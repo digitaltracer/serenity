@@ -1351,19 +1351,7 @@ export function registerAIAssistantHandlers(): void {
             console.log('🧪 Persisted insights sample (first 3):', sample);
           } catch {}
         }
-        // Persist aggregate usage for this analyze operation
-        try {
-          await sqliteService.addAIUsage([{ 
-            provider: options.provider, 
-            operation: 'analyze', 
-            promptTokens: usageTotals.promptTokens, 
-            completionTokens: usageTotals.completionTokens, 
-            totalTokens: usageTotals.totalTokens 
-          }]);
-          console.log('💾 Persisted AI analyze usage to database');
-        } catch (e) {
-          console.warn('⚠️ Failed to persist AI analyze usage to database:', e);
-        }
+        // Usage will be persisted via Redux middleware when fulfilled action is dispatched
       } catch (persistError) {
         console.warn('⚠️ Failed to persist AI insights to database:', persistError);
       }
@@ -1489,20 +1477,7 @@ export function registerAIAssistantHandlers(): void {
             try {
               console.log('🧪 Recap persisted summary:', { title: recap.title, type: recap.type, period: recap.period });
             } catch {}
-            // Persist usage for recap
-            try {
-              const u = normalizeUsage(result.usage);
-              await sqliteService.addAIUsage([{ 
-                provider: options.provider, 
-                operation: 'recap', 
-                promptTokens: u.promptTokens, 
-                completionTokens: u.completionTokens, 
-                totalTokens: u.totalTokens 
-              }]);
-              console.log('💾 Persisted AI recap usage to database');
-            } catch (e) {
-              console.warn('⚠️ Failed to persist AI recap usage to database:', e);
-            }
+            // Usage will be persisted via Redux middleware when fulfilled action is dispatched
           } catch (persistError) {
             console.warn('⚠️ Failed to persist AI recap to database:', persistError);
           }
@@ -1714,7 +1689,7 @@ export function registerAIAssistantHandlers(): void {
   });
 
   // Persist usage from renderer
-  ipcMain.handle('ai-assistant:save-usage', async (_event, payload: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; operation: 'analyze' | 'recap'; promptTokens: number; completionTokens: number; totalTokens: number; timestamp?: string }) => {
+  ipcMain.handle('ai-assistant:save-usage', async (_event, payload: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; operation: 'analyze' | 'recap' | 'quickadd'; promptTokens: number; completionTokens: number; totalTokens: number; timestamp?: string }) => {
     try {
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -2046,12 +2021,12 @@ The JSON object must have two top-level keys:
               totalTokens: u.totalTokens,
               timestamp: new Date().toISOString(),
             };
-            console.log(`💾 [QuickAdd][${provider}] Saving usage entry:`, usageEntry);
+            console.log(`💾 [QuickAdd][${provider}] Saving usage entry with deduplication:`, usageEntry);
 
             const { sqliteService } = await import('@serenity/database');
             await sqliteService.initialize();
             await sqliteService.addAIUsage([usageEntry]);
-            console.log(`✅ [QuickAdd][${provider}] Usage saved successfully to database`);
+            console.log(`✅ [QuickAdd][${provider}] Usage saved to database`);
           } else {
             console.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`);
           }
@@ -2174,12 +2149,12 @@ The JSON object must have two top-level keys:
 
           if (totalTokens > 0) {
             const usageEntry = { provider: 'gemini' as const, operation: 'quickadd' as const, promptTokens, completionTokens, totalTokens, timestamp: new Date().toISOString() };
-            console.log(`💾 [QuickAdd][${provider}] Saving usage entry:`, usageEntry);
+            console.log(`💾 [QuickAdd][${provider}] Saving usage entry with deduplication:`, usageEntry);
 
             const { sqliteService } = await import('@serenity/database');
             await sqliteService.initialize();
             await sqliteService.addAIUsage([usageEntry]);
-            console.log(`✅ [QuickAdd][${provider}] Usage saved successfully to database`);
+            console.log(`✅ [QuickAdd][${provider}] Usage saved to database`);
           } else {
             console.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`);
           }
@@ -2276,12 +2251,12 @@ The JSON object must have two top-level keys:
 
           if (u.totalTokens > 0) {
             const usageEntry = { provider: 'anthropic' as const, operation: 'quickadd' as const, promptTokens: u.promptTokens, completionTokens: u.completionTokens, totalTokens: u.totalTokens, timestamp: new Date().toISOString() };
-            console.log(`💾 [QuickAdd][${provider}] Saving usage entry:`, usageEntry);
+            console.log(`💾 [QuickAdd][${provider}] Saving usage entry with deduplication:`, usageEntry);
 
             const { sqliteService } = await import('@serenity/database');
             await sqliteService.initialize();
             await sqliteService.addAIUsage([usageEntry]);
-            console.log(`✅ [QuickAdd][${provider}] Usage saved successfully to database`);
+            console.log(`✅ [QuickAdd][${provider}] Usage saved to database`);
           } else {
             console.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`);
           }

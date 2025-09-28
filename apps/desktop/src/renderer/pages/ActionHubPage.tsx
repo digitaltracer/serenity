@@ -54,11 +54,16 @@ export const ActionHubPage: React.FC = () => {
     weekStart.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
     weekStart.setHours(0, 0, 0, 0);
 
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6); // End of current week (Saturday)
+    weekEnd.setHours(23, 59, 59, 999);
+
     if (progressView === 'weekly') {
-      // Filter tasks for current week
+      // Filter tasks for current week based on due date
       const weeklyTasks = tasks.filter(task => {
-        const taskDate = new Date(task.createdAt);
-        return taskDate >= weekStart;
+        if (!task.dueDate) return false; // Only include tasks with due dates
+        const taskDueDate = new Date(task.dueDate);
+        return taskDueDate >= weekStart && taskDueDate <= weekEnd;
       });
 
       const weeklyCompletedTasks = weeklyTasks.filter(task => task.completed);

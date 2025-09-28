@@ -5,7 +5,7 @@ export function useLoadPersistedAIData(
   actions: {
     restoreInsights: (insights: any[]) => any;
     restoreRecaps: (recaps: any[]) => any;
-    recordUsage: (usage: any) => any;
+    restoreUsage: (usage: any[]) => any;
   }
 ) {
   useEffect(() => {
@@ -80,10 +80,8 @@ export function useLoadPersistedAIData(
               totalTokens: Number(row.total_tokens || row.totalTokens || 0),
               note: row.note || undefined,
             }));
-            // Add usage records to Redux state
-            formattedUsage.forEach((usage: any) => {
-              dispatch(actions.recordUsage(usage));
-            });
+            // Restore usage records to Redux state (without triggering persistence)
+            dispatch(actions.restoreUsage(formattedUsage));
           }
         } catch (error) {
           console.warn('Failed to load persisted usage data:', error);

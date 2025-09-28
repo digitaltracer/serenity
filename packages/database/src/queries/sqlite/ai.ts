@@ -85,13 +85,30 @@ export class SQLiteAIQueries {
   // ===== Usage =====
   async addUsage(entries: Array<{ timestamp?: string; provider: 'openai' | 'gemini' | 'anthropic'; operation: 'analyze' | 'recap' | 'quickadd'; promptTokens: number; completionTokens: number; totalTokens: number }>): Promise<void> {
     if (!entries || entries.length === 0) return;
+
+    // Deduplication: check for recent duplicate entries (within 5 seconds)
+    const checkDuplicateStmt = this.db.prepare(`
+      SELECT COUNT(*) as count FROM ai_usage
+      WHERE provider = ? AND operation = ?
+      AND total_tokens = ?
+      AND datetime(timestamp) > datetime('now', '-5 seconds')
+    `);
+
     const sql = `INSERT INTO ai_usage (id, timestamp, provider, operation, prompt_tokens, completion_tokens, total_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)`;
     const stmt = this.db.prepare(sql);
     const insertMany = this.db.transaction((rows: typeof entries) => {
       for (const r of rows) {
+        // Check for duplicates
+        const duplicateCheck = checkDuplicateStmt.get(r.provider, r.operation, Math.floor(r.totalTokens||0)) as { count: number };
+        if (duplicateCheck.count > 0) {
+          console.log(`🚫 Skipping duplicate AI usage entry: ${r.provider}/${r.operation}/${r.totalTokens} tokens`);
+          continue;
+        }
+
         const id = `usage_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const ts = r.timestamp || new Date().toISOString();
         stmt.run(id, ts, r.provider, r.operation, Math.floor(r.promptTokens||0), Math.floor(r.completionTokens||0), Math.floor(r.totalTokens||0));
+        console.log(`✅ Saved AI usage entry: ${r.provider}/${r.operation}/${r.totalTokens} tokens`);
       }
     });
     insertMany(entries);

@@ -217,8 +217,8 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
 
     // Persist AI insights/recaps and usage to localStorage when updated
     if (action.type === 'aiAssistant/analyzeUserData/fulfilled' || action.type === 'aiAssistant/clearInsights' || action.type === 'aiAssistant/removeInsight') {
-      try { 
-        localStorage.setItem('serenity_ai_insights', JSON.stringify(state.aiAssistant.insights)); 
+      try {
+        localStorage.setItem('serenity_ai_insights', JSON.stringify(state.aiAssistant.insights));
         localStorage.setItem('serenity_ai_usage', JSON.stringify(state.aiAssistant.usage));
       } catch {}
 
@@ -247,6 +247,24 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
         }
       } catch (e) {
         console.warn('⚠️ Failed to persist AI insights/usage via IPC:', e);
+      }
+    }
+
+    // Handle direct recordUsage actions - persist individual usage entries to database
+    if (action.type === 'aiAssistant/recordUsage') {
+      try {
+        localStorage.setItem('serenity_ai_usage', JSON.stringify(state.aiAssistant.usage));
+
+        // Persist to database via IPC
+        const anyWindow: any = window as any;
+        if (anyWindow.electronAPI?.aiAssistant?.saveUsage) {
+          const usageEntry = action.payload;
+          console.log('[AI Persist] saving recordUsage via IPC:', usageEntry);
+          await anyWindow.electronAPI.aiAssistant.saveUsage(usageEntry);
+          console.log('✅ [AI Persist] Usage entry saved to database successfully');
+        }
+      } catch (e) {
+        console.warn('⚠️ Failed to persist recordUsage to database via IPC:', e);
       }
     }
     if (action.type === 'aiAssistant/generateRecap/fulfilled' || action.type === 'aiAssistant/removeRecap') {

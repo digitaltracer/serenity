@@ -399,6 +399,9 @@ const aiAssistantSlice = createSlice({
     clearUsage: (state) => {
       state.usage = [];
     },
+    restoreUsage: (state, action: PayloadAction<AIUsageEntry[]>) => {
+      state.usage = action.payload || [];
+    },
   },
   
   extraReducers: (builder) => {
@@ -565,6 +568,7 @@ export const {
   clearProviderModelInfo,
   recordUsage,
   clearUsage,
+  restoreUsage,
 } = aiAssistantSlice.actions;
 
 // Selectors

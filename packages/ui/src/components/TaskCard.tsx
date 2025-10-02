@@ -65,7 +65,8 @@ const TaskCard = React.memo<TaskCardProps>(({ task, onToggle, onToggleSubtask, o
           'p-6': !compactMode,
           'p-4': compactMode,
           'opacity-60': task.completed,
-          'border-red-300/80 from-red-50/30 to-red-25/60 dark:border-red-700/60 dark:from-red-900/20 dark:to-red-800/10': isOverdue,
+          // Enhanced overdue styling - red border, background, and shadow to draw attention
+          'border-red-400 border-2 from-red-50 to-red-100/50 dark:border-red-500 dark:from-red-900/30 dark:to-red-800/20 shadow-red-200/50 dark:shadow-red-900/40 ring-2 ring-red-200/60 dark:ring-red-800/50': isOverdue,
           'border-blue-300/80 from-blue-50/30 to-blue-25/60 dark:border-blue-700/60 dark:from-blue-900/20 dark:to-blue-800/10': isDueToday && !isOverdue,
         },
         className

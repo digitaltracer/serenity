@@ -192,9 +192,15 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
           if (signature !== lastAISentSignature) {
             lastAISentSignature = signature;
             if (aiSettingsTimer) clearTimeout(aiSettingsTimer);
-            aiSettingsTimer = setTimeout(() => {
+            // Save activeProvider changes immediately, debounce other settings
+            const isActiveProviderChange = action.type === 'aiAssistant/setActiveProvider' || action.type === 'aiAssistant/clearActiveProvider';
+            if (isActiveProviderChange) {
               try { anyWindow.electronAPI!.aiAssistant!.saveSettings(aiSettings); } catch {}
-            }, 300);
+            } else {
+              aiSettingsTimer = setTimeout(() => {
+                try { anyWindow.electronAPI!.aiAssistant!.saveSettings(aiSettings); } catch {}
+              }, 300);
+            }
           }
         }
         // Persist usage to localStorage for quick access across sessions

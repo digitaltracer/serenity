@@ -5,17 +5,17 @@
 
 import React, { useState, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectAllUsedTags, selectAllTasks, selectAllEntries, setUsedTags, updateAllTasks, updateAllEntries } from '@serenity/core';
+import { selectAllUsedTags, selectAllTasks, selectAllEntries, setUsedTags, updateAllTasks, updateAllEntries, logger } from '@serenity/core';
 import { cn } from '../utils/cn';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { Input } from './Input';
 import { Modal } from './Modal';
-import { 
-  Tag, 
-  Trash2, 
-  Edit3, 
-  Search, 
+import {
+  Tag,
+  Trash2,
+  Edit3,
+  Search,
   AlertTriangle,
   CheckCircle2,
   X,
@@ -104,9 +104,9 @@ const TagsManager: React.FC<TagsManagerProps> = ({ isOpen, onClose }) => {
       dispatch(updateAllTasks(updatedTasks));
       dispatch(updateAllEntries(updatedEntries));
       
-      console.log('🗑️ Tag deleted successfully:', tagName);
+      logger.info('Tag deleted successfully', { component: 'TagsManager', operation: 'tagDeleted', metadata: { tagName } });
     } catch (error) {
-      console.error('❌ Failed to delete tag:', error);
+      logger.error('❌ Failed to delete tag:', { component: 'TagsManager', operation: 'failedDeleteTag:' }, error as Error);
     }
   };
 
@@ -122,7 +122,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ isOpen, onClose }) => {
       setSelectedTags([]);
       setShowDeleteConfirm(false);
     } catch (error) {
-      console.error('❌ Failed to delete tags:', error);
+      logger.error('❌ Failed to delete tags:', { component: 'TagsManager', operation: 'failedDeleteTags:' }, error as Error);
     }
   };
 
@@ -155,9 +155,9 @@ const TagsManager: React.FC<TagsManagerProps> = ({ isOpen, onClose }) => {
       setEditingTag(null);
       setNewTagName('');
       
-      console.log('✏️ Tag renamed successfully:', oldName, '->', newName);
+      logger.info('Tag renamed successfully', { component: 'TagsManager', operation: 'tagRenamed', metadata: { oldName, newName } });
     } catch (error) {
-      console.error('❌ Failed to rename tag:', error);
+      logger.error('❌ Failed to rename tag:', { component: 'TagsManager', operation: 'failedRenameTag:' }, error as Error);
     }
   };
 
@@ -196,9 +196,9 @@ const TagsManager: React.FC<TagsManagerProps> = ({ isOpen, onClose }) => {
       setShowMergeModal(false);
       setMergeTarget('');
       
-      console.log('🔀 Tags merged successfully');
+      logger.info('🔀 Tags merged successfully', { component: 'TagsManager', operation: 'tagsMergedSuccessfully' });
     } catch (error) {
-      console.error('❌ Failed to merge tags:', error);
+      logger.error('❌ Failed to merge tags:', { component: 'TagsManager', operation: 'failedMergeTags:' }, error as Error);
     }
   };
 

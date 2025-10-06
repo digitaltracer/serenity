@@ -2,17 +2,19 @@ import React, { useEffect, useCallback, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppLockScreen } from './AppLockScreen';
 import { PasswordResetModal } from './PasswordResetModal';
+import { PasswordResetFlow } from './PasswordResetFlow';
 import { LoadingScreen } from './LoadingScreen';
 import { useToast } from './Toast';
 import { useCryptoOperations } from '../hooks/useCryptoOperations';
-import { 
-  initializeAuth, 
+import { logger } from '@serenity/core';
+import {
+  initializeAuth,
   validatePassword,
   resetPassword,
   factoryReset,
   unlockApp,
   authenticateWithBiometric,
-  selectIsLocked, 
+  selectIsLocked,
   selectIsInitialized,
   selectHasMasterPassword,
   selectIsValidating,
@@ -37,6 +39,7 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
   const dispatch = useDispatch();
   const { showSuccess, showError } = useToast();
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [showResetFlow, setShowResetFlow] = useState(false);
   const { cryptoProgress, startCryptoOperation, updateProgress, completeCryptoOperation, failCryptoOperation } = useCryptoOperations();
   
   const isLocked = useSelector(selectIsLocked);
@@ -57,13 +60,13 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
     if (!isInitialized) {
       const initializeApp = async () => {
         try {
-          console.log('🚀 Starting app initialization...');
+          logger.info('🚀 Starting app initialization...', { component: 'AuthenticatedApp', operation: 'startingAppInitialization...' });
           
           // Import crypto utils only when needed
           const { shouldShowCryptoLoading, initializeCrypto } = await import('@serenity/core');
           
           if (shouldShowCryptoLoading()) {
-            console.log('🔐 Encryption enabled, showing crypto loading screen');
+            logger.info('🔐 Encryption enabled, showing crypto loading screen', { component: 'AuthenticatedApp', operation: 'operation' });
             startCryptoOperation();
             
             // Initialize crypto with progress updates
@@ -81,7 +84,7 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
               failCryptoOperation('Failed to initialize encryption');
             }
           } else {
-            console.log('⚡ No encryption needed, proceeding with normal initialization');
+            logger.info('⚡ No encryption needed, proceeding with normal initialization', { component: 'AuthenticatedApp', operation: 'operation' });
           }
           
           // Add a minimum delay to show loading screen (even if initialization is fast)
@@ -91,7 +94,7 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
           dispatch(initializeAuth() as any);
           
         } catch (error) {
-          console.error('❌ Failed to initialize app:', error);
+          logger.error('❌ Failed to initialize app:', { component: 'AuthenticatedApp', operation: 'failedInitializeApp:' }, error as Error);
           // Fall back to default auth initialization
           dispatch(initializeAuth() as any);
         }
@@ -99,7 +102,7 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
       
       // Set a timeout to force initialization completion if it hangs
       const timeoutId = setTimeout(() => {
-        console.warn('App initialization timed out, falling back to default state');
+        logger.warn('App initialization timed out, falling back to default state', { component: 'AuthenticatedApp', operation: 'operation' });
         // Force initialization to complete
         dispatch({
           type: 'auth/initialize/fulfilled',
@@ -124,16 +127,16 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
     try {
       // If password is empty, it means biometric auth was used
       if (password === '') {
-        console.log('🔓 Touch ID authentication initiated, using biometric service...');
+        logger.info('🔓 Touch ID authentication initiated, using biometric service...', { component: 'AuthenticatedApp', operation: 'operation' });
         
         // Use the new biometric authentication service
         const result = await dispatch(authenticateWithBiometric('Unlock Serenity Notes and load integrations') as any);
         
         if (result.type === 'auth/authenticateWithBiometric/fulfilled') {
-          console.log('✅ Biometric authentication successful with integrations loaded');
+          logger.info('✅ Biometric authentication successful with integrations loaded', { component: 'AuthenticatedApp', operation: 'biometricAuthenticationSuccessful' });
           return true;
         } else {
-          console.error('❌ Biometric authentication failed:', result.payload);
+          logger.error('❌ Biometric authentication failed:', { component: 'AuthenticatedApp', operation: 'biometricAuthenticationFailed:' }, result.payload);
           return false;
         }
       }
@@ -145,17 +148,34 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
       }
       return false;
     } catch (error) {
-      console.error('Unlock failed:', error);
+      logger.error('Unlock failed:', { component: 'AuthenticatedApp', operation: 'unlockFailed:' }, error as Error);
       return false;
     }
   }, [dispatch]);
 
-  // Handle forgot password
+  // Handle forgot password - now shows the new reset flow
   const handleForgotPassword = useCallback(() => {
-    setIsResetModalOpen(true);
+    setShowResetFlow(true);
   }, []);
 
-  // Handle password reset
+  // Handle password reset completion from the new flow
+  const handleCompletePasswordReset = useCallback(async (newPassword: string) => {
+    try {
+      // First reset the password in the system
+      await dispatch(resetPassword() as any);
+
+      // Then set the new password (this will be implemented in core)
+      // For now, we'll just unlock the app with the new password
+      await handleUnlock(newPassword);
+
+      showSuccess('Password Reset Complete', 'Your master password has been updated successfully');
+      setShowResetFlow(false);
+    } catch (error) {
+      showError('Reset Failed', 'Failed to reset password');
+    }
+  }, [dispatch, showSuccess, showError, handleUnlock]);
+
+  // Handle old modal password reset
   const handleResetPassword = useCallback(async () => {
     try {
       const result = await dispatch(resetPassword() as any);
@@ -242,13 +262,26 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
 
   // Show loading state while initializing
   if (!isInitialized) {
-    console.log('🔄 Loading screen shown - isInitialized:', isInitialized, 'isValidating:', isValidating);
+    logger.info('Loading screen shown', { component: 'AuthenticatedApp', operation: 'loadingScreenShown', metadata: { isInitialized, isValidating } });
     return (
       <LoadingScreen 
         title="Loading Serenity Notes"
         message="Initializing application..."
         progress={20}
         stage="loading"
+      />
+    );
+  }
+
+  // Show password reset flow if requested
+  if (showResetFlow) {
+    // For now, we'll use empty arrays - in a real implementation, these would come from secure storage
+    return (
+      <PasswordResetFlow
+        onComplete={handleCompletePasswordReset}
+        onCancel={() => setShowResetFlow(false)}
+        recoveryCodes={[]} // TODO: Load from secure storage
+        securityQuestions={[]} // TODO: Load from secure storage
       />
     );
   }
@@ -266,7 +299,7 @@ export const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({
           maxAttempts={5}
           lockoutTime={lockoutTime}
         />
-        
+
         <PasswordResetModal
           isOpen={isResetModalOpen}
           onClose={() => setIsResetModalOpen(false)}

@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Project } from '../../types';
 import { generateId } from '../../utils';
 import { loadProjects } from '../../utils/persistence';
+import { logger } from '../../utils/logger';
 
 export interface ProjectsState {
   projects: Project[];
@@ -14,7 +15,7 @@ const initialProjects = (() => {
   try {
     return loadProjects();
   } catch (error) {
-    console.error('Failed to load projects from storage:', error);
+    logger.error('Failed to load projects from storage:', { component: 'projectsSlice', operation: 'failedLoadProjects' }, error as Error);
     return [];
   }
 })();

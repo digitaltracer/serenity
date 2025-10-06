@@ -3,6 +3,8 @@
  * Handles project operations with validation and business rules
  */
 
+import { logger } from '@serenity/core';
+
 interface ProjectData {
   name: string;
   description?: string;
@@ -34,7 +36,7 @@ export class ProjectService {
    */
   async getAllProjects() {
     try {
-      console.log('📁 ProjectService: Getting all projects');
+      logger.info('📁 ProjectService: Getting all projects', { component: 'ProjectService', operation: 'projectservice:GettingAll' });
       const service = await this.getSqliteService();
       const projects = await service.getProjects();
       
@@ -49,10 +51,10 @@ export class ProjectService {
         return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
       });
       
-      console.log(`✅ ProjectService: Retrieved ${sortedProjects.length} projects`);
+      logger.info(`✅ ProjectService: Retrieved ${sortedProjects.length} projects`, { component: 'ProjectService', operation: 'projectservice:Retrieved${sortedprojects.length}' });
       return { success: true, data: sortedProjects };
     } catch (error) {
-      console.error('❌ ProjectService: Failed to get projects:', error);
+      logger.error('❌ ProjectService: Failed to get projects:', { component: 'ProjectService', operation: 'projectservice:FailedGet' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to retrieve projects' 
@@ -65,7 +67,7 @@ export class ProjectService {
    */
   async getProject(id: string) {
     try {
-      console.log('📁 ProjectService: Getting project:', id);
+      logger.info('📁 ProjectService: Getting project:', {  component: 'ProjectService', operation: 'projectservice:GettingProject:' , metadata: { value: id } });
       
       if (!id || id.trim().length === 0) {
         return { success: false, error: 'Project ID is required' };
@@ -78,10 +80,10 @@ export class ProjectService {
         return { success: false, error: 'Project not found' };
       }
       
-      console.log('✅ ProjectService: Project retrieved:', project.name);
+      logger.info(`✅ ProjectService: Project retrieved: ${project.name}`, { component: 'ProjectService', operation: 'projectservice:ProjectRetrieved:' });
       return { success: true, data: project };
     } catch (error) {
-      console.error('❌ ProjectService: Failed to get project:', error);
+      logger.error('❌ ProjectService: Failed to get project:', { component: 'ProjectService', operation: 'projectservice:FailedGet' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to retrieve project' 
@@ -94,7 +96,7 @@ export class ProjectService {
    */
   async createProject(projectData: ProjectData) {
     try {
-      console.log('📁 ProjectService: Creating new project:', projectData.name);
+      logger.info(`📁 ProjectService: Creating new project: ${projectData.name}`, { component: 'ProjectService', operation: 'projectservice:CreatingNew' });
       
       // Validation
       if (!projectData.name || projectData.name.trim().length === 0) {
@@ -137,10 +139,10 @@ export class ProjectService {
 
       const newProject = await service.createProject(sanitizedProject);
       
-      console.log('✅ ProjectService: Project created successfully:', newProject.id);
+      logger.info(`✅ ProjectService: Project created successfully: ${newProject.id}`, { component: 'ProjectService', operation: 'projectservice:ProjectCreated' });
       return { success: true, data: newProject };
     } catch (error) {
-      console.error('❌ ProjectService: Failed to create project:', error);
+      logger.error('❌ ProjectService: Failed to create project:', { component: 'ProjectService', operation: 'projectservice:FailedCreate' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to create project' 
@@ -153,7 +155,7 @@ export class ProjectService {
    */
   async updateProject(id: string, updates: ProjectUpdate) {
     try {
-      console.log('📁 ProjectService: Updating project:', id);
+      logger.info('📁 ProjectService: Updating project:', {  component: 'ProjectService', operation: 'projectservice:UpdatingProject:' , metadata: { value: id } });
       
       // Validation
       if (!id || id.trim().length === 0) {
@@ -209,10 +211,10 @@ export class ProjectService {
 
       const updatedProject = await service.updateProject(id, sanitizedUpdates);
       
-      console.log('✅ ProjectService: Project updated successfully:', id);
+      logger.info('✅ ProjectService: Project updated successfully:', {  component: 'ProjectService', operation: 'projectservice:ProjectUpdated' , metadata: { value: id } });
       return { success: true, data: updatedProject };
     } catch (error) {
-      console.error('❌ ProjectService: Failed to update project:', error);
+      logger.error('❌ ProjectService: Failed to update project:', { component: 'ProjectService', operation: 'projectservice:FailedUpdate' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to update project' 
@@ -225,7 +227,7 @@ export class ProjectService {
    */
   async deleteProject(id: string) {
     try {
-      console.log('🗑️ ProjectService: Deleting project:', id);
+      logger.info('🗑️ ProjectService: Deleting project:', {  component: 'ProjectService', operation: '🗑️Projectservice:Deleting' , metadata: { value: id } });
       
       // Validation
       if (!id || id.trim().length === 0) {
@@ -247,10 +249,10 @@ export class ProjectService {
       
       const deleted = await service.deleteProject(id);
       
-      console.log('✅ ProjectService: Project deleted successfully:', id);
+      logger.info('✅ ProjectService: Project deleted successfully:', {  component: 'ProjectService', operation: 'projectservice:ProjectDeleted' , metadata: { value: id } });
       return { success: true, data: deleted };
     } catch (error) {
-      console.error('❌ ProjectService: Failed to delete project:', error);
+      logger.error('❌ ProjectService: Failed to delete project:', { component: 'ProjectService', operation: 'projectservice:FailedDelete' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to delete project' 
@@ -262,7 +264,7 @@ export class ProjectService {
    * Archive a project (business logic wrapper)
    */
   async archiveProject(id: string) {
-    console.log('📦 ProjectService: Archiving project:', id);
+    logger.info('📦 ProjectService: Archiving project:', {  component: 'ProjectService', operation: 'projectservice:ArchivingProject:' , metadata: { value: id } });
     return this.updateProject(id, { archived: true });
   }
 
@@ -270,7 +272,7 @@ export class ProjectService {
    * Unarchive a project (business logic wrapper)
    */
   async unarchiveProject(id: string) {
-    console.log('📤 ProjectService: Unarchiving project:', id);
+    logger.info('📤 ProjectService: Unarchiving project:', {  component: 'ProjectService', operation: 'projectservice:UnarchivingProject:' , metadata: { value: id } });
     return this.updateProject(id, { archived: false });
   }
 
@@ -279,7 +281,7 @@ export class ProjectService {
    */
   async getProjectStats(id: string) {
     try {
-      console.log('📊 ProjectService: Getting project statistics:', id);
+      logger.info('📊 ProjectService: Getting project statistics:', {  component: 'ProjectService', operation: 'projectservice:GettingProject' , metadata: { value: id } });
       
       if (!id || id.trim().length === 0) {
         return { success: false, error: 'Project ID is required' };
@@ -302,10 +304,10 @@ export class ProjectService {
           : 0
       };
       
-      console.log('✅ ProjectService: Project statistics calculated');
+      logger.info('✅ ProjectService: Project statistics calculated', { component: 'ProjectService', operation: 'projectservice:ProjectStatistics' });
       return { success: true, data: stats };
     } catch (error) {
-      console.error('❌ ProjectService: Failed to get project statistics:', error);
+      logger.error('❌ ProjectService: Failed to get project statistics:', { component: 'ProjectService', operation: 'projectservice:FailedGet' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to get project statistics' 

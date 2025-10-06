@@ -7,6 +7,7 @@ import { Task } from '../types';
 import { GoogleCalendarService, GoogleCalendarEvent } from './googleCalendarService';
 import { GitHubService, GitHubCommit, GitHubPullRequest } from './githubService';
 import { generateId } from '../utils';
+import { logger } from '../utils/logger';
 
 export interface SyncResult {
   success: boolean;
@@ -79,12 +80,12 @@ export class IntegrationSyncService {
             };
             syncedTasks.push(updatedTask);
             result.tasksUpdated++;
-            console.log(`📝 Updated existing calendar task: ${event.summary}`);
+            logger.info(`📝 Updated existing calendar task: ${event.summary}`, { component: 'integrationSyncService', operation: 'updatedExistingCalendar' });
           } else {
             // Create new task
             syncedTasks.push(task);
             result.tasksCreated++;
-            console.log(`📋 Created new calendar task: ${event.summary}`);
+            logger.info(`📋 Created new calendar task: ${event.summary}`, { component: 'integrationSyncService', operation: 'createdNewCalendar' });
           }
         } catch (error) {
           result.errors.push(`Failed to process event ${event.id}: ${error}`);
@@ -136,11 +137,11 @@ export class IntegrationSyncService {
           createdAt: new Date(),
           updatedAt: new Date()
         };
-        console.log('📁 Created new "Github" project for synced items');
+        logger.info('📁 Created new "Github" project for synced items', { component: 'integrationSyncService', operation: 'createdNew' });
         result.errors.push('CREATED_GITHUB_PROJECT'); // Signal to caller to create project
       } else {
         githubProjectId = githubProject.id;
-        console.log('📁 Using existing "Github" project:', githubProjectId);
+        logger.info('📁 Using existing "Github" project', { component: 'integrationSyncService', operation: 'usingExisting', metadata: { githubProjectId } });
       }
 
       // Get today's date range in user's local timezone (start of day to end of day)
@@ -148,11 +149,11 @@ export class IntegrationSyncService {
       const localStartOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const localEndOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
 
-      console.log(`🕒 Using local timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
-      console.log(`📅 Local "today" range: ${localStartOfDay.toLocaleString()} to ${localEndOfDay.toLocaleString()}`);
+      logger.info(`🕒 Using local timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, { component: 'integrationSyncService', operation: 'usingLocalTimezone:' });
+      logger.info(`📅 Local "today" range: ${localStartOfDay.toLocaleString()} to ${localEndOfDay.toLocaleString()}`, { component: 'integrationSyncService', operation: 'local' });
 
       // Fetch pull requests from today across ALL accessible repositories (owned + collaborator + org)
-      console.log('🔍 Syncing GitHub PRs from ALL accessible repositories (owned + collaborator + org)...');
+      logger.info('🔍 Syncing GitHub PRs from ALL accessible repositories (owned + collaborator + org)...', { component: 'integrationSyncService', operation: 'syncingGithubPrs' });
       const pullRequests = await GitHubService.getTodaysPullRequests(
         accessToken,
         null, // null = fetch from all repositories, not just displayed ones
@@ -179,9 +180,9 @@ export class IntegrationSyncService {
           if (!existingTask) {
             syncedTasks.push(task);
             result.tasksCreated++;
-            console.log(`📋 Created task for PR: ${pr.title} (${pr.repository.name})`);
+            logger.info(`📋 Created task for PR: ${pr.title} (${pr.repository.name})`, { component: 'integrationSyncService', operation: 'createdTaskFor' });
           } else {
-            console.log(`⏭️ Skipped existing PR: ${pr.title} (${pr.repository.name})`);
+            logger.info(`⏭️ Skipped existing PR: ${pr.title} (${pr.repository.name})`, { component: 'integrationSyncService', operation: 'skippedExistingPr:' });
           }
         } catch (error) {
           result.errors.push(`Failed to process PR ${pr.id}: ${error}`);

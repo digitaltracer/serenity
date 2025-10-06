@@ -66,6 +66,7 @@ import { usePersistGoogleCredentials } from './Integrations/hooks/usePersistGoog
 import { useGitHubTokens } from './Integrations/hooks/useGitHubTokens';
 import { useSyncToggles } from './Integrations/hooks/useSyncToggles';
 import { useSyncNow } from './Integrations/hooks/useSyncNow';
+import { logger } from '@serenity/core';
 
 export const IntegrationsPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -136,7 +137,7 @@ export const IntegrationsPage: React.FC = () => {
   // Handle privacy settings save
   const handlePrivacySettingsSave = async (settings: PrivacySecuritySettings) => {
     try {
-      console.log('Saving privacy settings:', settings);
+      logger.info('Saving privacy settings:', settings, { component: 'IntegrationsPage', operation: 'savingPrivacySettings:' });
       
       // Convert basic settings to enhanced settings format
       const enhancedSettings = {
@@ -172,7 +173,7 @@ export const IntegrationsPage: React.FC = () => {
       
       setShowPrivacyModal(false);
     } catch (error) {
-      console.error('Failed to save privacy settings:', error);
+      logger.error('Failed to save privacy settings:', { component: 'IntegrationsPage', operation: 'failedSavePrivacy' }, error);
       showError('Settings Error', 'Failed to save privacy settings. Please try again.');
     }
   };
@@ -198,7 +199,7 @@ export const IntegrationsPage: React.FC = () => {
 
   // Password validation handler
   const handlePasswordSubmit = async () => {
-    console.log('🔐 handlePasswordSubmit called with password length:', password.trim().length);
+    logger.info('🔐 handlePasswordSubmit called with password length:', password.trim().length, { component: 'IntegrationsPage', operation: 'handlepasswordsubmitCalledWith' });
     
     if (!password.trim()) {
       setPasswordError('Password is required');
@@ -209,48 +210,48 @@ export const IntegrationsPage: React.FC = () => {
     setPasswordError('');
 
     try {
-      console.log('🔄 Dispatching validatePassword...');
+      logger.info('🔄 Dispatching validatePassword...', { component: 'IntegrationsPage', operation: 'dispatchingValidatepassword...' });
       const anyDispatch = dispatch as any;
       const result = await (dispatch as any)(validatePassword(password.trim()));
-      console.log('📝 validatePassword result:', result);
+      logger.info('📝 validatePassword result:', result, { component: 'IntegrationsPage', operation: 'validatepasswordResult:' });
       
       if (validatePassword.fulfilled.match(result)) {
         // Password is valid, store it and proceed with pending action
-        console.log('✅ Password validation successful, setting validated master password');
-        console.log('🔑 Setting validatedMasterPassword (length:', password.trim().length, ')');
+        logger.info('✅ Password validation successful, setting validated master password', { component: 'IntegrationsPage', operation: 'operation' });
+        logger.info('🔑 Setting validatedMasterPassword (length:', password.trim().length, ')', { component: 'IntegrationsPage', operation: 'settingValidatedmasterpassword(length:' });
         setValidatedMasterPassword(password.trim());
         
         // Verify the state was set
-        console.log('✓ After setting - validatedMasterPassword length should be:', password.trim().length);
+        logger.info('✓ After setting - validatedMasterPassword length should be:', password.trim().length, { component: 'IntegrationsPage', operation: 'afterSettingValidatedmasterpassword' });
         
         setShowPasswordModal(false);
         setPassword('');
         
         if (pendingAction === 'google') {
-          console.log('🔑 Proceeding with Google Calendar connection with validated password');
+          logger.info('🔑 Proceeding with Google Calendar connection with validated password', { component: 'IntegrationsPage', operation: 'proceedingWithGoogle' });
           // Use the password directly since state might not have updated yet
           await performGoogleCalendarConnectWithPassword(password.trim());
         } else if (pendingAction === 'github') {
-          console.log('🔑 Proceeding with GitHub connection with validated password');
+          logger.info('🔑 Proceeding with GitHub connection with validated password', { component: 'IntegrationsPage', operation: 'proceedingWithGithub' });
           // Use the password directly since state might not have updated yet
           await performGitHubConnectWithPassword(password.trim());
         } else if (pendingAction === 'load') {
-          console.log('🔑 Proceeding to load saved integrations with validated password');
+          logger.info('🔑 Proceeding to load saved integrations with validated password', { component: 'IntegrationsPage', operation: 'proceedingLoadSaved' });
           await performLoadSavedIntegrations(password.trim());
         } else if (pendingAction === 'persist_sync' && pendingSyncToggle) {
-          console.log('🔑 Proceeding to persist sync toggle change with validated password');
+          logger.info('🔑 Proceeding to persist sync toggle change with validated password', { component: 'IntegrationsPage', operation: 'proceedingPersistSync' });
           await performSyncTogglePersistence(password.trim(), pendingSyncToggle);
         }
         
         setPendingAction(null);
         setPendingSyncToggle(null);
       } else {
-        console.error('❌ Password validation failed:', result.payload);
-        console.error('❌ Full result object:', result);
+        logger.error('❌ Password validation failed:', { component: 'IntegrationsPage', operation: 'passwordValidationFailed:' }, result.payload);
+        logger.error('❌ Full result object:', { component: 'IntegrationsPage', operation: 'fullResultObject:' }, result);
         setPasswordError(result.payload as string || 'Invalid password');
       }
     } catch (error) {
-      console.error('❌ Exception during password validation:', error);
+      logger.error('❌ Exception during password validation:', { component: 'IntegrationsPage', operation: 'exceptionDuringPassword' }, error);
       setPasswordError('Failed to validate password');
     } finally {
       setIsValidatingPassword(false);
@@ -277,28 +278,28 @@ export const IntegrationsPage: React.FC = () => {
 
   const performLoadSavedIntegrations = async (masterPassword: string) => {
     try {
-      console.log('🔓 Loading saved integrations with master password...');
+      logger.info('🔓 Loading saved integrations with master password...', { component: 'IntegrationsPage', operation: 'loadingSavedIntegrations' });
       const anyDispatch = dispatch as any;
       await anyDispatch(initializeIntegrations(masterPassword));
       
       showSuccess('Integrations Loaded', 'Your saved integrations have been loaded successfully.');
       setHasEncryptedIntegrations(false); // Hide the load button
     } catch (error) {
-      console.error('❌ Failed to load saved integrations:', error);
+      logger.error('❌ Failed to load saved integrations:', { component: 'IntegrationsPage', operation: 'failedLoadSaved' }, error);
       showError('Load Failed', `Failed to load integrations: ${error}`);
     }
   };
 
   const performSyncTogglePersistence = async (masterPassword: string, toggleData: { integration: 'google' | 'github', enabled: boolean }) => {
     try {
-      console.log(`💾 Persisting ${toggleData.integration} sync toggle (${toggleData.enabled}) with master password...`);
+      logger.info(`💾 Persisting ${toggleData.integration} sync toggle (${toggleData.enabled}) with master password...`, { component: 'IntegrationsPage', operation: 'persisting${toggledata.integration}Sync' });
       const anyDispatch = dispatch as any;
       await anyDispatch(persistIntegrationsState(masterPassword));
       
-      console.log(`✅ ${toggleData.integration} sync state persisted successfully`);
+      logger.info(`✅ ${toggleData.integration} sync state persisted successfully`, { component: 'IntegrationsPage', operation: '${toggledata.integration}SyncState' });
       showSuccess('Sync Settings', `${toggleData.integration === 'google' ? 'Google Calendar' : 'GitHub'} sync ${toggleData.enabled ? 'enabled' : 'disabled'} and saved permanently.`);
     } catch (error) {
-      console.error(`❌ Failed to persist ${toggleData.integration} sync state:`, error);
+      logger.error(`❌ Failed to persist ${toggleData.integration} sync state:`, { component: 'IntegrationsPage', operation: 'failedPersist${toggledata.integration}' }, error);
       showError('Sync Settings', 'Sync preference could not be saved permanently. Changes may be lost on restart.');
     }
   };
@@ -321,9 +322,9 @@ export const IntegrationsPage: React.FC = () => {
     // Clear encrypted storage
     try {
       await EncryptedIntegrationService.clearStoredIntegrations();
-      console.log('✅ Cleared encrypted Google Calendar data');
+      logger.info('✅ Cleared encrypted Google Calendar data', { component: 'IntegrationsPage', operation: 'clearedEncryptedGoogle' });
     } catch (error) {
-      console.error('❌ Failed to clear encrypted data:', error);
+      logger.error('❌ Failed to clear encrypted data:', { component: 'IntegrationsPage', operation: 'failedClearEncrypted' }, error);
     }
   };
 
@@ -332,7 +333,7 @@ export const IntegrationsPage: React.FC = () => {
   };
 
   const performGitHubConnect = async () => {
-    console.log('⚠️ performGitHubConnect called without password parameter');
+    logger.info('⚠️ performGitHubConnect called without password parameter', { component: 'IntegrationsPage', operation: 'performgithubconnectCalledWithout' });
     await performGitHubConnectWithPassword(validatedMasterPassword);
   };
 
@@ -356,9 +357,9 @@ export const IntegrationsPage: React.FC = () => {
     // Clear encrypted storage
     try {
       await EncryptedIntegrationService.clearStoredIntegrations();
-      console.log('✅ Cleared encrypted GitHub data');
+      logger.info('✅ Cleared encrypted GitHub data', { component: 'IntegrationsPage', operation: 'clearedEncryptedGithub' });
     } catch (error) {
-      console.error('❌ Failed to clear encrypted data:', error);
+      logger.error('❌ Failed to clear encrypted data:', { component: 'IntegrationsPage', operation: 'failedClearEncrypted' }, error);
     }
   };
 

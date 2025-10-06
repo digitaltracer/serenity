@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { logger } from '@serenity/core';
 
 export function useLoadPersistedAIData(
   dispatch: (action: any) => any,
@@ -16,13 +17,13 @@ export function useLoadPersistedAIData(
         const api = (window as any)?.electronAPI?.aiAssistant;
         if (!api) return;
 
-        console.log('🔄 Loading persisted AI data...');
+        logger.info('🔄 Loading persisted AI data...', { component: 'useLoadPersistedAIData', operation: 'loadingPersistedData...' });
 
         // Load insights
         try {
           const insightsResult = await api.listInsights();
           if (insightsResult?.success && insightsResult.data && !cancelled) {
-            console.log(`📊 Loaded ${insightsResult.data.length} persisted insights`);
+            logger.info(`📊 Loaded ${insightsResult.data.length} persisted insights`, { component: 'useLoadPersistedAIData', operation: 'loaded${insightsresult.data.length}Persisted' });
             const formattedInsights = insightsResult.data.map((row: any) => ({
               id: row.id?.toString() || `insight_${Date.now()}_${Math.random()}`,
               type: row.type || 'productivity',
@@ -38,14 +39,14 @@ export function useLoadPersistedAIData(
             dispatch(actions.restoreInsights(formattedInsights));
           }
         } catch (error) {
-          console.warn('Failed to load persisted insights:', error);
+          logger.warn('Failed to load persisted insights:', error, { component: 'useLoadPersistedAIData', operation: 'failedLoadPersisted' });
         }
 
         // Load recaps
         try {
           const recapsResult = await api.listRecaps();
           if (recapsResult?.success && recapsResult.data && !cancelled) {
-            console.log(`📝 Loaded ${recapsResult.data.length} persisted recaps`);
+            logger.info(`📝 Loaded ${recapsResult.data.length} persisted recaps`, { component: 'useLoadPersistedAIData', operation: 'loaded${recapsresult.data.length}Persisted' });
             const formattedRecaps = recapsResult.data.map((row: any) => ({
               id: row.id?.toString() || `recap_${Date.now()}_${Math.random()}`,
               type: row.type || 'weekly',
@@ -62,14 +63,14 @@ export function useLoadPersistedAIData(
             dispatch(actions.restoreRecaps(formattedRecaps));
           }
         } catch (error) {
-          console.warn('Failed to load persisted recaps:', error);
+          logger.warn('Failed to load persisted recaps:', error, { component: 'useLoadPersistedAIData', operation: 'failedLoadPersisted' });
         }
 
         // Load usage data
         try {
           const usageResult = await api.listUsage();
           if (usageResult?.success && usageResult.data && !cancelled) {
-            console.log(`💰 Loaded ${usageResult.data.length} usage records`);
+            logger.info(`💰 Loaded ${usageResult.data.length} usage records`, { component: 'useLoadPersistedAIData', operation: 'loaded${usageresult.data.length}Usage' });
             const formattedUsage = usageResult.data.map((row: any) => ({
               id: row.id?.toString() || `usage_${Date.now()}_${Math.random()}`,
               timestamp: row.created_at || row.timestamp || new Date().toISOString(),
@@ -84,12 +85,12 @@ export function useLoadPersistedAIData(
             dispatch(actions.restoreUsage(formattedUsage));
           }
         } catch (error) {
-          console.warn('Failed to load persisted usage data:', error);
+          logger.warn('Failed to load persisted usage data:', error, { component: 'useLoadPersistedAIData', operation: 'failedLoadPersisted' });
         }
 
-        console.log('✅ Persisted AI data loading complete');
+        logger.info('✅ Persisted AI data loading complete', { component: 'useLoadPersistedAIData', operation: 'persistedDataLoading' });
       } catch (error) {
-        console.error('Failed to load persisted AI data:', error);
+        logger.error('Failed to load persisted AI data:', { component: 'useLoadPersistedAIData', operation: 'failedLoadPersisted' }, error);
       }
     };
 

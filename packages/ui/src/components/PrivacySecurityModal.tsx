@@ -2,13 +2,14 @@ import React, { useState, useCallback } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { Input } from './Input';
-import { 
-  Lock, 
-  Shield, 
-  Eye, 
-  EyeOff, 
-  Clock, 
-  Monitor, 
+import { logger } from '@serenity/core';
+import {
+  Lock,
+  Shield,
+  Eye,
+  EyeOff,
+  Clock,
+  Monitor,
   Key,
   Database,
   AlertTriangle,
@@ -158,7 +159,7 @@ export const PrivacySecurityModal: React.FC<PrivacySecurityModalProps> = ({
               return;
             }
           } catch (error) {
-            console.error('Failed to validate current password:', error);
+            logger.error('Failed to validate current password:', { component: 'PrivacySecurityModal', operation: 'failedValidateCurrent' }, error as Error);
             setErrors({ currentPassword: 'Failed to validate current password' });
             setIsSubmitting(false);
             return;
@@ -171,7 +172,7 @@ export const PrivacySecurityModal: React.FC<PrivacySecurityModalProps> = ({
             const { saveMasterPasswordHashSecure } = await import('@serenity/core');
             await saveMasterPasswordHashSecure(newPassword);
           } catch (error) {
-            console.error('Failed to save master password:', error);
+            logger.error('Failed to save master password:', { component: 'PrivacySecurityModal', operation: 'failedSaveMaster' }, error as Error);
             setErrors({ general: 'Failed to save master password. Please try again.' });
             setIsSubmitting(false);
             return;
@@ -190,7 +191,7 @@ export const PrivacySecurityModal: React.FC<PrivacySecurityModalProps> = ({
       onClose();
 
     } catch (error) {
-      console.error('Failed to save settings:', error);
+      logger.error('Failed to save settings:', { component: 'PrivacySecurityModal', operation: 'failedSaveSettings:' }, error as Error);
       setErrors({ general: 'Failed to save settings. Please try again.' });
     } finally {
       setIsSubmitting(false);

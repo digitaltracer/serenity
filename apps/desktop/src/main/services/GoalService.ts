@@ -3,6 +3,7 @@
  */
 
 import type { Goal } from '@serenity/core';
+import { logger } from '@serenity/core';
 
 export class GoalService {
   private sqliteService: any = null;
@@ -22,7 +23,7 @@ export class GoalService {
       const goals: Goal[] = await service.getGoals();
       return { success: true, data: goals };
     } catch (error) {
-      console.error('GoalService: Failed to get goals:', error);
+      logger.error('GoalService: Failed to get goals:', { component: 'GoalService', operation: 'goalservice:FailedGet' }, error as Error);
       return { success: false, error: 'Failed to get goals' };
     }
   }
@@ -33,7 +34,7 @@ export class GoalService {
       const created = await service.createGoalWithId(goal);
       return { success: true, data: created };
     } catch (error) {
-      console.error('GoalService: Failed to create goal:', error);
+      logger.error('GoalService: Failed to create goal:', { component: 'GoalService', operation: 'goalservice:FailedCreate' }, error as Error);
       return { success: false, error: 'Failed to create goal' };
     }
   }
@@ -44,7 +45,7 @@ export class GoalService {
       const updated = await service.updateGoal(id, updates);
       return { success: true, data: updated };
     } catch (error) {
-      console.error('GoalService: Failed to update goal:', error);
+      logger.error('GoalService: Failed to update goal:', { component: 'GoalService', operation: 'goalservice:FailedUpdate' }, error as Error);
       return { success: false, error: 'Failed to update goal' };
     }
   }
@@ -55,7 +56,7 @@ export class GoalService {
       const ok = await service.deleteGoal(id);
       return { success: ok };
     } catch (error) {
-      console.error('GoalService: Failed to delete goal:', error);
+      logger.error('GoalService: Failed to delete goal:', { component: 'GoalService', operation: 'goalservice:FailedDelete' }, error as Error);
       return { success: false, error: 'Failed to delete goal' };
     }
   }

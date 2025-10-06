@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { AIAssistantService } from '../../services/aiAssistantService';
 import { Task, JournalEntry } from '../../types';
+import { logger } from '../../utils/logger';
 
 export interface AIProvider {
   id: 'openai' | 'gemini' | 'anthropic';
@@ -141,12 +142,12 @@ export const setApiKey = createAsyncThunk(
   async ({ provider, apiKey }: { provider: 'openai' | 'gemini' | 'anthropic'; apiKey: string }) => {
     // This will be handled by the main process for security
     if (typeof globalThis !== 'undefined' && (globalThis as any).window?.electronAPI?.aiAssistant?.setApiKey) {
-      console.log('[aiAssistant/setApiKey] Calling main process setApiKey for', provider);
+      logger.info(`[aiAssistant/setApiKey] Calling main process setApiKey for ${provider}`, { component: 'aiAssistantSlice', operation: '[aiassistant/setapikey]CallingMain' });
       const result = await (globalThis as any).window.electronAPI.aiAssistant.setApiKey(provider, apiKey);
-      console.log('[aiAssistant/setApiKey] Main returned:', result);
+      logger.info('[aiAssistant/setApiKey] Main returned', { component: 'aiAssistantSlice', operation: '[aiassistant/setapikey]MainReturned', metadata: { result } });
       if (result.success) {
         const payload = { provider, hasKey: true, modelInfo: result.modelInfo, usage: result.usage } as any;
-        console.log('[aiAssistant/setApiKey] Fulfilled payload:', payload);
+        logger.info('[aiAssistant/setApiKey] Fulfilled payload', { component: 'aiAssistantSlice', operation: '[aiassistant/setapikey]FulfilledPayload', metadata: { payload } });
         return payload;
       } else {
         throw new Error(result.error || 'Failed to set API key');

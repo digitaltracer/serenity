@@ -5,6 +5,7 @@
 import Database from 'better-sqlite3';
 import { Project } from '@serenity/core';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from '@serenity/core';
 
 export class SQLiteProjectQueries {
   private db: Database.Database;
@@ -79,7 +80,7 @@ export class SQLiteProjectQueries {
    * Create a project with a specific ID (used by middleware to preserve Redux IDs)
    */
   createProjectWithId(project: Project): Project {
-    console.log('📁 SQLite: Creating project with existing ID:', project.id);
+    logger.info('📁 SQLite: Creating project with existing ID:', { component: 'projects', operation: 'sqlite:CreatingProject' });
     
     const stmt = this.db.prepare(`
       INSERT INTO projects (
@@ -97,10 +98,10 @@ export class SQLiteProjectQueries {
       project.updatedAt.toISOString()
     );
     
-    console.log(`✅ SQLite: Project inserted with existing ID ${project.id}, changes: ${insertResult.changes}`);
+    logger.info(`Project inserted with existing ID ${project.id}`, { component: 'projects', operation: 'projectInserted' });
 
     const savedProject = this.getProjectById(project.id)!;
-    console.log('📤 SQLite: Returning saved project:', { id: savedProject.id, name: savedProject.name });
+    logger.info('Returning saved project', { component: 'projects', operation: 'returningSavedProject', metadata: { id: savedProject.id, name: savedProject.name } });
     
     return savedProject;
   }

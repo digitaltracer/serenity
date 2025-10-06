@@ -3,6 +3,7 @@ import { validateMasterPasswordSecure, saveMasterPasswordHashSecure } from '../.
 import { getPrivacySettingsSecure, savePrivacySettingsSecure, getSecureStorage, SECURE_KEYS } from '../../utils/secureStorage';
 import { secureSessionManager } from '../../utils/secureSessionManager';
 import { initializeIntegrations } from './integrationsSlice';
+import { logger } from '../../utils/logger';
 
 export interface AuthState {
   isLocked: boolean;
@@ -38,13 +39,13 @@ const initialState: AuthState = {
 export const initializeAuth = createAsyncThunk(
   'auth/initialize',
   async () => {
-    console.log('🚀 Auth initialization started');
+    logger.info('🚀 Auth initialization started', { component: 'authSlice', operation: 'authInitializationStarted' });
     const startTime = performance.now();
     
     try {
       // Check if database API is available
       if (!window.electronAPI?.auth) {
-        console.log('⚡ Auth API not available, using default settings');
+        logger.info('⚡ Auth API not available, using default settings', { component: 'authSlice', operation: 'operation' });
         return {
           hasMasterPassword: false,
           autoLockTimeout: 15,
@@ -53,16 +54,16 @@ export const initializeAuth = createAsyncThunk(
       }
       
       // Load privacy settings from database
-      console.log('🔐 Loading settings from database...');
+      logger.info('🔐 Loading settings from database...', { component: 'authSlice', operation: 'loadingSettingsFrom' });
       const settingsStart = performance.now();
       const privacySettings = await getPrivacySettingsSecure();
-      console.log(`✅ Privacy settings loaded in ${(performance.now() - settingsStart).toFixed(2)}ms`);
+      logger.info(`✅ Privacy settings loaded in ${(performance.now() - settingsStart).toFixed(2)}ms`, { component: 'authSlice', operation: 'privacySettingsLoaded' });
       
       const hasMasterPassword = privacySettings?.masterPasswordEnabled || false;
       const autoLockTimeout = privacySettings?.autoLockTimeout || 15;
       
-      console.log(`🔐 Auth config: masterPassword=${hasMasterPassword}, timeout=${autoLockTimeout}`);
-      console.log(`✅ Auth initialization completed in ${(performance.now() - startTime).toFixed(2)}ms`);
+      logger.info(`🔐 Auth config: masterPassword=${hasMasterPassword}, timeout=${autoLockTimeout}`, { component: 'authSlice', operation: 'operation' });
+      logger.info(`✅ Auth initialization completed in ${(performance.now() - startTime).toFixed(2)}ms`, { component: 'authSlice', operation: 'authInitializationCompleted' });
       
       return {
         hasMasterPassword,
@@ -70,8 +71,8 @@ export const initializeAuth = createAsyncThunk(
         isLocked: hasMasterPassword, // Lock if master password is enabled
       };
     } catch (error) {
-      console.error('❌ Failed to initialize auth:', error);
-      console.log(`⚠️ Falling back to defaults after ${(performance.now() - startTime).toFixed(2)}ms`);
+      logger.error('❌ Failed to initialize auth:', { component: 'authSlice', operation: 'failedInitializeAuth:' }, error as Error);
+      logger.info(`⚠️ Falling back to defaults after ${(performance.now() - startTime).toFixed(2)}ms`, { component: 'authSlice', operation: 'fallingBackDefaults' });
       return {
         hasMasterPassword: false,
         autoLockTimeout: 15,
@@ -100,11 +101,11 @@ export const validatePassword = createAsyncThunk(
 
       // Password is valid - load encrypted integrations
       try {
-        console.log('🔓 Master password validated, loading encrypted integrations...');
+        logger.info('🔓 Master password validated, loading encrypted integrations...', { component: 'authSlice', operation: 'operation' });
         await dispatch(initializeIntegrations(password));
-        console.log('✅ Encrypted integrations loaded successfully');
+        logger.info('✅ Encrypted integrations loaded successfully', { component: 'authSlice', operation: 'encryptedIntegrationsLoaded' });
       } catch (error) {
-        console.error('⚠️ Failed to load encrypted integrations after authentication:', error);
+        logger.error('⚠️ Failed to load encrypted integrations after authentication:', { component: 'authSlice', operation: 'failedLoadEncrypted' }, error as Error);
         // Don't fail the password validation if integrations fail to load
       }
 
@@ -115,25 +116,26 @@ export const validatePassword = createAsyncThunk(
         const hasStoredPassword = await BiometricAuthService.hasStoredMasterPassword();
         
         if (biometricAvailable.available && !hasStoredPassword) {
-          console.log('🔒 Storing master password for future biometric authentication...');
+          logger.info('🔒 Storing master password for future biometric authentication...', { component: 'authSlice', operation: 'storingMasterPassword' });
           const stored = await BiometricAuthService.storeMasterPasswordForBiometric(password);
           if (stored) {
-            console.log('✅ Master password stored for biometric authentication');
+            logger.info('✅ Master password stored for biometric authentication', { component: 'authSlice', operation: 'masterPasswordStored' });
           } else {
-            console.warn('⚠️ Failed to store master password for biometric authentication');
+            logger.warn('⚠️ Failed to store master password for biometric authentication', { component: 'authSlice', operation: 'failedStoreMaster' });
           }
         }
       } catch (error) {
-        console.warn('⚠️ Could not store master password for biometric auth:', error);
+        logger.warn('⚠️ Could not store master password for biometric auth:', { component: 'authSlice', operation: 'couldNotStore' });
         // Don't fail the password validation if biometric storage fails
       }
 
       // SECURITY FIX: Store password in secure session manager instead of Redux
       secureSessionManager.setMasterPassword(password);
-      
+
+
       return { success: true };
     } catch (error) {
-      console.error('Password validation failed:', error);
+      logger.error('Password validation failed:', { component: 'authSlice', operation: 'passwordValidationFailed:' }, error as Error);
       return rejectWithValue('Failed to validate password');
     }
   }
@@ -159,22 +161,23 @@ export const setMasterPassword = createAsyncThunk(
         const biometricAvailable = await BiometricAuthService.isAvailable();
         
         if (biometricAvailable.available) {
-          console.log('🔒 Storing master password for biometric authentication...');
+          logger.info('🔒 Storing master password for biometric authentication...', { component: 'authSlice', operation: 'storingMasterPassword' });
           const stored = await BiometricAuthService.storeMasterPasswordForBiometric(password);
           if (stored) {
-            console.log('✅ Master password stored for biometric authentication');
+            logger.info('✅ Master password stored for biometric authentication', { component: 'authSlice', operation: 'masterPasswordStored' });
           } else {
-            console.warn('⚠️ Failed to store master password for biometric authentication');
+            logger.warn('⚠️ Failed to store master password for biometric authentication', { component: 'authSlice', operation: 'failedStoreMaster' });
           }
         }
       } catch (error) {
-        console.warn('⚠️ Could not store master password for biometric auth:', error);
+        logger.warn('⚠️ Could not store master password for biometric auth:', { component: 'authSlice', operation: 'couldNotStore' });
         // Don't fail the entire operation if biometric storage fails
       }
-      
+
+
       return { success: true };
     } catch (error) {
-      console.error('Failed to set master password:', error);
+      logger.error('Failed to set master password:', { component: 'authSlice', operation: 'failedSetMaster' }, error as Error);
       return rejectWithValue('Failed to save master password');
     }
   }
@@ -184,7 +187,7 @@ export const authenticateWithBiometric = createAsyncThunk(
   'auth/authenticateWithBiometric',
   async (reason: string | undefined, { dispatch, rejectWithValue }) => {
     try {
-      console.log('🔒 Starting biometric authentication...');
+      logger.info('🔒 Starting biometric authentication...', { component: 'authSlice', operation: 'startingBiometricAuthentication...' });
       
       const { BiometricAuthService } = await import('../../services/biometricAuthService');
       const result = await BiometricAuthService.authenticateAndRetrieveMasterPassword(reason);
@@ -200,23 +203,24 @@ export const authenticateWithBiometric = createAsyncThunk(
         return rejectWithValue('Failed to retrieve master password');
       }
       
-      console.log('✅ Biometric authentication successful, loading encrypted integrations...');
+      logger.info('✅ Biometric authentication successful, loading encrypted integrations...', { component: 'authSlice', operation: 'operation' });
       
       // Load encrypted integrations with the retrieved master password (best-effort)
       try {
         // Dispatch returns an action; ignore its type to avoid TS mismatch in callers
         await (dispatch as any)(initializeIntegrations(result.masterPassword));
-        console.log('✅ Encrypted integrations loaded successfully after biometric auth');
+        logger.info('✅ Encrypted integrations loaded successfully after biometric auth', { component: 'authSlice', operation: 'encryptedIntegrationsLoaded' });
       } catch (error) {
-        console.error('⚠️ Failed to load encrypted integrations after biometric auth:', error);
+        logger.error('⚠️ Failed to load encrypted integrations after biometric auth:', { component: 'authSlice', operation: 'failedLoadEncrypted' }, error as Error);
       }
       
       // SECURITY FIX: Store password in secure session manager instead of Redux
       secureSessionManager.setMasterPassword(result.masterPassword);
-      
+
+
       return { success: true };
     } catch (error) {
-      console.error('Biometric authentication failed:', error);
+      logger.error('Biometric authentication failed:', { component: 'authSlice', operation: 'biometricAuthenticationFailed:' }, error as Error);
       return rejectWithValue(`Biometric authentication failed: ${error}`);
     }
   }
@@ -229,7 +233,7 @@ export const resetPassword = createAsyncThunk(
       // Remove master password hash from database
       if (window.electronAPI?.auth?.deleteSecureSetting) {
         await window.electronAPI.auth.deleteSecureSetting('master_password_hash');
-        console.log('✅ Removed master password hash from database');
+        logger.info('✅ Removed master password hash from database', { component: 'authSlice', operation: 'removedMasterPassword' });
       }
       
       // Update privacy settings to disable master password
@@ -244,7 +248,7 @@ export const resetPassword = createAsyncThunk(
       
       return { success: true };
     } catch (error) {
-      console.error('Failed to reset password:', error);
+      logger.error('Failed to reset password:', { component: 'authSlice', operation: 'failedResetPassword:' }, error as Error);
       return rejectWithValue('Failed to reset password');
     }
   }
@@ -257,7 +261,7 @@ export const factoryReset = createAsyncThunk(
       // Clear database secure settings (iterate known keys or use helper if available)
       if (window.electronAPI?.auth?.clearAllSecureSettings) {
         await window.electronAPI.auth.clearAllSecureSettings();
-        console.log('✅ Cleared all secure settings from database');
+        logger.info('✅ Cleared all secure settings from database', { component: 'authSlice', operation: 'clearedAllSecure' });
       }
       
       // Clear regular localStorage
@@ -268,7 +272,7 @@ export const factoryReset = createAsyncThunk(
       
       return { success: true };
     } catch (error) {
-      console.error('Failed to perform factory reset:', error);
+      logger.error('Failed to perform factory reset:', { component: 'authSlice', operation: 'failedPerformFactory' }, error as Error);
       return rejectWithValue('Failed to perform factory reset');
     }
   }

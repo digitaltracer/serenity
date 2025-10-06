@@ -3,13 +3,14 @@
  * Abstracts SQLite and PostgreSQL operations behind a common interface
  */
 
-import { 
-  DatabaseConfig, 
-  DatabaseType, 
-  DatabaseOperations, 
+import { logger } from '../utils/logger';
+import {
+  DatabaseConfig,
+  DatabaseType,
+  DatabaseOperations,
   DatabaseConnectionStatus,
   DatabaseStats,
-  DatabasePreferences 
+  DatabasePreferences
 } from '../types/database';
 
 export class DatabaseManager implements DatabaseOperations {
@@ -25,7 +26,7 @@ export class DatabaseManager implements DatabaseOperations {
    */
   async connect(config: DatabaseConfig): Promise<boolean> {
     try {
-      console.log(`🔌 Connecting to ${config.type} database...`);
+      logger.info(`🔌 Connecting to ${config.type} database...`, { component: 'DatabaseManager', operation: 'connecting${config.type}Database...' });
       
       // Disconnect from current database if connected
       if (this.currentAdapter) {
@@ -46,7 +47,7 @@ export class DatabaseManager implements DatabaseOperations {
           lastConnected: new Date(),
         };
         
-        console.log(`✅ Connected to ${config.type} database successfully`);
+        logger.info(`✅ Connected to ${config.type} database successfully`, { component: 'DatabaseManager', operation: 'connected${config.type}Database' });
         
         // Run migrations if needed
         await this.migrate();
@@ -56,8 +57,8 @@ export class DatabaseManager implements DatabaseOperations {
         throw new Error('Connection test failed');
       }
     } catch (error) {
-      console.error(`❌ Failed to connect to ${config.type} database:`, error);
-      
+      logger.error(`❌ Failed to connect to ${config.type} database:`, { component: 'DatabaseManager', operation: 'failedConnect${config.type}' }, error as Error);
+
       this.connectionStatus = {
         connected: false,
         type: config.type,
@@ -78,9 +79,9 @@ export class DatabaseManager implements DatabaseOperations {
     if (this.currentAdapter) {
       try {
         await this.currentAdapter.disconnect();
-        console.log('🔌 Database disconnected');
+        logger.info('🔌 Database disconnected', { component: 'DatabaseManager', operation: 'databaseDisconnected' });
       } catch (error) {
-        console.error('Error during disconnect:', error);
+        logger.error('Error during disconnect:', { component: 'DatabaseManager', operation: 'errorDuringDisconnect:' }, error as Error);
       }
       
       this.currentAdapter = null;
@@ -134,9 +135,9 @@ export class DatabaseManager implements DatabaseOperations {
       throw new Error('No database connection available');
     }
     
-    console.log('📋 Running database migrations...');
+    logger.info('📋 Running database migrations...', { component: 'DatabaseManager', operation: 'runningDatabaseMigrations...' });
     await this.currentAdapter.migrate();
-    console.log('✅ Migrations completed successfully');
+    logger.info('✅ Migrations completed successfully', { component: 'DatabaseManager', operation: 'migrationsCompletedSuccessfully' });
   }
 
   /**
@@ -158,9 +159,9 @@ export class DatabaseManager implements DatabaseOperations {
       throw new Error('No database connection available');
     }
     
-    console.log(`💾 Creating database backup at: ${path}`);
+    logger.info(`💾 Creating database backup at: ${path}`, { component: 'DatabaseManager', operation: 'creatingDatabaseBackup' });
     await this.currentAdapter.backup(path);
-    console.log('✅ Backup completed successfully');
+    logger.info('✅ Backup completed successfully', { component: 'DatabaseManager', operation: 'backupCompletedSuccessfully' });
   }
 
   /**
@@ -171,9 +172,9 @@ export class DatabaseManager implements DatabaseOperations {
       throw new Error('No database connection available');
     }
     
-    console.log(`📂 Restoring database from: ${path}`);
+    logger.info(`📂 Restoring database from: ${path}`, { component: 'DatabaseManager', operation: 'restoringDatabaseFrom:' });
     await this.currentAdapter.restore(path);
-    console.log('✅ Restore completed successfully');
+    logger.info('✅ Restore completed successfully', { component: 'DatabaseManager', operation: 'restoreCompletedSuccessfully' });
   }
 
   /**
@@ -184,9 +185,9 @@ export class DatabaseManager implements DatabaseOperations {
       throw new Error('No database connection available');
     }
     
-    console.log('🧹 Optimizing database...');
+    logger.info('🧹 Optimizing database...', { component: 'DatabaseManager', operation: 'optimizingDatabase...' });
     await this.currentAdapter.vacuum();
-    console.log('✅ Database optimization completed');
+    logger.info('✅ Database optimization completed', { component: 'DatabaseManager', operation: 'databaseOptimizationCompleted' });
   }
 
   /**
@@ -218,16 +219,16 @@ export class DatabaseManager implements DatabaseOperations {
    * Switch to a different database configuration
    */
   async switchDatabase(config: DatabaseConfig): Promise<boolean> {
-    console.log(`🔄 Switching from ${this.config?.type || 'none'} to ${config.type}`);
+    logger.info(`🔄 Switching from ${this.config?.type || 'none'} to ${config.type}`, { component: 'DatabaseManager', operation: 'switchingFrom${this.config?.type' });
     
     // Backup current data if switching between different types
     if (this.config && this.config.type !== config.type && this.isConnected()) {
       const backupPath = `serenity-backup-${Date.now()}.sql`;
       try {
         await this.backup(backupPath);
-        console.log(`📄 Created backup before switching: ${backupPath}`);
+        logger.info(`📄 Created backup before switching: ${backupPath}`, { component: 'DatabaseManager', operation: 'createdBackupBefore' });
       } catch (error) {
-        console.warn('Failed to create backup before switching:', error);
+        logger.warn('Failed to create backup before switching', { component: 'DatabaseManager', operation: 'failedCreateBackup' });
       }
     }
     

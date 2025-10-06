@@ -32,6 +32,7 @@ import { selectAllTasks, selectAllProjects } from '@serenity/core';
 import { selectAllEntries } from '@serenity/core';
 import { closeConfigModal } from '@serenity/core';
 import { useMemo } from 'react';
+import { logger } from '@serenity/core';
 import {
   DatabaseConfigurationModal,
   DatabaseStatusIndicator,
@@ -77,7 +78,7 @@ export const DatabasePage: React.FC = () => {
     try {
       await dispatch(connectToDatabase(newConfig)).unwrap();
     } catch (error) {
-      console.error('Failed to save database configuration:', error);
+      logger.error('Failed to save database configuration:', { component: 'DatabasePage', operation: 'failedSaveDatabase' }, error);
     }
   };
 
@@ -91,7 +92,7 @@ export const DatabasePage: React.FC = () => {
       const backupPath = `serenity-backup-${timestamp}.sql`;
       await dispatch(createDatabaseBackup(backupPath)).unwrap();
     } catch (error) {
-      console.error('Backup failed:', error);
+      logger.error('Backup failed:', { component: 'DatabasePage', operation: 'backupFailed:' }, error);
     }
   };
 
@@ -99,7 +100,7 @@ export const DatabasePage: React.FC = () => {
     try {
       await dispatch(optimizeDatabase()).unwrap();
     } catch (error) {
-      console.error('Optimization failed:', error);
+      logger.error('Optimization failed:', { component: 'DatabasePage', operation: 'optimizationFailed:' }, error);
     }
   };
 

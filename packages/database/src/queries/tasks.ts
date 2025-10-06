@@ -1,5 +1,5 @@
 import { getDatabase } from '../connection';
-import { Task, Subtask } from '@serenity/core';
+import { Task, Subtask, logger } from '@serenity/core';
 
 export const createTask = async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> => {
   const db = getDatabase();
@@ -161,7 +161,7 @@ const mapTaskFromDB = (row: any): Task => {
     try {
       return JSON.parse(jsonString);
     } catch (error) {
-      console.warn('Failed to parse recurring pattern JSON:', error, 'Using fallback:', fallback);
+      logger.warn('Failed to parse recurring pattern JSON', { component: 'tasks', operation: 'parseRecurringPattern' });
       return fallback;
     }
   };

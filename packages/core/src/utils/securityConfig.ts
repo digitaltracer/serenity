@@ -4,6 +4,8 @@
  */
 
 // Production-ready cryptographic settings
+import { logger } from './logger';
+
 export const CRYPTO_CONFIG = {
   // PBKDF2 iterations - balanced for security and performance
   PBKDF2_ITERATIONS: 100000, // OWASP recommended minimum
@@ -78,15 +80,15 @@ export const validateSecurityPolicy = (config: typeof CRYPTO_CONFIG): boolean =>
   }
   
   if (warnings.length > 0) {
-    console.warn('🔒 Security warnings:', warnings);
+    logger.warn('🔒 Security warnings', { component: 'securityConfig', operation: 'securityWarnings', metadata: { warnings } });
   }
   
   if (errors.length > 0) {
-    console.error('🚨 Security policy violations:', errors);
+    logger.error('🚨 Security policy violations', { component: 'securityConfig', operation: 'securityPolicyViolations', metadata: { errors } }, new Error(`Security policy violations: ${errors.join(', ')}`));
     return false;
   }
   
-  console.log('✅ Security policy validation passed');
+  logger.info('✅ Security policy validation passed', { component: 'securityConfig', operation: 'securityPolicyValidation' });
   return true;
 };
 

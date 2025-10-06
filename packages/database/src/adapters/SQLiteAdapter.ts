@@ -6,6 +6,7 @@
 import Database from 'better-sqlite3';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { logger } from '@serenity/core';
 
 export interface SQLiteConfig {
   dbPath?: string;
@@ -64,7 +65,9 @@ export class SQLiteAdapter {
         readonly: this.config.readonly || false,
         fileMustExist: false,
         timeout: 5000,
-        verbose: process.env.NODE_ENV === 'development' ? console.log : undefined
+        verbose: process.env.NODE_ENV === 'development'
+          ? (message?: unknown, ...additionalArgs: unknown[]) => logger.debug(String(message), { component: 'SQLiteAdapter', operation: 'query' })
+          : undefined
       });
 
       // Enable WAL mode for better performance
@@ -76,9 +79,9 @@ export class SQLiteAdapter {
       // Set synchronous mode for better durability
       this.db.pragma('synchronous = NORMAL');
 
-      console.log(`📁 SQLite database initialized at: ${this.dbPath}`);
+      logger.info(`📁 SQLite database initialized at: ${this.dbPath}`, { component: 'SQLiteAdapter', operation: 'sqliteDatabaseInitialized' });
     } catch (error) {
-      console.error('Failed to initialize SQLite database:', error);
+      logger.error('Failed to initialize SQLite database:', { component: 'SQLiteAdapter', operation: 'failedInitializeSqlite' }, error as Error);
       throw error;
     }
   }
@@ -261,7 +264,7 @@ export class SQLiteAdapter {
 
     try {
       this.db.exec(schema);
-      console.log('✅ Database schema created successfully');
+      logger.info('✅ Database schema created successfully', { component: 'SQLiteAdapter', operation: 'databaseSchemaCreated' });
 
       // Migration: Recreate ai_usage table with correct quickadd operation support
       await this.migrateAIUsageTable();
@@ -269,7 +272,7 @@ export class SQLiteAdapter {
       // Migration: Add completed_at column to tasks table if it doesn't exist
       await this.migrateTasksCompletedAt();
     } catch (error) {
-      console.error('Failed to create database schema:', error);
+      logger.error('Failed to create database schema:', { component: 'SQLiteAdapter', operation: 'failedCreateDatabase' }, error as Error);
       throw error;
     }
   }
@@ -293,11 +296,11 @@ export class SQLiteAdapter {
         testQuickAdd.run();
         // If successful, clean up the test record and we're good
         this.db.prepare('DELETE FROM ai_usage WHERE id = ?').run('test_quickadd');
-        console.log('✅ ai_usage table already supports quickadd operation');
+        logger.info('✅ ai_usage table already supports quickadd operation', { component: 'SQLiteAdapter', operation: 'ai_usageTableAlready' });
         return;
       } catch (constraintError: any) {
         if (constraintError.code === 'SQLITE_CONSTRAINT_CHECK') {
-          console.log('🔄 Migrating ai_usage table to support quickadd operation...');
+          logger.info('🔄 Migrating ai_usage table to support quickadd operation...', { component: 'SQLiteAdapter', operation: 'migratingAi_usageTable' });
 
           // Backup existing data
           const existingData = this.db.prepare('SELECT * FROM ai_usage').all();
@@ -331,17 +334,17 @@ export class SQLiteAdapter {
             });
 
             transaction(existingData);
-            console.log(`✅ Restored ${existingData.length} existing ai_usage records`);
+            logger.info(`✅ Restored ${existingData.length} existing ai_usage records`, { component: 'SQLiteAdapter', operation: 'restored${existingdata.length}Existing' });
           }
 
-          console.log('✅ ai_usage table migration completed successfully');
+          logger.info('✅ ai_usage table migration completed successfully', { component: 'SQLiteAdapter', operation: 'ai_usageTableMigration' });
         } else {
           // Some other error, re-throw
           throw constraintError;
         }
       }
     } catch (error) {
-      console.error('❌ Failed to migrate ai_usage table:', error);
+      logger.error('❌ Failed to migrate ai_usage table:', { component: 'SQLiteAdapter', operation: 'failedMigrateAi_usage' }, error as Error);
       throw error;
     }
   }
@@ -368,18 +371,18 @@ export class SQLiteAdapter {
       const hasCompletedAtColumn = tableInfo.some(column => column.name === 'completed_at');
 
       if (hasCompletedAtColumn) {
-        console.log('✅ tasks table already has completed_at column');
+        logger.info('✅ tasks table already has completed_at column', { component: 'SQLiteAdapter', operation: 'tasksTableAlready' });
         return;
       }
 
-      console.log('🔄 Adding completed_at column to tasks table...');
+      logger.info('🔄 Adding completed_at column to tasks table...', { component: 'SQLiteAdapter', operation: 'addingCompleted_atColumn' });
 
       // Add the completed_at column
       this.db.exec('ALTER TABLE tasks ADD COLUMN completed_at DATETIME;');
 
-      console.log('✅ completed_at column added to tasks table successfully');
+      logger.info('✅ completed_at column added to tasks table successfully', { component: 'SQLiteAdapter', operation: 'completed_atColumnAdded' });
     } catch (error) {
-      console.error('❌ Failed to migrate tasks table for completed_at column:', error);
+      logger.error('❌ Failed to migrate tasks table for completed_at column:', { component: 'SQLiteAdapter', operation: 'failedMigrateTasks' }, error as Error);
       throw error;
     }
   }
@@ -406,7 +409,7 @@ export class SQLiteAdapter {
       const result = this.db!.prepare('SELECT 1 as test').get() as { test: number } | undefined;
       return result ? result.test === 1 : false;
     } catch (error) {
-      console.error('Database connection test failed:', error);
+      logger.error('Database connection test failed:', { component: 'SQLiteAdapter', operation: 'databaseConnectionTest' }, error as Error);
       return false;
     }
   }
@@ -494,10 +497,10 @@ export class SQLiteAdapter {
 
     try {
       await this.db.backup(targetPath);
-      console.log(`💾 Database backup created: ${targetPath}`);
+      logger.info(`💾 Database backup created: ${targetPath}`, { component: 'SQLiteAdapter', operation: 'databaseBackupCreated:' });
       return targetPath;
     } catch (error) {
-      console.error('Failed to create database backup:', error);
+      logger.error('Failed to create database backup:', { component: 'SQLiteAdapter', operation: 'failedCreateDatabase' }, error as Error);
       throw error;
     }
   }
@@ -510,9 +513,9 @@ export class SQLiteAdapter {
       try {
         this.db.close();
         this.db = null;
-        console.log('🔒 SQLite database connection closed');
+        logger.info('🔒 SQLite database connection closed', { component: 'SQLiteAdapter', operation: 'sqliteDatabaseConnection' });
       } catch (error) {
-        console.error('Error closing database:', error);
+        logger.error('Error closing database:', { component: 'SQLiteAdapter', operation: 'errorClosingDatabase:' }, error as Error);
         throw error;
       }
     }
@@ -540,9 +543,9 @@ export class SQLiteAdapter {
 
     try {
       this.db.exec('VACUUM');
-      console.log('🧹 Database vacuumed successfully');
+      logger.info('🧹 Database vacuumed successfully', { component: 'SQLiteAdapter', operation: 'databaseVacuumedSuccessfully' });
     } catch (error) {
-      console.error('Failed to vacuum database:', error);
+      logger.error('Failed to vacuum database:', { component: 'SQLiteAdapter', operation: 'failedVacuumDatabase:' }, error as Error);
       throw error;
     }
   }
@@ -578,7 +581,7 @@ export class SQLiteAdapter {
         }
       }
     } catch (error) {
-      console.error('Raw query execution failed:', error);
+      logger.error('Raw query execution failed:', { component: 'SQLiteAdapter', operation: 'rawQueryExecution' }, error as Error);
       throw error;
     }
   }

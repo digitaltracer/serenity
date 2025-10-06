@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useDispatch } from 'react-redux';
+import { logger } from '@serenity/core';
 import {
   setGoogleCalendarSyncEnabled,
   setGitHubSyncEnabled,
@@ -45,7 +46,7 @@ export const useSyncToggles = ({
         await anyDispatch(persistIntegrationsState(sessionMasterPassword));
         showSuccess('Sync Settings', `Google Calendar sync ${enabled ? 'enabled' : 'disabled'} and saved permanently.`);
       } catch (error) {
-        console.error('Failed to persist Google sync state:', error);
+        logger.error('Failed to persist Google sync state:', { component: 'useSyncToggles', operation: 'failedPersistGoogle' }, error);
         showError('Sync Settings', 'Sync preference could not be saved permanently. Changes may be lost on restart.');
       }
     },
@@ -68,7 +69,7 @@ export const useSyncToggles = ({
         await anyDispatch(persistIntegrationsState(sessionMasterPassword));
         showSuccess('Sync Settings', `GitHub sync ${enabled ? 'enabled' : 'disabled'} and saved permanently.`);
       } catch (error) {
-        console.error('Failed to persist GitHub sync state:', error);
+        logger.error('Failed to persist GitHub sync state:', { component: 'useSyncToggles', operation: 'failedPersistGithub' }, error);
         showError('Sync Settings', 'Sync preference could not be saved permanently. Changes may be lost on restart.');
       }
     },

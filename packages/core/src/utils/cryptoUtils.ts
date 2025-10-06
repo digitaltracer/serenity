@@ -4,6 +4,7 @@
  */
 
 import { getPrivacySettingsSecure } from './secureStorage';
+import { logger } from './logger';
 
 /**
  * Safely parse JSON data that might be Base64 encoded
@@ -24,9 +25,9 @@ export const safeJsonParse = (data: string): any => {
       } else {
         jsonData = decodedData;
       }
-      console.log('🔓 Successfully decoded Base64 data');
+      logger.info('🔓 Successfully decoded Base64 data', { component: 'cryptoUtils', operation: 'successfullyDecodedBase64' });
     } catch (decodeError) {
-      console.warn('⚠️ Base64 decode failed, treating as regular JSON:', decodeError);
+      logger.warn('⚠️ Base64 decode failed, treating as regular JSON', { component: 'cryptoUtils', operation: 'base64DecodeFallback' });
       // Fall back to using original data
     }
   }
@@ -60,13 +61,13 @@ export const checkCryptoSettings = (): CryptoSettings => {
       hasMasterPassword = settings.masterPasswordEnabled || false;
     }
   } catch (error) {
-    console.error('Failed to check master password status:', error);
+    logger.error('Failed to check master password status:', { component: 'cryptoUtils', operation: 'failedCheckMaster' }, error as Error);
   }
   
   // Encryption is considered enabled if we have encrypted data OR master password is enabled
   const encryptionEnabled = hasEncryptedData || hasMasterPassword;
   
-  console.log('🔐 Crypto settings check:', { encryptionEnabled, hasEncryptedData, hasMasterPassword });
+  logger.info('🔐 Crypto settings check', { component: 'cryptoUtils', operation: 'cryptoSettingsCheck', metadata: { encryptionEnabled, hasEncryptedData, hasMasterPassword } });
   
   return {
     encryptionEnabled,
@@ -93,12 +94,12 @@ export const initializeCrypto = async (
     const settings = checkCryptoSettings();
     
     if (!settings.encryptionEnabled) {
-      console.log('⚡ No encryption needed, skipping crypto initialization');
+      logger.info('⚡ No encryption needed, skipping crypto initialization', { component: 'cryptoUtils', operation: 'operation' });
       onProgress?.(100, 'complete', 'No encryption needed');
       return true;
     }
     
-    console.log('🔐 Starting crypto initialization...');
+    logger.info('🔐 Starting crypto initialization...', { component: 'cryptoUtils', operation: 'startingCryptoInitialization...' });
     onProgress?.(10, 'initializing', 'Checking encryption requirements...');
     
     // Simulate progressive loading stages
@@ -115,11 +116,11 @@ export const initializeCrypto = async (
     await new Promise(resolve => setTimeout(resolve, 100));
     
     onProgress?.(100, 'complete', 'Encryption initialized successfully!');
-    console.log('✅ Crypto initialization completed');
+    logger.info('✅ Crypto initialization completed', { component: 'cryptoUtils', operation: 'cryptoInitializationCompleted' });
     
     return true;
   } catch (error) {
-    console.error('❌ Crypto initialization failed:', error);
+    logger.error('❌ Crypto initialization failed:', { component: 'cryptoUtils', operation: 'cryptoInitializationFailed:' }, error as Error);
     onProgress?.(0, 'initializing', 'Encryption initialization failed');
     return false;
   }

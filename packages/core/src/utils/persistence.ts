@@ -5,7 +5,8 @@
  */
 
 import { Task, JournalEntry, Project } from '../types';
-import { 
+import { logger } from './logger';
+import {
   safeValidateTasks, 
   safeValidateJournalEntries, 
   safeValidateProjects
@@ -47,7 +48,7 @@ const safeJSONParse = <T>(data: string | null, fallback: T, validator?: (data: u
     
     return parsed;
   } catch (error) {
-    console.error('Failed to parse stored data:', error);
+    logger.error('Failed to parse stored data:', { component: 'persistence', operation: 'failedParseStored' }, error as Error);
     return fallback;
   }
 };
@@ -55,14 +56,14 @@ const safeJSONParse = <T>(data: string | null, fallback: T, validator?: (data: u
 // Helper to safely stringify and save to localStorage
 const safeSave = (key: string, data: any): void => {
   if (!isLocalStorageAvailable()) {
-    console.warn(`localStorage not available, skipping save of ${key}`);
+    logger.warn(`localStorage not available, skipping save of ${key}`, { component: 'persistence', operation: 'operation' });
     return;
   }
   
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (error) {
-    console.error(`Failed to save ${key} to localStorage:`, error);
+    logger.error(`Failed to save ${key} to localStorage:`, { component: 'persistence', operation: `failedSave${key}` }, error as Error);
   }
 };
 
@@ -71,7 +72,7 @@ const safeSave = (key: string, data: any): void => {
  */
 export const loadTasks = (): Task[] => {
   if (!isLocalStorageAvailable()) {
-    console.warn('localStorage not available, returning empty tasks array');
+    logger.warn('localStorage not available, returning empty tasks array', { component: 'persistence', operation: 'operation' });
     return [];
   }
   
@@ -87,9 +88,9 @@ export const saveTasks = (tasks: Task[]): void => {
     // Validate tasks before saving
     const validatedTasks = safeValidateTasks(tasks);
     safeSave(STORAGE_KEYS.TASKS, validatedTasks);
-    console.log(`💾 Saved ${validatedTasks.length} tasks to localStorage`);
+    logger.info(`💾 Saved ${validatedTasks.length} tasks to localStorage`, { component: 'persistence', operation: 'saved${validatedtasks.length}Tasks' });
   } catch (error) {
-    console.error('Failed to save tasks:', error);
+    logger.error('Failed to save tasks:', { component: 'persistence', operation: 'failedSaveTasks:' }, error as Error);
   }
 };
 
@@ -98,7 +99,7 @@ export const saveTasks = (tasks: Task[]): void => {
  */
 export const loadJournalEntries = (): JournalEntry[] => {
   if (!isLocalStorageAvailable()) {
-    console.warn('localStorage not available, returning empty journal entries array');
+    logger.warn('localStorage not available, returning empty journal entries array', { component: 'persistence', operation: 'operation' });
     return [];
   }
   
@@ -114,9 +115,9 @@ export const saveJournalEntries = (entries: JournalEntry[]): void => {
     // Validate entries before saving
     const validatedEntries = safeValidateJournalEntries(entries);
     safeSave(STORAGE_KEYS.JOURNAL, validatedEntries);
-    console.log(`📖 Saved ${validatedEntries.length} journal entries to localStorage`);
+    logger.info(`📖 Saved ${validatedEntries.length} journal entries to localStorage`, { component: 'persistence', operation: 'saved${validatedentries.length}Journal' });
   } catch (error) {
-    console.error('Failed to save journal entries:', error);
+    logger.error('Failed to save journal entries:', { component: 'persistence', operation: 'failedSaveJournal' }, error as Error);
   }
 };
 
@@ -125,7 +126,7 @@ export const saveJournalEntries = (entries: JournalEntry[]): void => {
  */
 export const loadProjects = (): Project[] => {
   if (!isLocalStorageAvailable()) {
-    console.warn('localStorage not available, returning empty projects array');
+    logger.warn('localStorage not available, returning empty projects array', { component: 'persistence', operation: 'operation' });
     return [];
   }
   
@@ -141,9 +142,9 @@ export const saveProjects = (projects: Project[]): void => {
     // Validate projects before saving
     const validatedProjects = safeValidateProjects(projects);
     safeSave(STORAGE_KEYS.PROJECTS, validatedProjects);
-    console.log(`📁 Saved ${validatedProjects.length} projects to localStorage`);
+    logger.info(`📁 Saved ${validatedProjects.length} projects to localStorage`, { component: 'persistence', operation: 'saved${validatedprojects.length}Projects' });
   } catch (error) {
-    console.error('Failed to save projects:', error);
+    logger.error('Failed to save projects:', { component: 'persistence', operation: 'failedSaveProjects:' }, error as Error);
   }
 };
 
@@ -152,7 +153,7 @@ export const saveProjects = (projects: Project[]): void => {
  */
 export const clearAllData = (): void => {
   if (!isLocalStorageAvailable()) {
-    console.warn('localStorage not available, cannot clear data');
+    logger.warn('localStorage not available, cannot clear data', { component: 'persistence', operation: 'operation' });
     return;
   }
   
@@ -346,7 +347,7 @@ export const cleanupOrphanedData = (): {
   // Save cleaned data
   saveTasks(cleanedTasks);
   
-  console.log(`🧹 Cleanup completed: ${fixed} references fixed, ${removed} items removed`);
+  logger.info(`🧹 Cleanup completed: ${fixed} references fixed, ${removed} items removed`, { component: 'persistence', operation: 'operation' });
   
   return { fixed, removed };
 };

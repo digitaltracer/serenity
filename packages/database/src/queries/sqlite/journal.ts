@@ -5,6 +5,7 @@
 import Database from 'better-sqlite3';
 import { JournalEntry } from '@serenity/core';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from '@serenity/core';
 
 export class SQLiteJournalQueries {
   private db: Database.Database;
@@ -147,8 +148,8 @@ export class SQLiteJournalQueries {
    * Create a journal entry with a specific ID (used by middleware to preserve Redux IDs)
    */
   createEntryWithId(entry: JournalEntry): JournalEntry {
-    console.log('📖 SQLite: Creating journal entry with existing ID:', entry.id);
-    console.log('🏷️ SQLite: Entry tags:', entry.tags);
+    logger.info('📖 SQLite: Creating journal entry with existing ID:', { component: 'journal', operation: 'sqlite:CreatingJournal' });
+    logger.info('🏷️ SQLite: Entry tags:', { component: 'journal', operation: '🏷️Sqlite:Entry' });
     
     const dateStr = entry.date.toISOString().split('T')[0];
 
@@ -169,16 +170,16 @@ export class SQLiteJournalQueries {
       entry.updatedAt.toISOString()
     );
     
-    console.log(`✅ SQLite: Journal entry inserted with existing ID ${entry.id}, changes: ${insertResult.changes}`);
+    logger.info(`Journal entry inserted with existing ID ${entry.id}`, { component: 'journal', operation: 'journalEntryInserted' });
 
     // Insert tags if provided
     if (entry.tags && entry.tags.length > 0) {
-      console.log(`🏷️ SQLite: Inserting ${entry.tags.length} tags for entry ${entry.id}`);
+      logger.info(`Inserting ${entry.tags.length} tags for entry ${entry.id}`, { component: 'journal', operation: 'insertingTags' });
       this.updateEntryTags(entry.id, entry.tags);
     }
 
     const savedEntry = this.getEntryById(entry.id)!;
-    console.log('📤 SQLite: Returning saved entry:', { id: savedEntry.id, title: savedEntry.title });
+    logger.info('Returning saved entry', { component: 'journal', operation: 'returningSavedEntry', metadata: { id: savedEntry.id, title: savedEntry.title } });
     
     return savedEntry;
   }

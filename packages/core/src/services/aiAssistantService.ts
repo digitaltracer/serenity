@@ -5,6 +5,7 @@
 
 import { Task, JournalEntry } from '../types';
 import { AIInsight, AIRecap } from '../store/slices/aiAssistantSlice';
+import { logger } from '../utils/logger';
 
 export interface AIApiResponse {
   success: boolean;
@@ -374,15 +375,15 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
       const filteredTasksCount = tasks.length - newTasks.length;
       const filteredJournalCount = journalEntries.length - newJournalEntries.length;
       
-      console.log(`🔍 AI Analysis Filtering Results:`);
-      console.log(`📊 Tasks: ${newTasks.length} new / ${filteredTasksCount} already processed`);
-      console.log(`📝 Journal: ${newJournalEntries.length} new / ${filteredJournalCount} already processed`);
+      logger.info(`🔍 AI Analysis Filtering Results:`, { component: 'aiAssistantService', operation: 'analysisFilteringResults:' });
+      logger.info(`📊 Tasks: ${newTasks.length} new / ${filteredTasksCount} already processed`, { component: 'aiAssistantService', operation: 'tasks:${newtasks.length}New' });
+      logger.info(`📝 Journal: ${newJournalEntries.length} new / ${filteredJournalCount} already processed`, { component: 'aiAssistantService', operation: 'journal:${newjournalentries.length}New' });
       
       if (lastTaskAnalysisDate) {
-        console.log(`⏰ Last task analysis: ${lastTaskAnalysisDate.toISOString()}`);
+        logger.info(`⏰ Last task analysis: ${lastTaskAnalysisDate.toISOString()}`, { component: 'aiAssistantService', operation: 'lastTaskAnalysis:' });
       }
       if (lastJournalAnalysisDate) {
-        console.log(`⏰ Last journal analysis: ${lastJournalAnalysisDate.toISOString()}`);
+        logger.info(`⏰ Last journal analysis: ${lastJournalAnalysisDate.toISOString()}`, { component: 'aiAssistantService', operation: 'lastJournalAnalysis:' });
       }
     }
 
@@ -423,7 +424,7 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
       // Always log raw response to help debug parsing issues
       try {
         // eslint-disable-next-line no-console
-        console.error('[AIAssistantService] Raw AI response (insights):', response);
+        logger.error('[AIAssistantService] Raw AI response (insights):', { component: 'aiAssistantService', operation: '[aiassistantservice]RawResponse' }, new Error(response));
       } catch {}
 
       // Sanitize common wrapping formats (code fences, prose)
@@ -480,7 +481,7 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
     } catch (error) {
       try {
         // eslint-disable-next-line no-console
-        console.error('Failed to parse AI insights response:', error, '\n[AIAssistantService] Raw response for debugging:', response);
+        logger.error('Failed to parse AI insights response:', { component: 'aiAssistantService', operation: 'failedParseInsights' }, new Error(response));
       } catch {}
     }
 
@@ -508,7 +509,7 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
         metadata: parsed.metrics || {},
       };
     } catch (error) {
-      console.error('Failed to parse AI recap response:', error);
+      logger.error('Failed to parse AI recap response:', { component: 'aiAssistantService', operation: 'failedParseRecap' }, error as Error);
       return null;
     }
   }

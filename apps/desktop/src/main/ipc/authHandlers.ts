@@ -5,17 +5,21 @@
 
 import { ipcMain } from 'electron';
 import { z } from 'zod';
+import { AuthMiddleware } from '../middleware/AuthMiddleware';
+import { logger } from '@serenity/core';
 
 const keySchema = z.string().min(1);
 const valueSchema = z.string();
 
 export function registerAuthHandlers(): void {
-  console.log('🔧 Registering authentication IPC handlers...');
+  logger.info('🔧 Registering authentication IPC handlers...', { component: 'authHandlers', operation: 'registeringAuthenticationIpc' });
+
+  const authMiddleware = AuthMiddleware.getInstance();
 
   // Initialize secure settings table
   ipcMain.handle('auth:initialize-secure-settings', async () => {
     try {
-      console.log('🔐 Initializing secure settings table...');
+      logger.info('🔐 Initializing secure settings table...', { component: 'authHandlers', operation: 'initializingSecureSettings' });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -31,7 +35,7 @@ export function registerAuthHandlers(): void {
       
       return { success: true, data: result, error: null };
     } catch (error) {
-      console.error('❌ Failed to initialize secure settings table:', error);
+      logger.error('❌ Failed to initialize secure settings table:', { component: 'authHandlers', operation: 'failedInitializeSecure' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to initialize secure settings';
       return { success: false, data: null, error: errorMessage };
     }
@@ -43,7 +47,7 @@ export function registerAuthHandlers(): void {
       if (typeof passwordHash !== 'string' || passwordHash.length < 10) {
         return { success: false, data: null, error: 'Invalid password hash' };
       }
-      console.log('🔐 Setting master password hash...');
+      logger.info('🔐 Setting master password hash...', { component: 'authHandlers', operation: 'settingMasterPassword' });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -56,7 +60,7 @@ export function registerAuthHandlers(): void {
       
       return { success: true, data: result, error: null };
     } catch (error) {
-      console.error('❌ Failed to set master password hash:', error);
+      logger.error('❌ Failed to set master password hash:', { component: 'authHandlers', operation: 'failedSetMaster' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to set master password';
       return { success: false, data: null, error: errorMessage };
     }
@@ -65,7 +69,7 @@ export function registerAuthHandlers(): void {
   // Get master password hash
   ipcMain.handle('auth:get-master-password-hash', async () => {
     try {
-      console.log('🔍 Getting master password hash...');
+      logger.info('🔍 Getting master password hash...', { component: 'authHandlers', operation: 'gettingMasterPassword' });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -79,7 +83,7 @@ export function registerAuthHandlers(): void {
       
       return { success: true, data: { hash }, error: null };
     } catch (error) {
-      console.error('❌ Failed to get master password hash:', error);
+      logger.error('❌ Failed to get master password hash:', { component: 'authHandlers', operation: 'failedGetMaster' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to get master password';
       return { success: false, data: { hash: null }, error: errorMessage };
     }
@@ -88,7 +92,7 @@ export function registerAuthHandlers(): void {
   // Check if master password is set
   ipcMain.handle('auth:has-master-password', async () => {
     try {
-      console.log('🔍 Checking if master password is set...');
+      logger.info('🔍 Checking if master password is set...', { component: 'authHandlers', operation: 'checkingMasterPassword' });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -102,7 +106,7 @@ export function registerAuthHandlers(): void {
       
       return { success: true, data: { hasMasterPassword: hasPassword }, error: null };
     } catch (error) {
-      console.error('❌ Failed to check master password:', error);
+      logger.error('❌ Failed to check master password:', { component: 'authHandlers', operation: 'failedCheckMaster' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to check master password';
       return { success: false, data: { hasMasterPassword: false }, error: errorMessage };
     }
@@ -111,7 +115,7 @@ export function registerAuthHandlers(): void {
   // Clear master password hash
   ipcMain.handle('auth:clear-master-password-hash', async () => {
     try {
-      console.log('🧹 Clearing master password hash...');
+      logger.info('🧹 Clearing master password hash...', { component: 'authHandlers', operation: 'clearingMasterPassword' });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -123,7 +127,7 @@ export function registerAuthHandlers(): void {
       
       return { success: true, data: result, error: null };
     } catch (error) {
-      console.error('❌ Failed to clear master password hash:', error);
+      logger.error('❌ Failed to clear master password hash:', { component: 'authHandlers', operation: 'failedClearMaster' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to clear master password';
       return { success: false, data: null, error: errorMessage };
     }
@@ -132,7 +136,7 @@ export function registerAuthHandlers(): void {
   // Clear all secure settings
   ipcMain.handle('auth:clear-all-secure-settings', async () => {
     try {
-      console.log('🧹 Clearing all secure settings...');
+      logger.info('🧹 Clearing all secure settings...', { component: 'authHandlers', operation: 'clearingAllSecure' });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -143,7 +147,7 @@ export function registerAuthHandlers(): void {
       
       return { success: true, data: result, error: null };
     } catch (error) {
-      console.error('❌ Failed to clear all secure settings:', error);
+      logger.error('❌ Failed to clear all secure settings:', { component: 'authHandlers', operation: 'failedClearAll' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to clear secure settings';
       return { success: false, data: null, error: errorMessage };
     }
@@ -154,7 +158,7 @@ export function registerAuthHandlers(): void {
     try {
       const v = keySchema.safeParse(key);
       if (!v.success) return { success: false, data: { value: null }, error: 'Invalid key' };
-      console.log('🔍 Getting secure setting:', key);
+      logger.info('🔍 Getting secure setting:', {  component: 'authHandlers', operation: 'gettingSecureSetting:' , metadata: { value: key } });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -168,7 +172,7 @@ export function registerAuthHandlers(): void {
       
       return { success: true, data: { value }, error: null };
     } catch (error) {
-      console.error('❌ Failed to get secure setting:', error);
+      logger.error('❌ Failed to get secure setting:', { component: 'authHandlers', operation: 'failedGetSecure' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to get secure setting';
       return { success: false, data: { value: null }, error: errorMessage };
     }
@@ -180,7 +184,7 @@ export function registerAuthHandlers(): void {
       const k = keySchema.safeParse(key);
       const v = valueSchema.safeParse(value);
       if (!k.success || !v.success) return { success: false, data: null, error: 'Invalid key/value' };
-      console.log('🔐 Setting secure setting:', key);
+      logger.info('🔐 Setting secure setting:', {  component: 'authHandlers', operation: 'settingSecureSetting:' , metadata: { value: key } });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -193,7 +197,7 @@ export function registerAuthHandlers(): void {
       
       return { success: true, data: result, error: null };
     } catch (error) {
-      console.error('❌ Failed to set secure setting:', error);
+      logger.error('❌ Failed to set secure setting:', { component: 'authHandlers', operation: 'failedSetSecure' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to set secure setting';
       return { success: false, data: null, error: errorMessage };
     }
@@ -204,7 +208,7 @@ export function registerAuthHandlers(): void {
     try {
       const v = keySchema.safeParse(key);
       if (!v.success) return { success: false, data: null, error: 'Invalid key' };
-      console.log('🗑️ Deleting secure setting:', key);
+      logger.info('🗑️ Deleting secure setting:', {  component: 'authHandlers', operation: '🗑️DeletingSecure' , metadata: { value: key } });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -216,11 +220,92 @@ export function registerAuthHandlers(): void {
       
       return { success: true, data: result, error: null };
     } catch (error) {
-      console.error('❌ Failed to delete secure setting:', error);
+      logger.error('❌ Failed to delete secure setting:', { component: 'authHandlers', operation: 'failedDeleteSecure' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete secure setting';
       return { success: false, data: null, error: errorMessage };
     }
   });
 
-  console.log('✅ Authentication IPC handlers registered');
+  // Session management handlers
+  ipcMain.handle('auth:create-session', async () => {
+    try {
+      logger.info('🔓 Creating new session...', { component: 'authHandlers', operation: 'creatingNewSession...' });
+      authMiddleware.createSession();
+      return { success: true, data: null, error: null };
+    } catch (error) {
+      logger.error('❌ Failed to create session:', { component: 'authHandlers', operation: 'failedCreateSession:' }, error as Error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create session';
+      return { success: false, data: null, error: errorMessage };
+    }
+  });
+
+  ipcMain.handle('auth:destroy-session', async () => {
+    try {
+      logger.info('🔒 Destroying session...', { component: 'authHandlers', operation: 'destroyingSession...' });
+      authMiddleware.destroySession();
+      return { success: true, data: null, error: null };
+    } catch (error) {
+      logger.error('❌ Failed to destroy session:', { component: 'authHandlers', operation: 'failedDestroySession:' }, error as Error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to destroy session';
+      return { success: false, data: null, error: errorMessage };
+    }
+  });
+
+  ipcMain.handle('auth:validate-session', async () => {
+    try {
+      const isValid = authMiddleware.isSessionValid();
+      return { success: true, data: { isValid }, error: null };
+    } catch (error) {
+      logger.error('❌ Failed to validate session:', { component: 'authHandlers', operation: 'failedValidateSession:' }, error as Error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to validate session';
+      return { success: false, data: { isValid: false }, error: errorMessage };
+    }
+  });
+
+  ipcMain.handle('auth:get-session-status', async () => {
+    try {
+      const status = authMiddleware.getSessionStatus();
+      return { success: true, data: status, error: null };
+    } catch (error) {
+      logger.error('❌ Failed to get session status:', { component: 'authHandlers', operation: 'failedGetSession' }, error as Error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to get session status';
+      return { success: false, data: null, error: errorMessage };
+    }
+  });
+
+  ipcMain.handle('auth:update-activity', async () => {
+    try {
+      authMiddleware.updateActivity();
+      return { success: true, data: null, error: null };
+    } catch (error) {
+      logger.error('❌ Failed to update activity:', { component: 'authHandlers', operation: 'failedUpdateActivity:' }, error as Error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update activity';
+      return { success: false, data: null, error: errorMessage };
+    }
+  });
+
+  ipcMain.handle('auth:record-failed-attempt', async () => {
+    try {
+      authMiddleware.recordFailedAttempt();
+      const status = authMiddleware.getSessionStatus();
+      return { success: true, data: status, error: null };
+    } catch (error) {
+      logger.error('❌ Failed to record failed attempt:', { component: 'authHandlers', operation: 'failedRecordFailed' }, error as Error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to record failed attempt';
+      return { success: false, data: null, error: errorMessage };
+    }
+  });
+
+  ipcMain.handle('auth:reset-failed-attempts', async () => {
+    try {
+      authMiddleware.resetFailedAttempts();
+      return { success: true, data: null, error: null };
+    } catch (error) {
+      logger.error('❌ Failed to reset failed attempts:', { component: 'authHandlers', operation: 'failedResetFailed' }, error as Error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reset failed attempts';
+      return { success: false, data: null, error: errorMessage };
+    }
+  });
+
+  logger.info('✅ Authentication IPC handlers registered', { component: 'authHandlers', operation: 'authenticationIpcHandlers' });
 }

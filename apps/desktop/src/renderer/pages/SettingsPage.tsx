@@ -26,13 +26,14 @@ import {
   initializeAuth
 } from '@serenity/core';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, DatabaseConfigurationModal, PrivacySecurityModal, TagsManager, useToast, Toggle } from '@serenity/ui';
-import { 
-  Settings, 
-  Palette, 
-  Bell, 
-  User, 
-  Database, 
-  Shield, 
+import { logger } from '@serenity/core';
+import {
+  Settings,
+  Palette,
+  Bell,
+  User,
+  Database,
+  Shield,
   Globe,
   Sun,
   Moon,
@@ -113,7 +114,7 @@ export const SettingsPage: React.FC = () => {
           setPrivacySettings(basicSettings);
         }
       } catch (error) {
-        console.error('Failed to load settings:', error);
+        logger.error('Failed to load settings:', { component: 'SettingsPage', operation: 'failedLoadSettings:' }, error);
       }
     };
     
@@ -154,14 +155,14 @@ export const SettingsPage: React.FC = () => {
       
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Export failed:', error);
+      logger.error('Export failed:', { component: 'SettingsPage', operation: 'exportFailed:' }, error);
       // TODO: Add toast notification for error
     }
   };
 
   const handleDatabaseSave = async (config: any) => {
     try {
-      console.log('Database configuration saved:', config);
+      logger.info('Database configuration saved:', config, { component: 'SettingsPage', operation: 'databaseConfigurationSaved:' });
       
       // Handle different database types securely
       if (config.type === 'sqlite') {
@@ -206,7 +207,7 @@ export const SettingsPage: React.FC = () => {
       
       showSuccess('Database Configuration', 'Database configuration saved securely');
     } catch (error) {
-      console.error('Database save failed:', error);
+      logger.error('Database save failed:', { component: 'SettingsPage', operation: 'databaseSaveFailed:' }, error);
       showError('Configuration Error', 'Failed to save database configuration securely');
     }
   };
@@ -251,7 +252,7 @@ export const SettingsPage: React.FC = () => {
         showSuccess('Settings Saved', 'Privacy and security settings updated successfully');
       }
     } catch (error) {
-      console.error('Failed to save privacy settings:', error);
+      logger.error('Failed to save privacy settings:', { component: 'SettingsPage', operation: 'failedSavePrivacy' }, error);
       showError('Save Failed', 'Failed to save privacy settings');
     }
   };

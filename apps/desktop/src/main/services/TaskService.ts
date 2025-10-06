@@ -3,6 +3,8 @@
  * Handles task operations with validation and business rules
  */
 
+import { logger } from '@serenity/core';
+
 interface TaskData {
   title: string;
   description?: string;
@@ -42,7 +44,7 @@ export class TaskService {
    */
   async getAllTasks() {
     try {
-      console.log('📋 TaskService: Getting all tasks');
+      logger.info('📋 TaskService: Getting all tasks', { component: 'TaskService', operation: 'taskservice:GettingAll' });
       const service = await this.getSqliteService();
       const tasks = await service.getTasks();
       
@@ -65,10 +67,10 @@ export class TaskService {
         return 0;
       });
       
-      console.log(`✅ TaskService: Retrieved ${sortedTasks.length} tasks`);
+      logger.info(`✅ TaskService: Retrieved ${sortedTasks.length} tasks`, { component: 'TaskService', operation: 'taskservice:Retrieved${sortedtasks.length}' });
       return { success: true, data: sortedTasks };
     } catch (error) {
-      console.error('❌ TaskService: Failed to get tasks:', error);
+      logger.error('❌ TaskService: Failed to get tasks:', { component: 'TaskService', operation: 'taskservice:FailedGet' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to retrieve tasks' 
@@ -81,7 +83,7 @@ export class TaskService {
    */
   async createTask(taskData: TaskData) {
     try {
-      console.log('📝 TaskService: Creating new task:', taskData.title);
+      logger.info(`📝 TaskService: Creating new task: ${taskData.title}`, { component: 'TaskService', operation: 'taskservice:CreatingNew' });
       
       // Validation
       if (!taskData.title || taskData.title.trim().length === 0) {
@@ -131,10 +133,10 @@ export class TaskService {
       const service = await this.getSqliteService();
       const newTask = await service.createTask(sanitizedTask);
       
-      console.log('✅ TaskService: Task created successfully:', newTask.id);
+      logger.info(`✅ TaskService: Task created successfully: ${newTask.id}`, { component: 'TaskService', operation: 'taskservice:TaskCreated' });
       return { success: true, data: newTask };
     } catch (error) {
-      console.error('❌ TaskService: Failed to create task:', error);
+      logger.error('❌ TaskService: Failed to create task:', { component: 'TaskService', operation: 'taskservice:FailedCreate' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to create task' 
@@ -147,7 +149,7 @@ export class TaskService {
    */
   async updateTask(id: string, updates: TaskUpdate) {
     try {
-      console.log('📝 TaskService: Updating task:', id);
+      logger.info('📝 TaskService: Updating task:', {  component: 'TaskService', operation: 'taskservice:UpdatingTask:' , metadata: { value: id } });
       
       // Validation
       if (!id || id.trim().length === 0) {
@@ -239,10 +241,10 @@ export class TaskService {
       const service = await this.getSqliteService();
       const updatedTask = await service.updateTask(id, sanitizedUpdates);
       
-      console.log('✅ TaskService: Task updated successfully:', id);
+      logger.info('✅ TaskService: Task updated successfully:', {  component: 'TaskService', operation: 'taskservice:TaskUpdated' , metadata: { value: id } });
       return { success: true, data: updatedTask };
     } catch (error) {
-      console.error('❌ TaskService: Failed to update task:', error);
+      logger.error('❌ TaskService: Failed to update task:', { component: 'TaskService', operation: 'taskservice:FailedUpdate' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to update task' 
@@ -255,7 +257,7 @@ export class TaskService {
    */
   async deleteTask(id: string) {
     try {
-      console.log('🗑️ TaskService: Deleting task:', id);
+      logger.info('🗑️ TaskService: Deleting task:', {  component: 'TaskService', operation: '🗑️Taskservice:Deleting' , metadata: { value: id } });
       
       // Validation
       if (!id || id.trim().length === 0) {
@@ -277,10 +279,10 @@ export class TaskService {
       
       const deleted = await service.deleteTask(id);
       
-      console.log('✅ TaskService: Task deleted successfully:', id);
+      logger.info('✅ TaskService: Task deleted successfully:', {  component: 'TaskService', operation: 'taskservice:TaskDeleted' , metadata: { value: id } });
       return { success: true, data: deleted };
     } catch (error) {
-      console.error('❌ TaskService: Failed to delete task:', error);
+      logger.error('❌ TaskService: Failed to delete task:', { component: 'TaskService', operation: 'taskservice:FailedDelete' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to delete task' 
@@ -292,7 +294,7 @@ export class TaskService {
    * Complete a task (business logic wrapper)
    */
   async completeTask(id: string) {
-    console.log('✅ TaskService: Completing task:', id);
+    logger.info('✅ TaskService: Completing task:', {  component: 'TaskService', operation: 'taskservice:CompletingTask:' , metadata: { value: id } });
     return this.updateTask(id, {
       completed: true,
       completedAt: new Date().toISOString()
@@ -304,7 +306,7 @@ export class TaskService {
    */
   async bulkUpdateTasks(taskIds: string[], updates: TaskUpdate) {
     try {
-      console.log('📦 TaskService: Bulk updating tasks:', taskIds.length);
+      logger.info(`📦 TaskService: Bulk updating ${taskIds.length} tasks`, { component: 'TaskService', operation: 'taskservice:BulkUpdating' });
       
       if (!taskIds || taskIds.length === 0) {
         return { success: false, error: 'No task IDs provided' };
@@ -323,7 +325,7 @@ export class TaskService {
       const successful = results.filter(r => r.success).length;
       const failed = results.filter(r => !r.success).length;
       
-      console.log(`✅ TaskService: Bulk update completed - ${successful} successful, ${failed} failed`);
+      logger.info(`✅ TaskService: Bulk update completed - ${successful} successful, ${failed} failed`, { component: 'TaskService', operation: 'operation' });
       return { 
         success: true, 
         data: { 
@@ -332,7 +334,7 @@ export class TaskService {
         } 
       };
     } catch (error) {
-      console.error('❌ TaskService: Bulk update failed:', error);
+      logger.error('❌ TaskService: Bulk update failed:', { component: 'TaskService', operation: 'taskservice:BulkUpdate' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Bulk update failed' 

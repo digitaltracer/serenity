@@ -52,6 +52,7 @@ import {
   useToast,
   CustomSelect,
 } from '@serenity/ui';
+import { logger } from '@serenity/core';
 import {
   Brain,
   Key,
@@ -153,10 +154,10 @@ export const AIAssistantPage: React.FC = () => {
     try {
       const action = setApiKey({ provider: providerId, apiKey: apiKey.trim() });
       const result = await dispatch(action as any);
-      console.log('[AIAssistantPage] setApiKey dispatch result:', result);
+      logger.info('[AIAssistantPage] setApiKey dispatch result:', result, { component: 'AIAssistantPage', operation: '[aiassistantpage]SetapikeyDispatch' });
       const payload = (result as any)?.payload;
       if (payload?.usage) {
-        console.log('[AIAssistantPage] usage from setApiKey:', payload.usage);
+        logger.info('[AIAssistantPage] usage from setApiKey:', payload.usage, { component: 'AIAssistantPage', operation: '[aiassistantpage]UsageFrom' });
       }
       showSuccess('API Key Set', `${providerId.toUpperCase()} API key has been saved securely`);
       
@@ -168,30 +169,25 @@ export const AIAssistantPage: React.FC = () => {
         dispatch(setActiveProvider(providerId));
         try {
           if ((window as any).electronAPI?.aiAssistant?.saveSettings) {
-            console.log('[AIAssistantPage] Persisting activeProvider after key setup:', providerId);
+            logger.info('[AIAssistantPage] Persisting activeProvider after key setup:', providerId, { component: 'AIAssistantPage', operation: '[aiassistantpage]PersistingActiveprovider' });
             await (window as any).electronAPI.aiAssistant.saveSettings({
               activeProvider: providerId,
               autoAnalyze: configuration.autoAnalyze,
               analysisFrequency: configuration.analysisFrequency,
               dataTypes: configuration.dataTypes,
             });
-            console.log('[AIAssistantPage] Saved activeProvider to settings');
+            logger.info('[AIAssistantPage] Saved activeProvider to settings', { component: 'AIAssistantPage', operation: '[aiassistantpage]SavedActiveprovider' });
           }
         } catch (e) {
-          console.warn('[AIAssistantPage] Failed to save settings after key setup:', e);
+          logger.warn('[AIAssistantPage] Failed to save settings after key setup:', e, { component: 'AIAssistantPage', operation: '[aiassistantpage]FailedSave' });
         }
       }
       
-      console.log('🔄 API key save completed, UI should update automatically');
+      logger.info('🔄 API key save completed, UI should update automatically', { component: 'AIAssistantPage', operation: 'operation' });
       
     } catch (error) {
-      console.error('API Key Setting Error:', error);
-      console.error('Error details:', {
-        message: (error as any)?.message,
-        error: (error as any)?.error,
-        type: typeof error,
-        keys: Object.keys((error as any) || {})
-      });
+      logger.error('API Key Setting Error:', { component: 'AIAssistantPage', operation: 'apiKeySetting' }, error);
+      logger.error('Error details:', { component: 'AIAssistantPage', operation: 'errorDetails', keys: Object.keys((error as any) || {}) });
       
       // Extract meaningful error message from Redux async thunk error
       let errorMessage = 'Unknown error occurred';
@@ -684,7 +680,7 @@ export const AIAssistantPage: React.FC = () => {
                                     dataTypes: configuration.dataTypes,
                                     preferredModels: { [provider.id]: value },
                                   } as any;
-                                  console.log('[AIAssistantPage] Persisting preferred model for', provider.id, value);
+                                  logger.info('[AIAssistantPage] Persisting preferred model for', provider.id, value, { component: 'AIAssistantPage', operation: '[aiassistantpage]PersistingPreferred' });
                                   await (window as any).electronAPI?.aiAssistant?.saveSettings(settingsUpdate);
                                   // Update UI immediately
                                   dispatch(updateProvidersWithModelInfo({ [provider.id]: { model: value, version: value } }));

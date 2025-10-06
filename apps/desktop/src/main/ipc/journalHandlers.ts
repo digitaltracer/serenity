@@ -7,14 +7,15 @@ import { ipcMain } from 'electron';
 import { z } from 'zod';
 import { JournalEntrySchema } from '@serenity/core';
 import { apiService } from '../services/ApiService';
+import { logger } from '@serenity/core';
 
 export function registerJournalHandlers(): void {
-  console.log('🔧 Registering journal IPC handlers...');
+  logger.info('🔧 Registering journal IPC handlers...', { component: 'journalHandlers', operation: 'registeringJournalIpc' });
 
   // Journal operations through business logic
   ipcMain.handle('journal:get', async () => {
     try {
-      console.log('🔐 Getting journal entries through business layer...');
+      logger.info('🔐 Getting journal entries through business layer...', { component: 'journalHandlers', operation: 'gettingJournalEntries' });
       return await apiService.getJournalEntries();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get journal entries';
@@ -24,7 +25,7 @@ export function registerJournalHandlers(): void {
 
   ipcMain.handle('journal:create', async (_, entry) => {
     try {
-      console.log('🔐 Creating journal entry through business layer...');
+      logger.info('🔐 Creating journal entry through business layer...', { component: 'journalHandlers', operation: 'creatingJournalEntry' });
       const validated = JournalEntrySchema.omit({ id: true, createdAt: true, updatedAt: true }).parse(entry);
       return await apiService.createJournalEntry(validated);
     } catch (error) {
@@ -35,11 +36,11 @@ export function registerJournalHandlers(): void {
 
   ipcMain.handle('journal:create-with-id', async (_, entry) => {
     try {
-      console.log('🔐 Creating journal entry with ID through business layer:', entry.title, entry.id);
+      logger.info('🔐 Creating journal entry with ID through business layer:', {  component: 'journalHandlers', operation: 'creatingJournalEntry' , metadata: { data1: entry.title, data2: entry.id } });
       const validated = JournalEntrySchema.parse(entry);
       return await apiService.createJournalEntry(validated);
     } catch (error) {
-      console.error('❌ Business layer: Journal entry creation failed:', error);
+      logger.error('❌ Business layer: Journal entry creation failed:', { component: 'journalHandlers', operation: 'businessLayer:Journal' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create journal entry with ID';
       return { success: false, data: null, error: errorMessage };
     }
@@ -47,7 +48,7 @@ export function registerJournalHandlers(): void {
 
   ipcMain.handle('journal:update', async (_, id, updates) => {
     try {
-      console.log('🔐 Updating journal entry through business layer...');
+      logger.info('🔐 Updating journal entry through business layer...', { component: 'journalHandlers', operation: 'updatingJournalEntry' });
       z.string().min(1).parse(id);
       const validatedUpdates = JournalEntrySchema.partial().parse(updates);
       return await apiService.updateJournalEntry(id, validatedUpdates);
@@ -59,7 +60,7 @@ export function registerJournalHandlers(): void {
 
   ipcMain.handle('journal:delete', async (_, id) => {
     try {
-      console.log('🔐 Deleting journal entry through business layer...');
+      logger.info('🔐 Deleting journal entry through business layer...', { component: 'journalHandlers', operation: 'deletingJournalEntry' });
       z.string().min(1).parse(id);
       return await apiService.deleteJournalEntry(id);
     } catch (error) {
@@ -71,7 +72,7 @@ export function registerJournalHandlers(): void {
   // Additional journal business operations
   ipcMain.handle('journal:pin', async (_, id) => {
     try {
-      console.log('🔐 Pinning journal entry through business layer...');
+      logger.info('🔐 Pinning journal entry through business layer...', { component: 'journalHandlers', operation: 'pinningJournalEntry' });
       z.string().min(1).parse(id);
       return await apiService.pinJournalEntry(id);
     } catch (error) {
@@ -82,7 +83,7 @@ export function registerJournalHandlers(): void {
 
   ipcMain.handle('journal:unpin', async (_, id) => {
     try {
-      console.log('🔐 Unpinning journal entry through business layer...');
+      logger.info('🔐 Unpinning journal entry through business layer...', { component: 'journalHandlers', operation: 'unpinningJournalEntry' });
       z.string().min(1).parse(id);
       return await apiService.unpinJournalEntry(id);
     } catch (error) {
@@ -93,7 +94,7 @@ export function registerJournalHandlers(): void {
 
   ipcMain.handle('journal:get-by-date-range', async (_, startDate, endDate) => {
     try {
-      console.log('🔐 Getting journal entries by date range through business layer...');
+      logger.info('🔐 Getting journal entries by date range through business layer...', { component: 'journalHandlers', operation: 'gettingJournalEntries' });
       const date = (v: unknown) => z.union([z.date(), z.string().datetime(), z.string().date()]).transform((val) => new Date(val)).parse(v);
       return await apiService.getJournalEntriesByDateRange(date(startDate).toISOString(), date(endDate).toISOString());
     } catch (error) {
@@ -104,7 +105,7 @@ export function registerJournalHandlers(): void {
 
   ipcMain.handle('journal:get-stats', async () => {
     try {
-      console.log('🔐 Getting journal stats through business layer...');
+      logger.info('🔐 Getting journal stats through business layer...', { component: 'journalHandlers', operation: 'gettingJournalStats' });
       return await apiService.getJournalStats();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get journal stats';
@@ -112,7 +113,7 @@ export function registerJournalHandlers(): void {
     }
   });
 
-  console.log('✅ Journal IPC handlers registered');
+  logger.info('✅ Journal IPC handlers registered', { component: 'journalHandlers', operation: 'register' });
 }
 
 /**
@@ -120,7 +121,7 @@ export function registerJournalHandlers(): void {
  */
 export async function queryJournalEntriesIPC() {
   try {
-    console.log('🔐 Querying journal entries for AI analysis...');
+    logger.info('🔐 Querying journal entries for AI analysis...', { component: 'journalHandlers', operation: 'query' });
     return await apiService.getJournalEntries();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to query journal entries';

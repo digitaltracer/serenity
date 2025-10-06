@@ -5,13 +5,14 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useDispatch } from 'react-redux';
-import { 
+import { logger } from '../utils/logger';
+import {
   KeyboardShortcut,
   ShortcutContext,
   matchesShortcut,
   shouldIgnoreShortcuts,
   getGlobalShortcuts,
-  getEnabledShortcuts 
+  getEnabledShortcuts
 } from '../utils/keyboardShortcuts';
 
 export interface UseKeyboardShortcutsOptions {
@@ -79,7 +80,7 @@ export const useKeyboardShortcuts = (
       try {
         await handlerRef.current(matchingShortcut, event);
       } catch (error) {
-        console.error('Keyboard shortcut handler error:', error);
+        logger.error('Keyboard shortcut handler error:', { component: 'useKeyboardShortcuts', operation: 'keyboardShortcutHandler' }, error as Error);
       }
     }
   }, [enabled, preventDefault, stopPropagation]);
@@ -244,7 +245,7 @@ export const useShortcutActions = () => {
         break;
         
       default:
-        console.warn(`Unhandled keyboard shortcut action: ${action}`);
+        logger.warn(`Unhandled keyboard shortcut action: ${action}`, { component: 'useKeyboardShortcuts', operation: 'unhandledKeyboardShortcut' });
     }
   }, [dispatch]);
 };

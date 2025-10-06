@@ -7,14 +7,15 @@ import { ipcMain } from 'electron';
 import { z } from 'zod';
 import { ProjectSchema } from '@serenity/core';
 import { apiService } from '../services/ApiService';
+import { logger } from '@serenity/core';
 
 export function registerProjectHandlers(): void {
-  console.log('🔧 Registering project IPC handlers...');
+  logger.info('🔧 Registering project IPC handlers...', { component: 'projectHandlers', operation: 'registeringProjectIpc' });
 
   // Project operations through business logic
   ipcMain.handle('projects:get', async () => {
     try {
-      console.log('🔐 Getting projects through business layer...');
+      logger.info('🔐 Getting projects through business layer...', { component: 'projectHandlers', operation: 'gettingProjectsThrough' });
       return await apiService.getProjects();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get projects';
@@ -24,7 +25,7 @@ export function registerProjectHandlers(): void {
 
   ipcMain.handle('projects:get-single', async (_, id) => {
     try {
-      console.log('🔐 Getting single project through business layer...');
+      logger.info('🔐 Getting single project through business layer...', { component: 'projectHandlers', operation: 'gettingSingleProject' });
       z.string().min(1).parse(id);
       return await apiService.getProject(id);
     } catch (error) {
@@ -35,7 +36,7 @@ export function registerProjectHandlers(): void {
 
   ipcMain.handle('projects:create', async (_, project) => {
     try {
-      console.log('🔐 Creating project through business layer...');
+      logger.info('🔐 Creating project through business layer...', { component: 'projectHandlers', operation: 'creatingProjectThrough' });
       const validated = ProjectSchema.omit({ id: true, createdAt: true, updatedAt: true }).parse(project);
       return await apiService.createProject(validated);
     } catch (error) {
@@ -46,11 +47,11 @@ export function registerProjectHandlers(): void {
 
   ipcMain.handle('projects:create-with-id', async (_, project) => {
     try {
-      console.log('🔐 Creating project with ID through business layer:', project.name, project.id);
+      logger.info('🔐 Creating project with ID through business layer:', {  component: 'projectHandlers', operation: 'creatingProjectWith' , metadata: { data1: project.name, data2: project.id } });
       const validated = ProjectSchema.parse(project);
       return await apiService.createProject(validated);
     } catch (error) {
-      console.error('❌ Business layer: Project creation failed:', error);
+      logger.error('❌ Business layer: Project creation failed:', { component: 'projectHandlers', operation: 'businessLayer:Project' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create project with ID';
       return { success: false, data: null, error: errorMessage };
     }
@@ -58,7 +59,7 @@ export function registerProjectHandlers(): void {
 
   ipcMain.handle('projects:update', async (_, id, updates) => {
     try {
-      console.log('🔐 Updating project through business layer...');
+      logger.info('🔐 Updating project through business layer...', { component: 'projectHandlers', operation: 'updatingProjectThrough' });
       z.string().min(1).parse(id);
       const validatedUpdates = ProjectSchema.partial().parse(updates);
       return await apiService.updateProject(id, validatedUpdates);
@@ -70,7 +71,7 @@ export function registerProjectHandlers(): void {
 
   ipcMain.handle('projects:delete', async (_, id) => {
     try {
-      console.log('🔐 Deleting project through business layer...');
+      logger.info('🔐 Deleting project through business layer...', { component: 'projectHandlers', operation: 'deletingProjectThrough' });
       z.string().min(1).parse(id);
       return await apiService.deleteProject(id);
     } catch (error) {
@@ -82,7 +83,7 @@ export function registerProjectHandlers(): void {
   // Additional project business operations
   ipcMain.handle('projects:archive', async (_, id) => {
     try {
-      console.log('🔐 Archiving project through business layer...');
+      logger.info('🔐 Archiving project through business layer...', { component: 'projectHandlers', operation: 'archivingProjectThrough' });
       z.string().min(1).parse(id);
       return await apiService.archiveProject(id);
     } catch (error) {
@@ -93,7 +94,7 @@ export function registerProjectHandlers(): void {
 
   ipcMain.handle('projects:unarchive', async (_, id) => {
     try {
-      console.log('🔐 Unarchiving project through business layer...');
+      logger.info('🔐 Unarchiving project through business layer...', { component: 'projectHandlers', operation: 'unarchivingProjectThrough' });
       z.string().min(1).parse(id);
       return await apiService.unarchiveProject(id);
     } catch (error) {
@@ -104,7 +105,7 @@ export function registerProjectHandlers(): void {
 
   ipcMain.handle('projects:get-stats', async (_, id) => {
     try {
-      console.log('🔐 Getting project stats through business layer...');
+      logger.info('🔐 Getting project stats through business layer...', { component: 'projectHandlers', operation: 'gettingProjectStats' });
       z.string().min(1).parse(id);
       return await apiService.getProjectStats(id);
     } catch (error) {
@@ -113,5 +114,5 @@ export function registerProjectHandlers(): void {
     }
   });
 
-  console.log('✅ Project IPC handlers registered');
+  logger.info('✅ Project IPC handlers registered', { component: 'projectHandlers', operation: 'projectIpcHandlers' });
 }

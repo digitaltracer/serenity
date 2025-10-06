@@ -19,6 +19,7 @@ import integrationsReducer from './slices/integrationsSlice';
 import aiAssistantReducer from './slices/aiAssistantSlice';
 import { restoreInsights, restoreRecaps } from './slices/aiAssistantSlice';
 import { simplifiedPersistenceMiddleware, initializeSQLitePersistence } from './middleware/simplifiedPersistenceMiddleware';
+import { logger } from '../utils/logger';
 
 /**
  * Create the enhanced store - always starts with localStorage middleware
@@ -75,7 +76,7 @@ export type AppDispatch = typeof store.dispatch;
  */
 export async function initializeStoreData() {
   try {
-    console.log('🔄 Starting store data initialization...');
+    logger.info('🔄 Starting store data initialization...', { component: 'enhancedStore', operation: 'startingStoreData' });
     
     // Check if we're in Electron environment with SQLite support
     const hasElectronSQLite = typeof window !== 'undefined' && 
@@ -83,7 +84,7 @@ export async function initializeStoreData() {
                               window.electronAPI.sqlite;
     
     if (hasElectronSQLite) {
-      console.log('🗄️ Electron SQLite environment detected');
+      logger.info('🗄️ Electron SQLite environment detected', { component: 'enhancedStore', operation: '🗄️ElectronSqlite' });
       
       // Import migration utilities
       const { 
@@ -94,27 +95,27 @@ export async function initializeStoreData() {
       } = await import('../utils/migration');
       
       // Initialize SQLite persistence
-      console.log('🗄️ Initializing SQLite persistence...');
+      logger.info('🗄️ Initializing SQLite persistence...', { component: 'enhancedStore', operation: '🗄️InitializingSqlite' });
       const sqliteInitialized = await initializeSQLitePersistence();
       
       if (sqliteInitialized) {
         // Check if we should migrate
-        console.log('🚀 Starting SQLite migration process...');
+        logger.info('🚀 Starting SQLite migration process...', { component: 'enhancedStore', operation: 'startingSqliteMigration' });
         const migrationSuccess = await migrateToSQLite();
       
       if (migrationSuccess) {
         // Load data from SQLite
-        console.log('📂 Loading data from SQLite...');
+        logger.info('📂 Loading data from SQLite...', { component: 'enhancedStore', operation: 'loadingDataFrom' });
         const sqliteData = await loadInitialDataFromSQLite();
         
         if (sqliteData) {
           // Populate Redux store with SQLite data
-          console.log('📊 Populating Redux store with SQLite data...');
+          logger.info('📊 Populating Redux store with SQLite data...', { component: 'enhancedStore', operation: 'populatingReduxStore' });
           
           // Dispatch actions to populate the store
           if (sqliteData.tasks.length > 0) {
             store.dispatch({ type: 'tasks/setTasks', payload: sqliteData.tasks });
-            console.log(`✅ Loaded ${sqliteData.tasks.length} tasks from SQLite`);
+            logger.info(`✅ Loaded ${sqliteData.tasks.length} tasks from SQLite`, { component: 'enhancedStore', operation: 'loaded${sqlitedata.tasks.length}Tasks' });
             
             // Extract and set used tags from tasks
             const taskTags = sqliteData.tasks
@@ -122,18 +123,18 @@ export async function initializeStoreData() {
               .filter((tag: string) => tag && tag.trim());
             if (taskTags.length > 0) {
               store.dispatch({ type: 'tags/addUsedTags', payload: taskTags });
-              console.log(`✅ Loaded ${taskTags.length} tags from tasks`);
+              logger.info(`✅ Loaded ${taskTags.length} tags from tasks`, { component: 'enhancedStore', operation: 'loaded${tasktags.length}Tags' });
             }
           }
           
           if (sqliteData.projects.length > 0) {
             store.dispatch({ type: 'projects/setProjects', payload: sqliteData.projects });
-            console.log(`✅ Loaded ${sqliteData.projects.length} projects from SQLite`);
+            logger.info(`✅ Loaded ${sqliteData.projects.length} projects from SQLite`, { component: 'enhancedStore', operation: 'loaded${sqlitedata.projects.length}Projects' });
           }
           
           if (sqliteData.journalEntries.length > 0) {
             store.dispatch({ type: 'journal/setEntries', payload: sqliteData.journalEntries });
-            console.log(`✅ Loaded ${sqliteData.journalEntries.length} journal entries from SQLite`);
+            logger.info(`✅ Loaded ${sqliteData.journalEntries.length} journal entries from SQLite`, { component: 'enhancedStore', operation: 'loaded${sqlitedata.journalentries.length}Journal' });
             
             // Extract and set used tags from journal entries
             const journalTags = sqliteData.journalEntries
@@ -141,7 +142,7 @@ export async function initializeStoreData() {
               .filter((tag: string) => tag && tag.trim());
             if (journalTags.length > 0) {
               store.dispatch({ type: 'tags/addUsedTags', payload: journalTags });
-              console.log(`✅ Loaded ${journalTags.length} tags from journal entries`);
+              logger.info(`✅ Loaded ${journalTags.length} tags from journal entries`, { component: 'enhancedStore', operation: 'loaded${journaltags.length}Tags' });
             }
           }
           
@@ -151,18 +152,18 @@ export async function initializeStoreData() {
             const goalsResult = await anyWindow.electronAPI?.goals?.get();
             if (goalsResult?.success && Array.isArray(goalsResult.data)) {
               store.dispatch({ type: 'goals/setGoals', payload: goalsResult.data });
-              console.log(`✅ Loaded ${goalsResult.data.length} goals from SQLite`);
+              logger.info(`✅ Loaded ${goalsResult.data.length} goals from SQLite`, { component: 'enhancedStore', operation: 'loaded${goalsresult.data.length}Goals' });
             } else {
-              console.warn('⚠️ No goals loaded from SQLite');
+              logger.warn('⚠️ No goals loaded from SQLite', { component: 'enhancedStore', operation: 'goalsLoadedFrom' });
             }
           } catch (e) {
-            console.warn('⚠️ Failed to load goals from SQLite:', e);
+            logger.warn('⚠️ Failed to load goals from SQLite', { component: 'enhancedStore', operation: 'failedLoadGoals' });
           }
 
           // Load AI insights/recaps/usage from SQLite and hydrate Redux
           try {
             const anyWindow: any = window as any;
-            console.log('🔄 Loading AI insights/recaps/usage from SQLite...');
+            logger.info('🔄 Loading AI insights/recaps/usage from SQLite...', { component: 'enhancedStore', operation: 'loadingInsights/recaps/usageFrom' });
             const [insightsRes, recapsRes, usageRes] = await Promise.all([
               anyWindow.electronAPI?.aiAssistant?.listInsights?.(),
               anyWindow.electronAPI?.aiAssistant?.listRecaps?.(),
@@ -184,8 +185,8 @@ export async function initializeStoreData() {
                 metadata: (() => { try { return JSON.parse(row.metadata || '{}'); } catch { return {}; } })(),
               }));
               store.dispatch({ type: 'aiAssistant/restoreInsights', payload: insights });
-              console.log(`✅ Loaded ${insights.length} AI insights from SQLite`);
-              try { console.log('🧪 Insights hydration sample (first 3):', insights.slice(0,3)); } catch {}
+              logger.info(`✅ Loaded ${insights.length} AI insights from SQLite`, { component: 'enhancedStore', operation: 'loaded${insights.length}Insights' });
+              try { logger.info('🧪 Insights hydration sample (first 3)', { component: 'enhancedStore', operation: 'insightsHydrationSample', metadata: { sample: insights.slice(0,3) } }); } catch {}
               try { localStorage.setItem('serenity_ai_insights', JSON.stringify(insights)); } catch {}
             }
 
@@ -205,14 +206,14 @@ export async function initializeStoreData() {
                 metadata: (() => { try { return JSON.parse(row.metadata || '{}'); } catch { return {}; } })(),
               }));
               store.dispatch({ type: 'aiAssistant/restoreRecaps', payload: recaps });
-              console.log(`✅ Loaded ${recaps.length} AI recaps from SQLite`);
-              try { console.log('🧪 Recaps hydration sample (first 2):', recaps.slice(0,2).map((r:any)=>({title:r.title,type:r.type,period:r.period}))); } catch {}
+              logger.info(`✅ Loaded ${recaps.length} AI recaps from SQLite`, { component: 'enhancedStore', operation: 'loaded${recaps.length}Recaps' });
+              try { logger.info('🧪 Recaps hydration sample (first 2)', { component: 'enhancedStore', operation: 'recapsHydrationSample', metadata: { sample: recaps.slice(0,2).map((r:any)=>({title:r.title,type:r.type,period:r.period})) } }); } catch {}
               try { localStorage.setItem('serenity_ai_recaps', JSON.stringify(recaps)); } catch {}
             }
 
             // Map and restore usage
             if (usageRes?.success && Array.isArray(usageRes.data)) {
-              console.log(`📊 Hydrating ${usageRes.data.length} AI usage rows from SQLite`);
+              logger.info(`📊 Hydrating ${usageRes.data.length} AI usage rows from SQLite`, { component: 'enhancedStore', operation: 'hydrating${usageres.data.length}Usage' });
               // Clear and repopulate usage entries
               store.dispatch({ type: 'aiAssistant/clearUsage' });
               usageRes.data.forEach((u: any) => {
@@ -231,40 +232,40 @@ export async function initializeStoreData() {
               });
               try {
                 const hydratedUsage = (store.getState() as any).aiAssistant.usage;
-                console.log('🧪 Usage hydration sample (first 3):', hydratedUsage.slice(0, 3));
+                logger.info('🧪 Usage hydration sample (first 3)', { component: 'enhancedStore', operation: 'usageHydrationSample', metadata: { sample: hydratedUsage.slice(0, 3) } });
               } catch {}
-              console.log(`✅ Loaded ${usageRes.data.length} AI usage rows from SQLite`);
+              logger.info(`✅ Loaded ${usageRes.data.length} AI usage rows from SQLite`, { component: 'enhancedStore', operation: 'loaded${usageres.data.length}Usage' });
               try { localStorage.setItem('serenity_ai_usage', JSON.stringify((store.getState() as any).aiAssistant.usage)); } catch {}
             }
           } catch (e) {
-            console.warn('⚠️ Failed to load AI insights/recaps/usage from SQLite:', e);
+            logger.warn('⚠️ Failed to load AI insights/recaps/usage from SQLite', { component: 'enhancedStore', operation: 'failedLoadInsightsRecapsUsage' });
           }
 
-          console.log('✅ SQLite data initialization completed successfully');
+          logger.info('✅ SQLite data initialization completed successfully', { component: 'enhancedStore', operation: 'sqliteDataInitialization' });
           return true;
         } else {
-          console.log('📭 No SQLite data found');
+          logger.info('📭 No SQLite data found', { component: 'enhancedStore', operation: 'sqliteDataFound' });
         }
       } else {
-          console.log('⚠️ SQLite migration failed, falling back to localStorage');
+          logger.info('⚠️ SQLite migration failed, falling back to localStorage', { component: 'enhancedStore', operation: 'operation' });
         }
       } else {
-        console.log('⚠️ SQLite initialization failed, using localStorage');
+        logger.info('⚠️ SQLite initialization failed, using localStorage', { component: 'enhancedStore', operation: 'operation' });
       }
     } else {
-      console.log('💾 No SQLite support detected, using localStorage');
+      logger.info('💾 No SQLite support detected, using localStorage', { component: 'enhancedStore', operation: 'operation' });
     }
     
     // Fallback: Load from localStorage if SQLite is not available
     const { hasLocalStorageData, getLocalStorageData } = await import('../utils/migration');
     
     if (hasLocalStorageData()) {
-      console.log('📦 Loading data from localStorage as fallback...');
+      logger.info('📦 Loading data from localStorage as fallback...', { component: 'enhancedStore', operation: 'loadingDataFrom' });
       const localData = getLocalStorageData();
       
       if (localData.tasks.length > 0) {
         store.dispatch({ type: 'tasks/setTasks', payload: localData.tasks });
-        console.log(`✅ Loaded ${localData.tasks.length} tasks from localStorage`);
+        logger.info(`✅ Loaded ${localData.tasks.length} tasks from localStorage`, { component: 'enhancedStore', operation: 'loaded${localdata.tasks.length}Tasks' });
         
         // Extract and set used tags from tasks
         const taskTags = localData.tasks
@@ -272,7 +273,7 @@ export async function initializeStoreData() {
           .filter((tag: string) => tag && tag.trim());
         if (taskTags.length > 0) {
           store.dispatch({ type: 'tags/addUsedTags', payload: taskTags });
-          console.log(`✅ Loaded ${taskTags.length} tags from tasks`);
+          logger.info(`✅ Loaded ${taskTags.length} tags from tasks`, { component: 'enhancedStore', operation: 'loaded${tasktags.length}Tags' });
         }
       }
 
@@ -282,20 +283,20 @@ export async function initializeStoreData() {
         if (goalsStr) {
           const goals = JSON.parse(goalsStr);
           store.dispatch({ type: 'goals/setGoals', payload: goals });
-          console.log(`✅ Loaded ${goals.length} goals from localStorage`);
+          logger.info(`✅ Loaded ${goals.length} goals from localStorage`, { component: 'enhancedStore', operation: 'loaded${goals.length}Goals' });
         }
       } catch (e) {
-        console.warn('⚠️ Failed to load goals from localStorage:', e);
+        logger.warn('⚠️ Failed to load goals from localStorage', { component: 'enhancedStore', operation: 'failedLoadGoals' });
       }
       
       if (localData.projects.length > 0) {
         store.dispatch({ type: 'projects/setProjects', payload: localData.projects });
-        console.log(`✅ Loaded ${localData.projects.length} projects from localStorage`);
+        logger.info(`✅ Loaded ${localData.projects.length} projects from localStorage`, { component: 'enhancedStore', operation: 'loaded${localdata.projects.length}Projects' });
       }
       
       if (localData.journalEntries.length > 0) {
         store.dispatch({ type: 'journal/setEntries', payload: localData.journalEntries });
-        console.log(`✅ Loaded ${localData.journalEntries.length} journal entries from localStorage`);
+        logger.info(`✅ Loaded ${localData.journalEntries.length} journal entries from localStorage`, { component: 'enhancedStore', operation: 'loaded${localdata.journalentries.length}Journal' });
         
         // Extract and set used tags from journal entries
         const journalTags = localData.journalEntries
@@ -303,22 +304,22 @@ export async function initializeStoreData() {
           .filter((tag: string) => tag && tag.trim());
         if (journalTags.length > 0) {
           store.dispatch({ type: 'tags/addUsedTags', payload: journalTags });
-          console.log(`✅ Loaded ${journalTags.length} tags from journal entries`);
+          logger.info(`✅ Loaded ${journalTags.length} tags from journal entries`, { component: 'enhancedStore', operation: 'loaded${journaltags.length}Tags' });
         }
       }
       
-      console.log('✅ LocalStorage data initialization completed');
+      logger.info('✅ LocalStorage data initialization completed', { component: 'enhancedStore', operation: 'localstorageDataInitialization' });
       return true;
     }
     
     // Always try to load integrations state from localStorage (regardless of SQLite)
     loadIntegrationsState();
     
-    console.log('📭 No existing data found - starting with empty store');
+    logger.info('📭 No existing data found - starting with empty store', { component: 'enhancedStore', operation: 'existingDataFound' });
     return true;
-    
+
   } catch (error) {
-    console.error('❌ Failed to initialize store data:', error);
+    logger.error('❌ Failed to initialize store data:', { component: 'enhancedStore', operation: 'failedInitializeStore' }, error as Error);
     return false;
   }
 
@@ -333,7 +334,7 @@ export async function initializeStoreData() {
       store.dispatch(restoreRecaps(JSON.parse(recapsStr)));
     }
   } catch (e) {
-    console.warn('⚠️ Failed to restore AI insights/recaps:', e);
+    logger.warn('⚠️ Failed to restore AI insights/recaps:', { component: 'enhancedStore', operation: 'failedRestoreInsights/recaps:' });
   }
 }
 
@@ -346,7 +347,7 @@ export async function checkSQLiteAvailability(): Promise<boolean> {
       const result = await window.electronAPI.sqlite.testConnection();
       return result.success;
     } catch (error) {
-      console.error('SQLite availability check failed:', error);
+      logger.error('SQLite availability check failed:', { component: 'enhancedStore', operation: 'sqliteAvailabilityCheck' }, error as Error);
       return false;
     }
   }
@@ -362,7 +363,7 @@ export async function getDatabaseStats() {
       const result = await window.electronAPI.sqlite.getStats();
       return result.success ? result.data : null;
     } catch (error) {
-      console.error('Failed to get database stats:', error);
+      logger.error('Failed to get database stats:', { component: 'enhancedStore', operation: 'failedGetDatabase' }, error as Error);
       return null;
     }
   }
@@ -374,20 +375,20 @@ export async function getDatabaseStats() {
  */
 function loadIntegrationsState() {
   try {
-    console.log('🔗 Loading integrations state from localStorage...');
+    logger.info('🔗 Loading integrations state from localStorage...', { component: 'enhancedStore', operation: 'loadingIntegrationsState' });
     const integrationsData = localStorage.getItem('serenity_integrations');
     
     if (integrationsData) {
       const parsedData = require('../utils/cryptoUtils').safeJsonParse(integrationsData);
-      console.log('✅ Found integrations data:', parsedData);
+      logger.info('✅ Found integrations data:', { component: 'enhancedStore', operation: 'foundIntegrationsData:' });
       
       // Dispatch action to restore integrations state
       store.dispatch({ type: 'integrations/restoreState', payload: parsedData });
-      console.log('✅ Integrations state restored successfully');
+      logger.info('✅ Integrations state restored successfully', { component: 'enhancedStore', operation: 'integrationsStateRestored' });
     } else {
-      console.log('📭 No integrations data found in localStorage');
+      logger.info('📭 No integrations data found in localStorage', { component: 'enhancedStore', operation: 'integrationsDataFound' });
     }
   } catch (error) {
-    console.error('❌ Failed to load integrations state:', error);
+    logger.error('❌ Failed to load integrations state:', { component: 'enhancedStore', operation: 'failedLoadIntegrations' }, error as Error);
   }
 }

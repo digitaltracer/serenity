@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, useToast } from '@serenity/ui';
 import { useDispatch, useSelector } from 'react-redux';
-import { addTask, addEntry, parseQuickInput, selectActiveProjects } from '@serenity/core';
+import { addTask, addEntry, parseQuickInput, selectActiveProjects, logger } from '@serenity/core';
 import { CheckSquare, BookOpen, FolderOpen, BarChart3, Loader2 } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
@@ -15,96 +15,89 @@ export const HomePage: React.FC = () => {
   const activeProjects = useSelector(selectActiveProjects);
 
   useEffect(() => {
-    console.log('🔄 [HomePage] useEffect triggered - starting AI settings load');
+    logger.debug('useEffect triggered - starting AI settings load', { component: 'HomePage', operation: 'loadAISettings' });
     (async () => {
       try {
-        console.log('📋 [HomePage] STEP 1: Loading AI assistant settings...');
+        logger.debug('Loading AI assistant settings', { component: 'HomePage', operation: 'loadAISettings' });
 
         const electronAPI = (window as any).electronAPI;
-        console.log('📋 [HomePage] STEP 2: electronAPI available:', !!electronAPI);
+        logger.trace('electronAPI availability check', { component: 'HomePage', operation: 'loadAISettings', metadata: { available: !!electronAPI } });
 
         const aiAssistant = electronAPI?.aiAssistant;
-        console.log('📋 [HomePage] STEP 3: aiAssistant available:', !!aiAssistant);
-        console.log('📋 [HomePage] STEP 4: getSettings function available:', !!aiAssistant?.getSettings);
+        logger.trace('aiAssistant availability check', { component: 'HomePage', operation: 'loadAISettings', metadata: { available: !!aiAssistant, hasGetSettings: !!aiAssistant?.getSettings } });
 
         if (!electronAPI) {
-          console.error('❌ [HomePage] FAILURE: electronAPI is not available');
+          logger.error('electronAPI is not available', { component: 'HomePage', operation: 'loadAISettings' });
           setActiveProvider(null);
           return;
         }
 
         if (!aiAssistant) {
-          console.error('❌ [HomePage] FAILURE: aiAssistant is not available');
+          logger.error('aiAssistant is not available', { component: 'HomePage', operation: 'loadAISettings' });
           setActiveProvider(null);
           return;
         }
 
         if (!aiAssistant.getSettings) {
-          console.error('❌ [HomePage] FAILURE: getSettings function is not available');
+          logger.error('getSettings function is not available', { component: 'HomePage', operation: 'loadAISettings' });
           setActiveProvider(null);
           return;
         }
 
-        console.log('📋 [HomePage] STEP 5: Calling getSettings()...');
+        logger.debug('Calling getSettings', { component: 'HomePage', operation: 'loadAISettings' });
         const settingsResult = await aiAssistant.getSettings();
-        console.log('📋 [HomePage] STEP 6: Settings result received:', settingsResult);
-        console.log('📋 [HomePage] STEP 7: Settings result type:', typeof settingsResult);
-        console.log('📋 [HomePage] STEP 8: Settings success:', settingsResult?.success);
-        console.log('📋 [HomePage] STEP 9: Settings data:', settingsResult?.settings);
+        logger.trace('Settings result received', { component: 'HomePage', operation: 'loadAISettings', metadata: { success: settingsResult?.success, hasSettings: !!settingsResult?.settings } });
 
         if (!settingsResult) {
-          console.error('❌ [HomePage] FAILURE: getSettings returned null/undefined');
+          logger.error('getSettings returned null/undefined', { component: 'HomePage', operation: 'loadAISettings' });
           setActiveProvider(null);
           return;
         }
 
         if (!settingsResult.success) {
-          console.error('❌ [HomePage] FAILURE: getSettings returned success=false:', settingsResult);
+          logger.error('getSettings returned success=false', { component: 'HomePage', operation: 'loadAISettings', metadata: { result: settingsResult } });
           setActiveProvider(null);
           return;
         }
 
         if (!settingsResult.settings) {
-          console.error('❌ [HomePage] FAILURE: getSettings returned no settings object:', settingsResult);
+          logger.error('getSettings returned no settings object', { component: 'HomePage', operation: 'loadAISettings', metadata: { result: settingsResult } });
           setActiveProvider(null);
           return;
         }
 
         const provider = settingsResult.settings.activeProvider;
-        console.log('📋 [HomePage] STEP 10: Extracted activeProvider:', provider);
-        console.log('📋 [HomePage] STEP 11: Provider type:', typeof provider);
-        console.log('📋 [HomePage] STEP 12: Provider is truthy:', !!provider);
+        logger.trace('Extracted activeProvider', { component: 'HomePage', operation: 'loadAISettings', metadata: { provider, type: typeof provider, truthy: !!provider } });
 
         // Use the same logic as AI Assistant page
         const providersWithKeys = settingsResult.settings.providersWithKeys;
-        console.log('📋 [HomePage] STEP 13: Providers with keys:', providersWithKeys);
+        logger.trace('Providers with keys', { component: 'HomePage', operation: 'loadAISettings', metadata: { providersWithKeys } });
 
         const hasKey = provider ? !!providersWithKeys?.[provider] : false;
-        console.log('📋 [HomePage] STEP 14: Current provider has key:', hasKey);
+        logger.trace('Provider key check', { component: 'HomePage', operation: 'loadAISettings', metadata: { provider, hasKey } });
 
         if (provider && hasKey) {
-          console.log('✅ [HomePage] SUCCESS: Setting activeProvider to:', provider);
+          logger.info('Setting activeProvider', { component: 'HomePage', operation: 'loadAISettings', metadata: { provider } });
           setActiveProvider(provider);
         } else if (!provider) {
-          console.log('📋 [HomePage] STEP 15: No activeProvider set, looking for first provider with key...');
+          logger.debug('No activeProvider set, looking for first provider with key', { component: 'HomePage', operation: 'loadAISettings' });
           const firstWithKey = (['openai', 'gemini', 'anthropic'] as const).find(p => providersWithKeys?.[p]);
-          console.log('📋 [HomePage] STEP 16: First provider with key found:', firstWithKey);
+          logger.debug('First provider with key search result', { component: 'HomePage', operation: 'loadAISettings', metadata: { firstWithKey } });
 
           if (firstWithKey) {
-            console.log('✅ [HomePage] SUCCESS: Auto-setting activeProvider to:', firstWithKey);
+            logger.info('Auto-setting activeProvider', { component: 'HomePage', operation: 'loadAISettings', metadata: { provider: firstWithKey } });
             setActiveProvider(firstWithKey);
           } else {
-            console.warn('⚠️ [HomePage] WARNING: No providers have API keys, setting to null');
+            logger.warn('No providers have API keys, setting to null', { component: 'HomePage', operation: 'loadAISettings' });
             setActiveProvider(null);
           }
         } else {
-          console.warn('⚠️ [HomePage] WARNING: Provider set but no API key, setting to null');
+          logger.warn('Provider set but no API key, setting to null', { component: 'HomePage', operation: 'loadAISettings', metadata: { provider } });
           setActiveProvider(null);
         }
 
       } catch (error) {
-        console.error('❌ [HomePage] EXCEPTION: Error loading AI settings:', error);
-        console.error('❌ [HomePage] EXCEPTION: Error stack:', error instanceof Error ? error.stack : 'No stack available');
+        logger.error('Error loading AI settings', { component: 'HomePage', operation: 'loadAISettings' }, error as Error);
         setActiveProvider(null);
       }
     })();
@@ -170,37 +163,44 @@ export const HomePage: React.FC = () => {
                 setIsProcessing(true);
                 (async () => {
                   try {
-                    console.log('🚀 [QuickAdd] USER SUBMITTED INPUT - Starting LLM processing');
-                    console.log('🚀 [QuickAdd] Input text:', text);
+                    logger.info('User submitted input - Starting LLM processing', { component: 'HomePage', operation: 'quickAdd', metadata: { text } });
 
                     const llm = (window as any).electronAPI?.aiAssistant;
                     let res: any = null;
 
-                    console.log('🔍 [QuickAdd] STEP 1: Debug check - llm available:', !!llm);
-                    console.log('🔍 [QuickAdd] STEP 2: Debug check - quickAdd function:', !!llm?.quickAdd);
-                    console.log('🔍 [QuickAdd] STEP 3: Debug check - activeProvider:', activeProvider);
-                    console.log('🔍 [QuickAdd] STEP 4: Debug check - activeProvider type:', typeof activeProvider);
-                    console.log('🔍 [QuickAdd] STEP 5: Debug check - activeProvider truthy:', !!activeProvider);
+                    logger.trace('QuickAdd availability check', { component: 'HomePage', operation: 'quickAdd', metadata: { llmAvailable: !!llm, quickAddAvailable: !!llm?.quickAdd, activeProvider, providerType: typeof activeProvider, providerTruthy: !!activeProvider } });
 
                     if (llm?.quickAdd && activeProvider) {
-                      console.log('[QuickAdd] Calling LLM with provider:', activeProvider);
+                      logger.debug('Calling LLM with provider', { component: 'HomePage', operation: 'quickAdd', metadata: { provider: activeProvider } });
                       const r = await llm.quickAdd(text, activeProvider as 'openai' | 'gemini' | 'anthropic', true);
-                      console.info('[QuickAdd] IPC result:', r);
+                      logger.debug('IPC result received', { component: 'HomePage', operation: 'quickAdd', metadata: { success: r?.success, hasData: !!r?.data } });
                       if (r?.success && r.data) {
                         res = r.data;
-                        if (r.debug) console.info('[QuickAdd] provider:', r.debug.provider, 'model:', r.debug.model, 'sample:', r.debug.contentSample);
+                        if (r.debug) {
+                          logger.trace('LLM details', {
+                            component: 'HomePage',
+                            operation: 'quickAdd',
+                            metadata: {
+                              provider: r.debug.provider,
+                              model: r.debug.model,
+                              contentSample: r.debug.contentSample
+                            }
+                          });
+                        }
                       } else {
-                        console.warn('[QuickAdd] LLM quick-add failed; falling back to local parsing:', r?.error, r?.debug);
+                        logger.warn('LLM quick-add failed, falling back to local parsing', {
+                          component: 'HomePage',
+                          operation: 'quickAdd',
+                          metadata: { error: r?.error, debug: r?.debug }
+                        });
                       }
                     } else {
-                      console.warn('[QuickAdd] LLM conditions not met - skipping LLM call');
-                      console.warn('[QuickAdd] - llm.quickAdd available:', !!llm?.quickAdd);
-                      console.warn('[QuickAdd] - activeProvider set:', !!activeProvider, activeProvider);
+                      logger.warn('LLM conditions not met - skipping LLM call', { component: 'HomePage', operation: 'quickAdd', metadata: { quickAddAvailable: !!llm?.quickAdd, activeProvider } });
                     }
                     if (!res) {
                       // Fallback to local rule-based parser if LLM unavailable
                       const local = parseQuickInput(text);
-                      console.info('[QuickAdd] Local parse fallback:', local);
+                      logger.info('Local parse fallback', { component: 'HomePage', operation: 'quickAdd', metadata: { kind: local.kind } });
                       if (local.kind === 'task') {
                         res = { ...local.task, kind: 'task', project: local.debug?.project };
                       } else {
@@ -231,7 +231,7 @@ export const HomePage: React.FC = () => {
                         recurring: undefined,
                         userId: undefined,
                       } as any;
-                      console.info('[QuickAdd] Saving task:', task);
+                      logger.info('Saving task', { component: 'HomePage', operation: 'quickAdd', metadata: { title: task.title, projectId, priority: task.priority } });
                       dispatch(addTask(task));
                       const projectName = projectId ? activeProjects.find(p => p.id === projectId)?.name : null;
                       const message = projectName ? `Task created in ${projectName}` : 'Task created';
@@ -244,13 +244,13 @@ export const HomePage: React.FC = () => {
                         tags: Array.isArray(res.tags) ? res.tags : [],
                         pinned: false,
                       } as any;
-                      console.info('[QuickAdd] Saving journal entry:', entry);
+                      logger.info('Saving journal entry', { component: 'HomePage', operation: 'quickAdd', metadata: { tagCount: entry.tags.length } });
                       dispatch(addEntry(entry));
                       showSuccess('Journal added');
                     }
                     setQuickText('');
                   } catch (err: any) {
-                    console.error('[QuickAdd] error:', err);
+                    logger.error('QuickAdd error', { component: 'HomePage', operation: 'quickAdd' }, err);
                     showError('Could not interpret input', err?.message || 'Try a simpler sentence.');
                   } finally {
                     setIsProcessing(false);

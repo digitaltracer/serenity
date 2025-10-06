@@ -28,6 +28,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     importFromLocalStorage: (data: any) => ipcRenderer.invoke('system:import-from-localstorage', data),
     exportAllData: () => ipcRenderer.invoke('system:export-all-data'),
     secureQuery: (queryType: string, params?: any[]) => ipcRenderer.invoke('system:secure-query', queryType, params),
+
+    // Logging operations
+    writeLog: (logEntry: any) => ipcRenderer.invoke('system:write-log', logEntry),
+    getLogs: () => ipcRenderer.invoke('system:get-logs'),
+    clearLogs: () => ipcRenderer.invoke('system:clear-logs'),
   },
 
   // Task operations (business logic)

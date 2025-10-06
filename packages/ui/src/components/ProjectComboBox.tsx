@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '../utils/cn';
 import { ChevronDown, Check, Plus, Folder } from 'lucide-react';
 import { Portal } from './Portal';
+import { logger } from '@serenity/core';
 
 export interface ProjectOption {
   id: string;
@@ -135,17 +136,17 @@ const ProjectComboBox: React.FC<ProjectComboBoxProps> = ({
   const handleCreateProject = () => {
     if (inputValue.trim() && onCreateProject) {
       const projectName = inputValue.trim();
-      console.log('📝 ProjectComboBox: Creating project:', projectName);
-      
+      logger.info('Creating project', { component: 'ProjectComboBox', operation: 'creatingProject', metadata: { projectName } });
+
       const newProjectId = onCreateProject(projectName);
-      console.log('🆔 ProjectComboBox: Received project ID:', newProjectId);
-      
+      logger.info('Received project ID', { component: 'ProjectComboBox', operation: 'receivedProjectId', metadata: { newProjectId } });
+
       // If the onCreateProject callback returns a project ID, auto-select it
       if (newProjectId && onChange) {
-        console.log('✅ ProjectComboBox: Auto-selecting project:', newProjectId, projectName);
+        logger.info('Auto-selecting project', { component: 'ProjectComboBox', operation: 'autoSelectingProject', metadata: { newProjectId, projectName } });
         onChange(newProjectId, projectName);
       } else {
-        console.warn('❌ ProjectComboBox: No project ID returned or no onChange callback');
+        logger.warn('❌ ProjectComboBox: No project ID returned or no onChange callback', { component: 'ProjectComboBox', operation: 'projectcombobox:ProjectReturned' });
       }
       
       setInputValue('');

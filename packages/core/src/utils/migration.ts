@@ -3,6 +3,7 @@
  */
 
 import { Task, Project, JournalEntry } from '../types';
+import { logger } from './logger';
 
 /**
  * Check if there's existing localStorage data that needs migration
@@ -66,7 +67,7 @@ export function clearLocalStorageData(): void {
   // Mark migration as complete
   localStorage.setItem('serenity_migration_complete', 'true');
   
-  console.log('🧹 LocalStorage data cleared after migration');
+  logger.info('🧹 LocalStorage data cleared after migration', { component: 'migration', operation: 'localstorageDataCleared' });
 }
 
 /**
@@ -82,24 +83,24 @@ export function isMigrationComplete(): boolean {
 export async function migrateToSQLite(): Promise<boolean> {
   // Check if we're in Electron environment
   if (typeof window === 'undefined' || !window.electronAPI?.sqlite) {
-    console.warn('⚠️ SQLite not available - skipping migration');
+    logger.warn('⚠️ SQLite not available - skipping migration', { component: 'migration', operation: 'sqliteNotAvailable' });
     return false;
   }
   
   // Check if migration is already complete
   if (isMigrationComplete()) {
-    console.log('✅ Migration already completed');
+    logger.info('✅ Migration already completed', { component: 'migration', operation: 'migrationAlreadyCompleted' });
     return true;
   }
   
   // Check if there's data to migrate
   if (!hasLocalStorageData()) {
-    console.log('📭 No localStorage data to migrate');
+    logger.info('📭 No localStorage data to migrate', { component: 'migration', operation: 'localstorageDataMigrate' });
     localStorage.setItem('serenity_migration_complete', 'true');
     return true;
   }
   
-  console.log('🚀 Starting data migration from localStorage to SQLite...');
+  logger.info('🚀 Starting data migration from localStorage to SQLite...', { component: 'migration', operation: 'startingDataMigration' });
   
   try {
     // Initialize SQLite database
@@ -111,10 +112,10 @@ export async function migrateToSQLite(): Promise<boolean> {
     // Get data from localStorage
     const data = getLocalStorageData();
     
-    console.log(`📊 Migration data summary:
+    logger.info(`📊 Migration data summary:
       - Tasks: ${data.tasks.length}
       - Projects: ${data.projects.length}
-      - Journal Entries: ${data.journalEntries.length}`);
+      - Journal Entries: ${data.journalEntries.length}`, { component: 'migration', operation: 'operation' });
     
     // Migrate data to SQLite
     const migrationResult = await window.electronAPI!.sqlite!.importFromLocalStorage(data);
@@ -125,12 +126,12 @@ export async function migrateToSQLite(): Promise<boolean> {
     
     const { imported, errors } = migrationResult.result;
     
-    console.log(`✅ Migration completed successfully!
+    logger.info(`✅ Migration completed successfully!
       - Items imported: ${imported}
-      - Errors: ${errors.length}`);
+      - Errors: ${errors.length}`, { component: 'migration', operation: 'operation' });
     
     if (errors.length > 0) {
-      console.warn('⚠️ Migration warnings:', errors);
+      logger.warn('⚠️ Migration warnings', { component: 'migration', operation: 'migrationWarnings', metadata: { errors } });
     }
     
     // Clear localStorage data
@@ -138,7 +139,7 @@ export async function migrateToSQLite(): Promise<boolean> {
     
     return true;
   } catch (error) {
-    console.error('❌ Migration failed:', error);
+    logger.error('❌ Migration failed:', { component: 'migration', operation: 'migrationFailed:' }, error as Error);
     return false;
   }
 }
@@ -152,12 +153,12 @@ export async function loadInitialDataFromSQLite(): Promise<{
   journalEntries: JournalEntry[];
 } | null> {
   if (typeof window === 'undefined' || !window.electronAPI?.sqlite) {
-    console.warn('⚠️ SQLite not available - using empty data');
+    logger.warn('⚠️ SQLite not available - using empty data', { component: 'migration', operation: 'sqliteNotAvailable' });
     return null;
   }
   
   try {
-    console.log('📂 Loading initial data from SQLite...');
+    logger.info('📂 Loading initial data from SQLite...', { component: 'migration', operation: 'loadingInitialData' });
     
     const [tasksResult, projectsResult, journalResult] = await Promise.all([
       window.electronAPI!.sqlite!.getTasks(),
@@ -175,14 +176,14 @@ export async function loadInitialDataFromSQLite(): Promise<{
       journalEntries: journalResult.data || [],
     };
     
-    console.log(`📊 Loaded initial data:
+    logger.info(`📊 Loaded initial data:
       - Tasks: ${data.tasks.length}
       - Projects: ${data.projects.length}
-      - Journal Entries: ${data.journalEntries.length}`);
+      - Journal Entries: ${data.journalEntries.length}`, { component: 'migration', operation: 'operation' });
     
     return data;
   } catch (error) {
-    console.error('❌ Failed to load initial data from SQLite:', error);
+    logger.error('❌ Failed to load initial data from SQLite:', { component: 'migration', operation: 'failedLoadInitial' }, error as Error);
     return null;
   }
 }
@@ -205,11 +206,11 @@ export async function createMigrationBackup(): Promise<boolean> {
     
     // Save backup to localStorage with a special key
     localStorage.setItem('serenity_migration_backup', JSON.stringify(backup));
-    console.log('💾 Migration backup created');
+    logger.info('💾 Migration backup created', { component: 'migration', operation: 'migrationBackupCreated' });
     
     return true;
   } catch (error) {
-    console.error('❌ Failed to create migration backup:', error);
+    logger.error('❌ Failed to create migration backup:', { component: 'migration', operation: 'failedCreateMigration' }, error as Error);
     return false;
   }
 }

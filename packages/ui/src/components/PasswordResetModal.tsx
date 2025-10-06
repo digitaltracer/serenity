@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
-import { 
-  AlertTriangle, 
-  Download, 
-  Trash2, 
+import { logger } from '@serenity/core';
+import {
+  AlertTriangle,
+  Download,
+  Trash2,
   RefreshCw,
   Shield,
   Database,
@@ -40,7 +41,7 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
         await onExportData();
         setHasExportedData(true);
       } catch (error) {
-        console.error('Export failed:', error);
+        logger.error('Export failed:', { component: 'PasswordResetModal', operation: 'exportFailed:' }, error as Error);
       } finally {
         setIsProcessing(false);
       }
@@ -53,7 +54,7 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
       await onResetPassword();
       setCurrentStep('complete');
     } catch (error) {
-      console.error('Password reset failed:', error);
+      logger.error('Password reset failed:', { component: 'PasswordResetModal', operation: 'passwordResetFailed:' }, error as Error);
     } finally {
       setIsProcessing(false);
     }
@@ -65,7 +66,7 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
       await onFactoryReset();
       setCurrentStep('complete');
     } catch (error) {
-      console.error('Factory reset failed:', error);
+      logger.error('Factory reset failed:', { component: 'PasswordResetModal', operation: 'factoryResetFailed:' }, error as Error);
     } finally {
       setIsProcessing(false);
     }

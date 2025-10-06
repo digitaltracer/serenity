@@ -4,20 +4,21 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { 
-  Brain, 
-  TrendingUp, 
-  Target, 
-  Clock, 
-  Calendar, 
-  Lightbulb, 
+import {
+  Brain,
+  TrendingUp,
+  Target,
+  Clock,
+  Calendar,
+  Lightbulb,
   ChevronRight,
   Star,
   AlertTriangle,
   CheckCircle,
   Zap
 } from 'lucide-react';
-import { 
+import { logger } from '@serenity/core';
+import {
   AnalyticsUtils,
   Task,
   JournalEntry,
@@ -279,7 +280,7 @@ function generateProductivityInsights(metrics: ProductivityMetrics, tasks: Task[
       category: 'productivity',
       action: {
         label: 'Learn about task breakdown',
-        callback: () => console.log('Open task breakdown guide'),
+        callback: () => logger.info('Open task breakdown guide', { component: 'SmartInsights', operation: 'openTaskBreakdown' }),
       },
     });
   }

@@ -7,130 +7,131 @@
 import { taskService } from './TaskService';
 import { projectService } from './ProjectService';
 import { journalService } from './JournalService';
+import { logger } from '@serenity/core';
 
 export class ApiService {
   // Task operations
   async getTasks() {
-    console.log('🔐 ApiService: Getting tasks through business logic layer');
+    logger.info('🔐 ApiService: Getting tasks through business logic layer', { component: 'ApiService', operation: 'apiservice:GettingTasks' });
     return await taskService.getAllTasks();
   }
 
   async createTask(taskData: any) {
-    console.log('🔐 ApiService: Creating task through business logic layer');
+    logger.info('🔐 ApiService: Creating task through business logic layer', { component: 'ApiService', operation: 'apiservice:CreatingTask' });
     return await taskService.createTask(taskData);
   }
 
   async updateTask(id: string, updates: any) {
-    console.log('🔐 ApiService: Updating task through business logic layer');
+    logger.info('🔐 ApiService: Updating task through business logic layer', { component: 'ApiService', operation: 'apiservice:UpdatingTask' });
     return await taskService.updateTask(id, updates);
   }
 
   async deleteTask(id: string) {
-    console.log('🔐 ApiService: Deleting task through business logic layer');
+    logger.info('🔐 ApiService: Deleting task through business logic layer', { component: 'ApiService', operation: 'apiservice:DeletingTask' });
     return await taskService.deleteTask(id);
   }
 
   async completeTask(id: string) {
-    console.log('🔐 ApiService: Completing task through business logic layer');
+    logger.info('🔐 ApiService: Completing task through business logic layer', { component: 'ApiService', operation: 'apiservice:CompletingTask' });
     return await taskService.completeTask(id);
   }
 
   async bulkUpdateTasks(taskIds: string[], updates: any) {
-    console.log('🔐 ApiService: Bulk updating tasks through business logic layer');
+    logger.info('🔐 ApiService: Bulk updating tasks through business logic layer', { component: 'ApiService', operation: 'apiservice:BulkUpdating' });
     return await taskService.bulkUpdateTasks(taskIds, updates);
   }
 
   // Project operations
   async getProjects() {
-    console.log('🔐 ApiService: Getting projects through business logic layer');
+    logger.info('🔐 ApiService: Getting projects through business logic layer', { component: 'ApiService', operation: 'apiservice:GettingProjects' });
     return await projectService.getAllProjects();
   }
 
   async getProject(id: string) {
-    console.log('🔐 ApiService: Getting project through business logic layer');
+    logger.info('🔐 ApiService: Getting project through business logic layer', { component: 'ApiService', operation: 'apiservice:GettingProject' });
     return await projectService.getProject(id);
   }
 
   async createProject(projectData: any) {
-    console.log('🔐 ApiService: Creating project through business logic layer');
+    logger.info('🔐 ApiService: Creating project through business logic layer', { component: 'ApiService', operation: 'apiservice:CreatingProject' });
     return await projectService.createProject(projectData);
   }
 
   async updateProject(id: string, updates: any) {
-    console.log('🔐 ApiService: Updating project through business logic layer');
+    logger.info('🔐 ApiService: Updating project through business logic layer', { component: 'ApiService', operation: 'apiservice:UpdatingProject' });
     return await projectService.updateProject(id, updates);
   }
 
   async deleteProject(id: string) {
-    console.log('🔐 ApiService: Deleting project through business logic layer');
+    logger.info('🔐 ApiService: Deleting project through business logic layer', { component: 'ApiService', operation: 'apiservice:DeletingProject' });
     return await projectService.deleteProject(id);
   }
 
   async archiveProject(id: string) {
-    console.log('🔐 ApiService: Archiving project through business logic layer');
+    logger.info('🔐 ApiService: Archiving project through business logic layer', { component: 'ApiService', operation: 'apiservice:ArchivingProject' });
     return await projectService.archiveProject(id);
   }
 
   async unarchiveProject(id: string) {
-    console.log('🔐 ApiService: Unarchiving project through business logic layer');
+    logger.info('🔐 ApiService: Unarchiving project through business logic layer', { component: 'ApiService', operation: 'apiservice:UnarchivingProject' });
     return await projectService.unarchiveProject(id);
   }
 
   async getProjectStats(id: string) {
-    console.log('🔐 ApiService: Getting project statistics through business logic layer');
+    logger.info('🔐 ApiService: Getting project statistics through business logic layer', { component: 'ApiService', operation: 'apiservice:GettingProject' });
     return await projectService.getProjectStats(id);
   }
 
   // Journal operations
   async getJournalEntries() {
-    console.log('🔐 ApiService: Getting journal entries through business logic layer');
+    logger.info('🔐 ApiService: Getting journal entries through business logic layer', { component: 'ApiService', operation: 'apiservice:GettingJournal' });
     return await journalService.getAllJournalEntries();
   }
 
   async createJournalEntry(entryData: any) {
-    console.log('🔐 ApiService: Creating journal entry through business logic layer');
+    logger.info('🔐 ApiService: Creating journal entry through business logic layer', { component: 'ApiService', operation: 'apiservice:CreatingJournal' });
     return await journalService.createJournalEntry(entryData);
   }
 
   async updateJournalEntry(id: string, updates: any) {
-    console.log('🔐 ApiService: Updating journal entry through business logic layer');
+    logger.info('🔐 ApiService: Updating journal entry through business logic layer', { component: 'ApiService', operation: 'apiservice:UpdatingJournal' });
     return await journalService.updateJournalEntry(id, updates);
   }
 
   async deleteJournalEntry(id: string) {
-    console.log('🔐 ApiService: Deleting journal entry through business logic layer');
+    logger.info('🔐 ApiService: Deleting journal entry through business logic layer', { component: 'ApiService', operation: 'apiservice:DeletingJournal' });
     return await journalService.deleteJournalEntry(id);
   }
 
   async pinJournalEntry(id: string) {
-    console.log('🔐 ApiService: Pinning journal entry through business logic layer');
+    logger.info('🔐 ApiService: Pinning journal entry through business logic layer', { component: 'ApiService', operation: 'apiservice:PinningJournal' });
     return await journalService.pinJournalEntry(id);
   }
 
   async unpinJournalEntry(id: string) {
-    console.log('🔐 ApiService: Unpinning journal entry through business logic layer');
+    logger.info('🔐 ApiService: Unpinning journal entry through business logic layer', { component: 'ApiService', operation: 'apiservice:UnpinningJournal' });
     return await journalService.unpinJournalEntry(id);
   }
 
   async getJournalEntriesByDateRange(startDate: string, endDate: string) {
-    console.log('🔐 ApiService: Getting journal entries by date range through business logic layer');
+    logger.info('🔐 ApiService: Getting journal entries by date range through business logic layer', { component: 'ApiService', operation: 'apiservice:GettingJournal' });
     return await journalService.getJournalEntriesByDateRange(startDate, endDate);
   }
 
   async getJournalStats() {
-    console.log('🔐 ApiService: Getting journal statistics through business logic layer');
+    logger.info('🔐 ApiService: Getting journal statistics through business logic layer', { component: 'ApiService', operation: 'apiservice:GettingJournal' });
     return await journalService.getJournalStats();
   }
 
   // Database management operations (still needed for system-level operations)
   async initializeDatabase() {
     try {
-      console.log('🔐 ApiService: Initializing database');
+      logger.info('🔐 ApiService: Initializing database', { component: 'ApiService', operation: 'apiservice:InitializingDatabase' });
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
       return { success: true, error: null };
     } catch (error) {
-      console.error('❌ ApiService: Database initialization failed:', error);
+      logger.error('❌ ApiService: Database initialization failed:', { component: 'ApiService', operation: 'apiservice:DatabaseInitialization' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Database initialization failed' 
@@ -140,13 +141,13 @@ export class ApiService {
 
   async testDatabaseConnection() {
     try {
-      console.log('🔐 ApiService: Testing database connection');
+      logger.info('🔐 ApiService: Testing database connection', { component: 'ApiService', operation: 'apiservice:TestingDatabase' });
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
       const isConnected = await sqliteService.testConnection();
       return { success: isConnected, error: isConnected ? null : 'Connection failed' };
     } catch (error) {
-      console.error('❌ ApiService: Database connection test failed:', error);
+      logger.error('❌ ApiService: Database connection test failed:', { component: 'ApiService', operation: 'apiservice:DatabaseConnection' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Connection test failed' 
@@ -156,13 +157,13 @@ export class ApiService {
 
   async getDatabaseStats() {
     try {
-      console.log('🔐 ApiService: Getting database statistics');
+      logger.info('🔐 ApiService: Getting database statistics', { component: 'ApiService', operation: 'apiservice:GettingDatabase' });
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
       const stats = sqliteService.getStatistics();
       return { success: true, data: stats, error: null };
     } catch (error) {
-      console.error('❌ ApiService: Failed to get database statistics:', error);
+      logger.error('❌ ApiService: Failed to get database statistics:', { component: 'ApiService', operation: 'apiservice:FailedGet' }, error as Error);
       return { 
         success: false, 
         data: null, 
@@ -173,13 +174,13 @@ export class ApiService {
 
   async backupDatabase(backupPath?: string) {
     try {
-      console.log('🔐 ApiService: Creating database backup');
+      logger.info('🔐 ApiService: Creating database backup', { component: 'ApiService', operation: 'apiservice:CreatingDatabase' });
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
       const path = await sqliteService.backup(backupPath);
       return { success: true, path, error: null };
     } catch (error) {
-      console.error('❌ ApiService: Database backup failed:', error);
+      logger.error('❌ ApiService: Database backup failed:', { component: 'ApiService', operation: 'apiservice:DatabaseBackup' }, error as Error);
       return { 
         success: false, 
         path: null, 
@@ -190,13 +191,13 @@ export class ApiService {
 
   async exportAllData() {
     try {
-      console.log('🔐 ApiService: Exporting all data');
+      logger.info('🔐 ApiService: Exporting all data', { component: 'ApiService', operation: 'apiservice:ExportingAll' });
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
       const data = await sqliteService.exportAllData();
       return { success: true, data, error: null };
     } catch (error) {
-      console.error('❌ ApiService: Data export failed:', error);
+      logger.error('❌ ApiService: Data export failed:', { component: 'ApiService', operation: 'apiservice:DataExport' }, error as Error);
       return { 
         success: false, 
         data: null, 
@@ -207,7 +208,7 @@ export class ApiService {
 
   async importFromLocalStorage(data: any) {
     try {
-      console.log('🔐 ApiService: Importing data from localStorage');
+      logger.info('🔐 ApiService: Importing data from localStorage', { component: 'ApiService', operation: 'apiservice:ImportingData' });
       
       // Business logic: Validate import data structure
       if (!data || typeof data !== 'object') {
@@ -219,7 +220,7 @@ export class ApiService {
       const result = await sqliteService.importFromLocalStorage(data);
       return { success: true, result, error: null };
     } catch (error) {
-      console.error('❌ ApiService: Data import failed:', error);
+      logger.error('❌ ApiService: Data import failed:', { component: 'ApiService', operation: 'apiservice:DataImport' }, error as Error);
       return { 
         success: false, 
         result: null, 
@@ -231,7 +232,7 @@ export class ApiService {
   // Analytics and insights operations
   async getProductivityInsights() {
     try {
-      console.log('🔐 ApiService: Getting productivity insights');
+      logger.info('🔐 ApiService: Getting productivity insights', { component: 'ApiService', operation: 'apiservice:GettingProductivity' });
       
       // Combine data from multiple services for comprehensive insights
       const [tasksResult, projectsResult, journalResult] = await Promise.all([
@@ -287,7 +288,7 @@ export class ApiService {
       
       return { success: true, data: insights };
     } catch (error) {
-      console.error('❌ ApiService: Failed to get productivity insights:', error);
+      logger.error('❌ ApiService: Failed to get productivity insights:', { component: 'ApiService', operation: 'apiservice:FailedGet' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to get insights' 

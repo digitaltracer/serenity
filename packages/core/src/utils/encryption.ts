@@ -4,6 +4,7 @@
  */
 
 import { ErrorHandler, throwEncryptionError } from './errorHandler';
+import { logger } from './logger';
 
 export interface EncryptedData {
   data: string; // Base64 encoded encrypted data
@@ -545,7 +546,7 @@ export class KeyRotationManager {
     // Clean up old versions if needed
     await this.cleanupOldVersions();
     
-    console.log(`🔄 Key rotated to version ${newVersion}`);
+    logger.info(`🔄 Key rotated to version ${newVersion}`, { component: 'encryption', operation: 'keyRotatedVersion' });
     return newVersion;
   }
 
@@ -570,7 +571,7 @@ export class KeyRotationManager {
     const versionsToRemove = versions.slice(versionsToKeep);
     versionsToRemove.forEach(version => {
       if (version !== this.currentVersion) {
-        console.log(`🗑️ Removing old key version ${version}`);
+        logger.info(`🗑️ Removing old key version ${version}`, { component: 'encryption', operation: '🗑️RemovingOld' });
         this.keyVersions.delete(version);
       }
     });
@@ -608,7 +609,7 @@ export class KeyRotationManager {
     }
     
     if (versionInfo.status === 'expired') {
-      console.warn(`⚠️ Decrypting with expired key version ${keyVersion}`);
+      logger.warn(`⚠️ Decrypting with expired key version ${keyVersion}`, { component: 'encryption', operation: 'decryptingWithExpired' });
     }
     
     return EncryptionService.decrypt(encryptedData, password, classification);
@@ -648,9 +649,9 @@ export class KeyRotationManager {
         try {
           const reencrypted = await this.reencryptData(item.data, password, item.classification);
           results.push(reencrypted);
-          console.log(`🔄 Re-encrypted item ${i + 1}/${total} to version ${this.currentVersion}`);
+          logger.info(`🔄 Re-encrypted item ${i + 1}/${total} to version ${this.currentVersion}`, { component: 'encryption', operation: 're-encryptedItem${i' });
         } catch (error) {
-          console.error(`❌ Failed to re-encrypt item ${i + 1}:`, error);
+          logger.error(`❌ Failed to re-encrypt item ${i + 1}:`, { component: 'encryption', operation: 'failedRe-encryptItem' }, error as Error);
           // Keep original if re-encryption fails
           results.push(item.data);
         }

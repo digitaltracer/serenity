@@ -49,13 +49,14 @@ import {
   GlobalSearchModal,
   PageTransition
 } from '@serenity/ui';
-import { 
+import { logger } from '@serenity/core';
+import {
   Home,
-  CheckSquare, 
-  Calendar, 
-  BookOpen, 
-  BarChart3, 
-  Settings, 
+  CheckSquare,
+  Calendar,
+  BookOpen,
+  BarChart3,
+  Settings,
   Plus,
   Menu,
   ListChecks,
@@ -136,7 +137,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const handleArchiveTask = (taskId: string) => {
     // For now, we'll implement archive as setting a special tag or status
     // This can be expanded later with a proper archive field
-    console.log('Archive task:', taskId);
+    logger.info('Archive task:', taskId, { component: 'Layout', operation: 'archiveTask:' });
     // TODO: Implement proper archiving when archive field is added to Task interface
   };
 

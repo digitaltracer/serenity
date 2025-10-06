@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { logger } from '@serenity/core';
 
 export interface AIInsightRow {
   id: string;
@@ -101,14 +102,14 @@ export class SQLiteAIQueries {
         // Check for duplicates
         const duplicateCheck = checkDuplicateStmt.get(r.provider, r.operation, Math.floor(r.totalTokens||0)) as { count: number };
         if (duplicateCheck.count > 0) {
-          console.log(`🚫 Skipping duplicate AI usage entry: ${r.provider}/${r.operation}/${r.totalTokens} tokens`);
+          logger.info(`🚫 Skipping duplicate AI usage entry: ${r.provider}/${r.operation}/${r.totalTokens} tokens`, { component: 'ai', operation: 'skippingDuplicateUsage' });
           continue;
         }
 
         const id = `usage_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const ts = r.timestamp || new Date().toISOString();
         stmt.run(id, ts, r.provider, r.operation, Math.floor(r.promptTokens||0), Math.floor(r.completionTokens||0), Math.floor(r.totalTokens||0));
-        console.log(`✅ Saved AI usage entry: ${r.provider}/${r.operation}/${r.totalTokens} tokens`);
+        logger.info(`✅ Saved AI usage entry: ${r.provider}/${r.operation}/${r.totalTokens} tokens`, { component: 'ai', operation: 'savedUsageEntry:' });
       }
     });
     insertMany(entries);

@@ -31,7 +31,8 @@ import {
   useGlobalKeyboardShortcuts,
   useShortcutActions,
   KeyboardShortcut,
-  ShortcutCategory
+  ShortcutCategory,
+  logger
 } from '@serenity/core';
 import {
   KeyboardShortcutsHelp,
@@ -58,7 +59,7 @@ export const KeyboardShortcutsProvider: React.FC<KeyboardShortcutsProviderProps>
   // Enhanced shortcut handler with navigation support
   const handleShortcut = useCallback(async (shortcut: KeyboardShortcut, event: KeyboardEvent) => {
     const { action } = shortcut;
-    console.log('🎹 Keyboard shortcut triggered:', action, shortcut.key, shortcut.modifiers);
+    logger.info('🎹 Keyboard shortcut triggered:', action, shortcut.key, shortcut.modifiers, { component: 'KeyboardShortcutsProvider', operation: 'keyboardShortcutTriggered:' });
     
     switch (action) {
       // General actions
@@ -76,7 +77,7 @@ export const KeyboardShortcutsProvider: React.FC<KeyboardShortcutsProviderProps>
         
       case 'OPEN_COMMAND_PALETTE':
         // TODO: Implement command palette
-        console.log('Command palette not yet implemented');
+        logger.info('Command palette not yet implemented', { component: 'KeyboardShortcutsProvider', operation: 'commandPaletteNot' });
         break;
         
       // Navigation actions
@@ -131,14 +132,14 @@ export const KeyboardShortcutsProvider: React.FC<KeyboardShortcutsProviderProps>
       case 'EDIT_SELECTED_TASK':
       case 'DUPLICATE_SELECTED_TASK':
         // These would be handled by page-specific components
-        console.log(`Task action: ${action} - handled by page context`);
+        logger.info(`Task action: ${action} - handled by page context`, { component: 'KeyboardShortcutsProvider', operation: 'taskAction:${action}' });
         break;
         
       // Selection actions
       case 'SELECT_ALL':
       case 'SELECT_NONE':
         // These would be handled by page-specific components
-        console.log(`Selection action: ${action} - handled by page context`);
+        logger.info(`Selection action: ${action} - handled by page context`, { component: 'KeyboardShortcutsProvider', operation: 'selectionAction:${action}' });
         break;
         
       // Search actions
@@ -152,7 +153,7 @@ export const KeyboardShortcutsProvider: React.FC<KeyboardShortcutsProviderProps>
         break;
         
       default:
-        console.warn(`Unhandled keyboard shortcut action: ${action}`);
+        logger.warn(`Unhandled keyboard shortcut action: ${action}`, { component: 'KeyboardShortcutsProvider', operation: 'unhandledKeyboardShortcut' });
     }
   }, [dispatch, navigate]);
 
@@ -161,37 +162,37 @@ export const KeyboardShortcutsProvider: React.FC<KeyboardShortcutsProviderProps>
   
   // Debug: Log shortcuts state
   React.useEffect(() => {
-    console.log('🎹 Keyboard shortcuts state:', {
+    logger.info('🎹 Keyboard shortcuts state:', {
       totalShortcuts: shortcuts.length,
       enabledShortcuts: shortcuts.filter(s => s.enabled).length,
       globalShortcuts: shortcuts.filter(s => s.isGlobal).length,
       shortcutsEnabled
-    });
+    }, { component: 'KeyboardShortcutsProvider', operation: 'keyboardShortcutsState:' });
     
     // Debug: Log first few shortcuts to see their structure
-    console.log('🔍 First 5 shortcuts:', shortcuts.slice(0, 5).map(s => ({
+    logger.info('🔍 First 5 shortcuts:', shortcuts.slice(0, 5).map(s => ({
       id: s.id,
       key: s.key,
       isGlobal: s.isGlobal,
       enabled: s.enabled,
       action: s.action,
       modifiers: s.modifiers
-    })));
+    })), { component: 'KeyboardShortcutsProvider', operation: 'firstShortcuts:' });
     
     // Debug: Log all global shortcuts specifically
     const globalOnes = shortcuts.filter(s => s.isGlobal);
-    console.log('🌍 All global shortcuts:', globalOnes.map(s => ({
+    logger.info('🌍 All global shortcuts:', globalOnes.map(s => ({
       id: s.id,
       key: s.key,
       isGlobal: s.isGlobal,
       action: s.action
-    })));
+    })), { component: 'KeyboardShortcutsProvider', operation: 'allGlobalShortcuts:' });
     
     // Debug: Check if DEFAULT_SHORTCUTS is being used correctly
-    console.log('📋 Checking DEFAULT_SHORTCUTS import...');
+    logger.info('📋 Checking DEFAULT_SHORTCUTS import...', { component: 'KeyboardShortcutsProvider', operation: 'checkingDefault_shortcutsImport...' });
     import('@serenity/core').then(core => {
       const { DEFAULT_SHORTCUTS } = core;
-      console.log('📦 DEFAULT_SHORTCUTS from core:', {
+      logger.info('📦 DEFAULT_SHORTCUTS from core:', {
         total: DEFAULT_SHORTCUTS?.length || 0,
         globalCount: DEFAULT_SHORTCUTS?.filter(s => s.isGlobal)?.length || 0,
         firstFive: DEFAULT_SHORTCUTS?.slice(0, 5)?.map(s => ({
@@ -199,7 +200,7 @@ export const KeyboardShortcutsProvider: React.FC<KeyboardShortcutsProviderProps>
           isGlobal: s.isGlobal,
           key: s.key
         })) || []
-      });
+      }, { component: 'KeyboardShortcutsProvider', operation: 'default_shortcutsFromCore:' });
     });
   }, [shortcuts, shortcutsEnabled]);
 

@@ -3,17 +3,132 @@
  * Handles database management, analytics, and system operations
  */
 
-import { ipcMain } from 'electron';
+import { ipcMain, app } from 'electron';
 import { z } from 'zod';
 import { apiService } from '../services/ApiService';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { logger } from '@serenity/core';
+
+// Log file management with rotation
+const MAX_LOG_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_LOG_FILES = 5; // Keep 5 rotated log files
+
+async function writeLogToFile(logEntry: any): Promise<void> {
+  const logsDir = path.join(app.getPath('userData'), 'logs');
+  const currentLogFile = path.join(logsDir, 'serenity.log');
+
+  try {
+    // Ensure logs directory exists
+    await fs.mkdir(logsDir, { recursive: true });
+
+    // Check if log rotation is needed
+    try {
+      const stats = await fs.stat(currentLogFile);
+      if (stats.size > MAX_LOG_FILE_SIZE) {
+        await rotateLogFiles(logsDir);
+      }
+    } catch {
+      // File doesn't exist yet, will be created
+    }
+
+    // Format log entry for file
+    const logLine = `[${logEntry.timestamp}] ${logEntry.level} ${logEntry.context?.component || ''}:${logEntry.context?.operation || ''} - ${logEntry.message}`;
+    const errorDetails = logEntry.error ? `\n  Error: ${logEntry.error.name}: ${logEntry.error.message}\n  Stack: ${logEntry.error.stack || 'N/A'}` : '';
+    const fullLogLine = logLine + errorDetails + '\n';
+
+    // Append to log file
+    await fs.appendFile(currentLogFile, fullLogLine, 'utf8');
+  } catch (error) {
+    // Silently fail - don't want logging to crash the app
+    logger.error('Failed to write log to file:', { component: 'systemHandlers', operation: 'failedWriteLog' }, error as Error);
+  }
+}
+
+async function rotateLogFiles(logsDir: string): Promise<void> {
+  try {
+    // Rotate existing log files
+    for (let i = MAX_LOG_FILES - 1; i >= 1; i--) {
+      const oldFile = path.join(logsDir, `serenity.log.${i}`);
+      const newFile = path.join(logsDir, `serenity.log.${i + 1}`);
+
+      try {
+        await fs.rename(oldFile, newFile);
+      } catch {
+        // File doesn't exist, skip
+      }
+    }
+
+    // Move current log to .1
+    const currentLog = path.join(logsDir, 'serenity.log');
+    const rotatedLog = path.join(logsDir, 'serenity.log.1');
+
+    try {
+      await fs.rename(currentLog, rotatedLog);
+    } catch {
+      // File doesn't exist, skip
+    }
+
+    // Delete oldest log if it exceeds MAX_LOG_FILES
+    const oldestLog = path.join(logsDir, `serenity.log.${MAX_LOG_FILES + 1}`);
+    try {
+      await fs.unlink(oldestLog);
+    } catch {
+      // File doesn't exist, skip
+    }
+  } catch (error) {
+    logger.error('Failed to rotate log files:', { component: 'systemHandlers', operation: 'failedRotateLog' }, error as Error);
+  }
+}
 
 export function registerSystemHandlers(): void {
-  console.log('🔧 Registering system IPC handlers...');
+  logger.info('🔧 Registering system IPC handlers...', { component: 'systemHandlers', operation: 'registeringSystemIpc' });
+
+  // Log file writing with rotation
+  ipcMain.handle('system:write-log', async (_, logEntry) => {
+    try {
+      await writeLogToFile(logEntry);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to write log' };
+    }
+  });
+
+  // Get log files for debugging
+  ipcMain.handle('system:get-logs', async () => {
+    try {
+      const logsDir = path.join(app.getPath('userData'), 'logs');
+      const currentLogFile = path.join(logsDir, 'serenity.log');
+
+      const content = await fs.readFile(currentLogFile, 'utf8');
+      return { success: true, data: content };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to read logs' };
+    }
+  });
+
+  // Clear log files
+  ipcMain.handle('system:clear-logs', async () => {
+    try {
+      const logsDir = path.join(app.getPath('userData'), 'logs');
+      const files = await fs.readdir(logsDir);
+
+      for (const file of files) {
+        if (file.startsWith('serenity.log')) {
+          await fs.unlink(path.join(logsDir, file));
+        }
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to clear logs' };
+    }
+  });
 
   // System management operations
   ipcMain.handle('system:initialize', async () => {
     try {
-      console.log('🔐 Initializing system through business layer...');
+      logger.info('🔐 Initializing system through business layer...', { component: 'systemHandlers', operation: 'initializingSystemThrough' });
       return await apiService.initializeDatabase();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to initialize system';
@@ -23,7 +138,7 @@ export function registerSystemHandlers(): void {
 
   ipcMain.handle('system:test-connection', async () => {
     try {
-      console.log('🔐 Testing connection through business layer...');
+      logger.info('🔐 Testing connection through business layer...', { component: 'systemHandlers', operation: 'testingConnectionThrough' });
       return await apiService.testDatabaseConnection();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Connection test failed';
@@ -33,7 +148,7 @@ export function registerSystemHandlers(): void {
 
   ipcMain.handle('system:test-persistence', async () => {
     try {
-      console.log('🧪 Testing persistence through business layer...');
+      logger.info('🧪 Testing persistence through business layer...', { component: 'systemHandlers', operation: 'testingPersistenceThrough' });
       
       // Create a test task through business logic
       const testTask = {
@@ -45,17 +160,17 @@ export function registerSystemHandlers(): void {
         dueDate: new Date()
       };
 
-      console.log('📝 Creating test task through business layer:', testTask);
+      logger.info('📝 Creating test task through business layer:', {  component: 'systemHandlers', operation: 'creatingTestTask' , metadata: { value: testTask } });
       const createResult = await apiService.createTask(testTask);
       
       if (!createResult.success) {
         return { success: false, error: createResult.error };
       }
       
-      console.log('✅ Task created through business layer:', createResult.data.id);
+      logger.info(`✅ Task created through business layer: ${createResult.data.id}`, { component: 'systemHandlers', operation: 'taskCreatedThrough' });
 
       // Retrieve all tasks through business logic
-      console.log('📂 Retrieving all tasks through business layer...');
+      logger.info('📂 Retrieving all tasks through business layer...', { component: 'systemHandlers', operation: 'retrievingAllTasks' });
       const tasksResult = await apiService.getTasks();
       
       if (!tasksResult.success) {
@@ -63,14 +178,14 @@ export function registerSystemHandlers(): void {
       }
       
       const allTasks = tasksResult.data || [];
-      console.log('📊 TOTAL TASKS:', allTasks.length);
-      console.log('📋 TASKS RETRIEVED THROUGH BUSINESS LAYER:');
+      logger.info(`📊 TOTAL TASKS: ${allTasks.length}`, { component: 'systemHandlers', operation: 'totalTasks:' });
+      logger.info('📋 TASKS RETRIEVED THROUGH BUSINESS LAYER:', { component: 'systemHandlers', operation: 'tasksRetrievedThrough' });
       allTasks.forEach((task: any, index: number) => {
-        console.log(`  ${index + 1}. ${task.title} (ID: ${task.id})`);
-        console.log(`     Description: ${task.description}`);
-        console.log(`     Priority: ${task.priority}, Completed: ${task.completed}`);
-        console.log(`     Created: ${task.createdAt}`);
-        console.log('     ---');
+        logger.info(`  ${index + 1}. ${task.title} (ID: ${task.id})`, { component: 'systemHandlers', operation: '${index1}.${task.title}' });
+        logger.info(`     Description: ${task.description}`, { component: 'systemHandlers', operation: 'description:${task.description}' });
+        logger.info(`     Priority: ${task.priority}, Completed: ${task.completed}`, { component: 'systemHandlers', operation: 'operation' });
+        logger.info(`     Created: ${task.createdAt}`, { component: 'systemHandlers', operation: 'created' });
+        logger.info('     ---', { component: 'systemHandlers', operation: 'separator' });
       });
 
       return { 
@@ -80,7 +195,7 @@ export function registerSystemHandlers(): void {
         totalTasks: allTasks.length 
       };
     } catch (error) {
-      console.error('❌ Business logic test failed:', error);
+      logger.error('❌ Business logic test failed:', { component: 'systemHandlers', operation: 'businessLogicTest' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
@@ -91,7 +206,7 @@ export function registerSystemHandlers(): void {
   // System verification through business logic layer
   ipcMain.handle('system:verify-data-loading', async () => {
     try {
-      console.log('🔍 VERIFYING DATA LOADING THROUGH BUSINESS LAYER...');
+      logger.info('🔍 VERIFYING DATA LOADING THROUGH BUSINESS LAYER...', { component: 'systemHandlers', operation: 'verifyingDataLoading' });
       
       const [tasksResult, projectsResult, journalResult] = await Promise.all([
         apiService.getTasks(),
@@ -107,10 +222,10 @@ export function registerSystemHandlers(): void {
       const projectsData = projectsResult.data || [];
       const journalData = journalResult.data || [];
       
-      console.log('📊 VERIFICATION RESULTS:');
-      console.log(`  - Tasks: ${tasksData.length}`);
-      console.log(`  - Projects: ${projectsData.length}`);
-      console.log(`  - Journal entries: ${journalData.length}`);
+      logger.info('📊 VERIFICATION RESULTS:', { component: 'systemHandlers', operation: 'verificationResults:' });
+      logger.info(`  - Tasks: ${tasksData.length}`, { component: 'systemHandlers', operation: 'tasks:${tasksdata.length}' });
+      logger.info(`  - Projects: ${projectsData.length}`, { component: 'systemHandlers', operation: 'projects:${projectsdata.length}' });
+      logger.info(`  - Journal entries: ${journalData.length}`, { component: 'systemHandlers', operation: 'journalEntries:${journaldata.length}' });
 
       return { 
         success: true, 
@@ -124,7 +239,7 @@ export function registerSystemHandlers(): void {
         }
       };
     } catch (error) {
-      console.error('❌ Data loading verification failed:', error);
+      logger.error('❌ Data loading verification failed:', { component: 'systemHandlers', operation: 'dataLoadingVerification' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
@@ -134,7 +249,7 @@ export function registerSystemHandlers(): void {
 
   ipcMain.handle('system:get-stats', async () => {
     try {
-      console.log('🔐 Getting system statistics through business layer...');
+      logger.info('🔐 Getting system statistics through business layer...', { component: 'systemHandlers', operation: 'gettingSystemStatistics' });
       return await apiService.getDatabaseStats();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get statistics';
@@ -147,7 +262,7 @@ export function registerSystemHandlers(): void {
       if (backupPath !== undefined && typeof backupPath !== 'string') {
         return { success: false, path: null, error: 'Invalid backup path' };
       }
-      console.log('🔐 Creating backup through business layer...');
+      logger.info('🔐 Creating backup through business layer...', { component: 'systemHandlers', operation: 'creatingBackupThrough' });
       return await apiService.backupDatabase(backupPath);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Backup failed';
@@ -160,7 +275,7 @@ export function registerSystemHandlers(): void {
       if (typeof data !== 'object' || data === null) {
         return { success: false, result: null, error: 'Invalid import data' };
       }
-      console.log('🔐 Importing data through business layer...');
+      logger.info('🔐 Importing data through business layer...', { component: 'systemHandlers', operation: 'importingDataThrough' });
       return await apiService.importFromLocalStorage(data);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Import failed';
@@ -170,7 +285,7 @@ export function registerSystemHandlers(): void {
 
   ipcMain.handle('system:export-all-data', async () => {
     try {
-      console.log('🔐 Exporting data through business layer...');
+      logger.info('🔐 Exporting data through business layer...', { component: 'systemHandlers', operation: 'exportingDataThrough' });
       return await apiService.exportAllData();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Export failed';
@@ -182,7 +297,7 @@ export function registerSystemHandlers(): void {
   // SECURITY: This is restricted to predefined safe queries only
   ipcMain.handle('system:secure-query', async (_, queryType: string, params?: any[]) => {
     try {
-      console.log('🔐 Executing secure system query through business layer:', queryType);
+      logger.info('🔐 Executing secure system query through business layer:', {  component: 'systemHandlers', operation: 'executingSecureSystem' , metadata: { value: queryType } });
       
       // Only allow predefined secure queries
       const allowedQueries = {
@@ -244,7 +359,7 @@ export function registerSystemHandlers(): void {
       
       return { success: true, data: result, error: null };
     } catch (error) {
-      console.error('❌ Secure query execution failed:', error);
+      logger.error('❌ Secure query execution failed:', { component: 'systemHandlers', operation: 'secureQueryExecution' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Query execution failed';
       return { success: false, data: null, error: errorMessage };
     }
@@ -253,7 +368,7 @@ export function registerSystemHandlers(): void {
   // Analytics and insights through business logic
   ipcMain.handle('analytics:get-productivity-insights', async () => {
     try {
-      console.log('🔐 Getting productivity insights through business layer...');
+      logger.info('🔐 Getting productivity insights through business layer...', { component: 'systemHandlers', operation: 'gettingProductivityInsights' });
       return await apiService.getProductivityInsights();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get productivity insights';
@@ -261,5 +376,5 @@ export function registerSystemHandlers(): void {
     }
   });
 
-  console.log('✅ System IPC handlers registered');
+  logger.info('✅ System IPC handlers registered', { component: 'systemHandlers', operation: 'systemIpcHandlers' });
 }

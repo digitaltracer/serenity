@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useDispatch } from 'react-redux';
+import { logger } from '@serenity/core';
 import {
   addTask,
   addProject,
@@ -54,7 +55,7 @@ export const useSyncNow = ({
           });
           dispatch(updateGoogleCalendarLastSync(new Date().toISOString()));
         } catch (error) {
-          console.error('Google Calendar sync failed:', error);
+          logger.error('Google Calendar sync failed:', { component: 'useSyncNow', operation: 'googleCalendarSync' }, error);
         }
       }
 
@@ -132,7 +133,7 @@ export const useSyncNow = ({
             dispatch(updateGitHubLastSync(new Date().toISOString()));
           }
         } catch (error) {
-          console.error('GitHub multi-token sync failed:', error);
+          logger.error('GitHub multi-token sync failed:', { component: 'useSyncNow', operation: 'githubMulti-tokenSync' }, error);
         }
       }
 
@@ -143,7 +144,7 @@ export const useSyncNow = ({
         try {
           await (dispatch as any)(persistIntegrationsState(sessionMasterPassword));
         } catch (error) {
-          console.warn('Failed to persist integration timestamps:', error);
+          logger.warn('Failed to persist integration timestamps:', error, { component: 'useSyncNow', operation: 'failedPersistIntegration' });
         }
       }
 

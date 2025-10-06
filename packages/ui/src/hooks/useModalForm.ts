@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { logger } from '@serenity/core';
 
 export interface ModalFormHookProps<T> {
   isOpen: boolean;
@@ -61,7 +62,7 @@ export function useModalForm<T extends Record<string, any>>({
       await onSubmit(formData);
       onClose();
     } catch (error) {
-      console.error('Form submission error:', error);
+      logger.error('Form submission error:', { component: 'useModalForm', operation: 'formSubmissionError:' }, error as Error);
       // Keep modal open on error
     } finally {
       setIsSubmitting(false);

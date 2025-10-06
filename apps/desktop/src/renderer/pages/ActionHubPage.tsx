@@ -4,6 +4,7 @@ import { RootState, selectCompactMode } from '@serenity/core';
 import { addTask, toggleTask, deleteTask, updateTask, addProject, deleteProject, updateGoalsProgress, selectAllEntries, selectAllProjects, addUsedTags, generateId, addSubtask, toggleSubtask, selectPaginatedTasks, selectTasksPagination, loadMoreTasks, resetPagination, setPaginationHasMore } from '@serenity/core';
 import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, ProjectComboBox, TagInput, DatePicker, Textarea, cn, DraggableTaskCard, SelectableItem, BulkOperationsToolbar, BulkActionsButton } from '@serenity/ui';
 import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List, Trash2 } from 'lucide-react';
+import { logger } from '@serenity/core';
 
 export const ActionHubPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -142,7 +143,7 @@ export const ActionHubPage: React.FC = () => {
   };
 
   const handleCreateProjectFromCombo = (projectName: string): string => {
-    console.log('🚀 ActionHub: handleCreateProjectFromCombo called with:', projectName);
+    logger.info('🚀 ActionHub: handleCreateProjectFromCombo called with:', projectName, { component: 'ActionHubPage', operation: 'actionhub:HandlecreateprojectfromcomboCalled' });
     
     // Generate the ID ourselves before dispatching
     const newProjectId = generateId();
@@ -157,12 +158,12 @@ export const ActionHubPage: React.FC = () => {
       updatedAt: new Date(),
     };
     
-    console.log('🎯 ActionHub: Creating project with pre-generated ID:', newProjectId);
+    logger.info('🎯 ActionHub: Creating project with pre-generated ID:', newProjectId, { component: 'ActionHubPage', operation: 'actionhub:CreatingProject' });
     
     // Use the regular addProject action with pre-generated data
     dispatch(addProject(projectData));
     
-    console.log('✅ ActionHub: Returning project ID for auto-selection:', newProjectId);
+    logger.info('✅ ActionHub: Returning project ID for auto-selection:', newProjectId, { component: 'ActionHubPage', operation: 'actionhub:ReturningProject' });
     return newProjectId;
   };
 

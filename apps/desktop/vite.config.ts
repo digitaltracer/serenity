@@ -2,8 +2,37 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
+// Plugin to strip logger.debug and logger.trace calls in production
+function stripDebugLogsPlugin() {
+  return {
+    name: 'strip-debug-logs',
+    enforce: 'pre' as const,
+    transform(code: string, id: string) {
+      // Only process in production builds
+      if (process.env.NODE_ENV !== 'production') {
+        return null;
+      }
+
+      // Skip node_modules
+      if (id.includes('node_modules')) {
+        return null;
+      }
+
+      // Strip logger.debug and logger.trace calls
+      let transformedCode = code;
+      transformedCode = transformedCode.replace(/logger\.debug\([^;]*\);?/g, '');
+      transformedCode = transformedCode.replace(/logger\.trace\([^;]*\);?/g, '');
+
+      return {
+        code: transformedCode,
+        map: null
+      };
+    }
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), stripDebugLogsPlugin()],
   root: resolve(__dirname),
   base: './',
   server: {

@@ -1,5 +1,6 @@
 import pgPromise from 'pg-promise';
 import { config } from 'dotenv';
+import { logger } from '@serenity/core';
 
 config();
 
@@ -54,7 +55,7 @@ export const testConnection = async (): Promise<boolean> => {
     await database.one('SELECT 1 as test');
     return true;
   } catch (error) {
-    console.error('Database connection test failed:', error);
+    logger.error('Database connection test failed:', { component: 'connection', operation: 'databaseConnectionTest' }, error as Error);
     return false;
   }
 };
@@ -102,7 +103,7 @@ export const testDatabaseConnection = async (connectionUrl: string): Promise<boo
       try {
         await testDb.$pool.end();
       } catch (cleanupError) {
-        console.error('Error during connection cleanup:', cleanupError);
+        logger.error('Error during connection cleanup:', { component: 'connection', operation: 'errorDuringConnection' }, cleanupError as Error);
       }
     }
   }

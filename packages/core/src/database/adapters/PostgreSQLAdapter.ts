@@ -4,11 +4,12 @@
  */
 
 import { Pool, PoolClient, PoolConfig } from 'pg';
-import { 
-  DatabaseConfig, 
-  PostgreSQLConfig, 
-  DatabaseOperations, 
-  DatabaseStats 
+import { logger } from '../../utils/logger';
+import {
+  DatabaseConfig,
+  PostgreSQLConfig,
+  DatabaseOperations,
+  DatabaseStats
 } from '../../types/database';
 
 export class PostgreSQLAdapter implements DatabaseOperations {
@@ -28,7 +29,7 @@ export class PostgreSQLAdapter implements DatabaseOperations {
     this.config = pgConfig;
     
     try {
-      console.log(`🐘 Connecting to PostgreSQL: ${pgConfig.host}:${pgConfig.port}/${pgConfig.database}`);
+      logger.info(`🐘 Connecting to PostgreSQL: ${pgConfig.host}:${pgConfig.port}/${pgConfig.database}`, { component: 'PostgreSQLAdapter', operation: 'connectingPostgresql:${pgconfig.host}:${pgconfig.port}/${pgconfig.database}' });
       
       // Create connection pool with proper configuration
       const poolConfig: PoolConfig = {
@@ -51,11 +52,11 @@ export class PostgreSQLAdapter implements DatabaseOperations {
       client.release();
       
       this.connected = true;
-      console.log('✅ PostgreSQL connection pool established');
+      logger.info('✅ PostgreSQL connection pool established', { component: 'PostgreSQLAdapter', operation: 'postgresqlConnectionPool' });
       
       return true;
     } catch (error) {
-      console.error('PostgreSQL connection failed:', error);
+      logger.error('PostgreSQL connection failed:', { component: 'PostgreSQLAdapter', operation: 'postgresqlConnectionFailed:' }, error as Error);
       this.connected = false;
       if (this.pool) {
         await this.pool.end();
@@ -75,9 +76,9 @@ export class PostgreSQLAdapter implements DatabaseOperations {
         this.pool = null;
         this.connected = false;
         this.config = null;
-        console.log('🔌 PostgreSQL connection pool closed');
+        logger.info('🔌 PostgreSQL connection pool closed', { component: 'PostgreSQLAdapter', operation: 'postgresqlConnectionPool' });
       } catch (error) {
-        console.error('Error closing PostgreSQL connection pool:', error);
+        logger.error('Error closing PostgreSQL connection pool:', { component: 'PostgreSQLAdapter', operation: 'errorClosingPostgresql' }, error as Error);
         throw error;
       }
     }
@@ -104,7 +105,7 @@ export class PostgreSQLAdapter implements DatabaseOperations {
       client.release();
       return result.rows[0]?.test === 1;
     } catch (error) {
-      console.error('PostgreSQL connection test failed:', error);
+      logger.error('PostgreSQL connection test failed:', { component: 'PostgreSQLAdapter', operation: 'postgresqlConnectionTest' }, error as Error);
       return false;
     }
   }
@@ -117,7 +118,7 @@ export class PostgreSQLAdapter implements DatabaseOperations {
       throw new Error('Not connected to database');
     }
     
-    console.log('📋 Running PostgreSQL migrations...');
+    logger.info('📋 Running PostgreSQL migrations...', { component: 'PostgreSQLAdapter', operation: 'runningPostgresqlMigrations...' });
     
     const client = await this.pool.connect();
     
@@ -145,10 +146,10 @@ export class PostgreSQLAdapter implements DatabaseOperations {
       // Commit transaction
       await client.query('COMMIT');
       
-      console.log('✅ PostgreSQL migrations completed');
+      logger.info('✅ PostgreSQL migrations completed', { component: 'PostgreSQLAdapter', operation: 'postgresqlMigrationsCompleted' });
     } catch (error) {
       await client.query('ROLLBACK');
-      console.error('Migration failed:', error);
+      logger.error('Migration failed:', { component: 'PostgreSQLAdapter', operation: 'migrationFailed:' }, error as Error);
       throw error;
     } finally {
       client.release();
@@ -172,7 +173,7 @@ export class PostgreSQLAdapter implements DatabaseOperations {
       
       return result.rows[0]?.version || null;
     } catch (error) {
-      console.error('Failed to get PostgreSQL schema version:', error);
+      logger.error('Failed to get PostgreSQL schema version:', { component: 'PostgreSQLAdapter', operation: 'failedGetPostgresql' }, error as Error);
       return null;
     }
   }
@@ -185,7 +186,7 @@ export class PostgreSQLAdapter implements DatabaseOperations {
       throw new Error('Not connected to database');
     }
     
-    console.log(`💾 Creating PostgreSQL backup: ${path}`);
+    logger.info(`💾 Creating PostgreSQL backup: ${path}`, { component: 'PostgreSQLAdapter', operation: 'creatingPostgresqlBackup:' });
     
     try {
       const { spawn } = require('child_process');
@@ -203,16 +204,16 @@ export class PostgreSQLAdapter implements DatabaseOperations {
         ], { env });
         
         pgDump.stdout.on('data', (data: Buffer) => {
-          console.log(`pg_dump: ${data.toString()}`);
+          logger.info(`pg_dump: ${data.toString()}`, { component: 'PostgreSQLAdapter', operation: 'pg_dump:${data.tostring()}' });
         });
         
         pgDump.stderr.on('data', (data: Buffer) => {
-          console.log(`pg_dump: ${data.toString()}`);
+          logger.info(`pg_dump: ${data.toString()}`, { component: 'PostgreSQLAdapter', operation: 'pg_dump:${data.tostring()}' });
         });
         
         pgDump.on('close', (code: number | null) => {
           if (code === 0) {
-            console.log('✅ PostgreSQL backup completed');
+            logger.info('✅ PostgreSQL backup completed', { component: 'PostgreSQLAdapter', operation: 'postgresqlBackupCompleted' });
             resolve();
           } else {
             reject(new Error(`pg_dump failed with exit code ${code}`));
@@ -224,7 +225,7 @@ export class PostgreSQLAdapter implements DatabaseOperations {
         });
       });
     } catch (error) {
-      console.error('Backup failed:', error);
+      logger.error('Backup failed:', { component: 'PostgreSQLAdapter', operation: 'backupFailed:' }, error as Error);
       throw error;
     }
   }
@@ -237,7 +238,7 @@ export class PostgreSQLAdapter implements DatabaseOperations {
       throw new Error('Not connected to database');
     }
     
-    console.log(`📂 Restoring PostgreSQL database from: ${path}`);
+    logger.info(`📂 Restoring PostgreSQL database from: ${path}`, { component: 'PostgreSQLAdapter', operation: 'restoringPostgresqlDatabase' });
     
     try {
       const { spawn } = require('child_process');
@@ -255,16 +256,16 @@ export class PostgreSQLAdapter implements DatabaseOperations {
         ], { env });
         
         psql.stdout.on('data', (data: Buffer) => {
-          console.log(`psql: ${data.toString()}`);
+          logger.info(`psql: ${data.toString()}`, { component: 'PostgreSQLAdapter', operation: 'psql:${data.tostring()}' });
         });
         
         psql.stderr.on('data', (data: Buffer) => {
-          console.log(`psql: ${data.toString()}`);
+          logger.info(`psql: ${data.toString()}`, { component: 'PostgreSQLAdapter', operation: 'psql:${data.tostring()}' });
         });
         
         psql.on('close', (code: number | null) => {
           if (code === 0) {
-            console.log('✅ PostgreSQL restore completed');
+            logger.info('✅ PostgreSQL restore completed', { component: 'PostgreSQLAdapter', operation: 'postgresqlRestoreCompleted' });
             resolve();
           } else {
             reject(new Error(`psql failed with exit code ${code}`));
@@ -276,7 +277,7 @@ export class PostgreSQLAdapter implements DatabaseOperations {
         });
       });
     } catch (error) {
-      console.error('Restore failed:', error);
+      logger.error('Restore failed:', { component: 'PostgreSQLAdapter', operation: 'restoreFailed:' }, error as Error);
       throw error;
     }
   }
@@ -289,7 +290,7 @@ export class PostgreSQLAdapter implements DatabaseOperations {
       throw new Error('Not connected to database');
     }
     
-    console.log('🧹 Running PostgreSQL VACUUM ANALYZE...');
+    logger.info('🧹 Running PostgreSQL VACUUM ANALYZE...', { component: 'PostgreSQLAdapter', operation: 'runningPostgresqlVacuum' });
     
     const client = await this.pool.connect();
     
@@ -303,13 +304,13 @@ export class PostgreSQLAdapter implements DatabaseOperations {
       
       // Run VACUUM ANALYZE on each table
       for (const row of result.rows) {
-        console.log(`Vacuuming table: ${row.tablename}`);
+        logger.info(`Vacuuming table: ${row.tablename}`, { component: 'PostgreSQLAdapter', operation: 'vacuumingTable:${row.tablename}' });
         await client.query(`VACUUM ANALYZE ${row.tablename}`);
       }
       
-      console.log('✅ PostgreSQL VACUUM completed');
+      logger.info('✅ PostgreSQL VACUUM completed', { component: 'PostgreSQLAdapter', operation: 'postgresqlVacuumCompleted' });
     } catch (error) {
-      console.error('VACUUM failed:', error);
+      logger.error('VACUUM failed:', { component: 'PostgreSQLAdapter', operation: 'vacuumFailed:' }, error as Error);
       throw error;
     } finally {
       client.release();
@@ -396,7 +397,7 @@ export class PostgreSQLAdapter implements DatabaseOperations {
         lastOptimized: new Date(),
       };
     } catch (error) {
-      console.error('Failed to get PostgreSQL stats:', error);
+      logger.error('Failed to get PostgreSQL stats:', { component: 'PostgreSQLAdapter', operation: 'failedGetPostgresql' }, error as Error);
       throw error;
     } finally {
       client.release();
@@ -417,7 +418,7 @@ export class PostgreSQLAdapter implements DatabaseOperations {
       const result = await client.query('SELECT version()');
       return result.rows[0]?.version || 'Unknown';
     } catch (error) {
-      console.error('Failed to get server version:', error);
+      logger.error('Failed to get server version:', { component: 'PostgreSQLAdapter', operation: 'failedGetServer' }, error as Error);
       throw error;
     } finally {
       client.release();
@@ -442,7 +443,7 @@ export class PostgreSQLAdapter implements DatabaseOperations {
       `);
       return parseInt(result.rows[0]?.count || '0');
     } catch (error) {
-      console.error('Failed to get active connections:', error);
+      logger.error('Failed to get active connections:', { component: 'PostgreSQLAdapter', operation: 'failedGetActive' }, error as Error);
       throw error;
     } finally {
       client.release();
@@ -460,7 +461,7 @@ export class PostgreSQLAdapter implements DatabaseOperations {
    * Create the application schema with all required tables
    */
   private async createApplicationSchema(client: PoolClient): Promise<void> {
-    console.log('🏗️ Creating application schema...');
+    logger.info('🏗️ Creating application schema...', { component: 'PostgreSQLAdapter', operation: '🏗️CreatingApplication' });
     
     // Create main tables
     const schemaSQL = `
@@ -583,6 +584,6 @@ export class PostgreSQLAdapter implements DatabaseOperations {
     `;
 
     await client.query(schemaSQL);
-    console.log('✅ Application schema created successfully');
+    logger.info('✅ Application schema created successfully', { component: 'PostgreSQLAdapter', operation: 'applicationSchemaCreated' });
   }
 }

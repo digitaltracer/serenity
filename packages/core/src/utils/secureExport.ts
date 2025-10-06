@@ -3,6 +3,7 @@
  */
 
 import { EncryptionService, EncryptedData, DataClassification } from './encryption';
+import { logger } from './logger';
 // Define the interface locally to avoid circular dependency
 export interface EnhancedPrivacySecuritySettings {
   masterPasswordEnabled: boolean;
@@ -161,7 +162,7 @@ export class SecureExportManager {
 
       return JSON.stringify(exportData, null, 2);
     } catch (error) {
-      console.error('Export failed:', error);
+      logger.error('Export failed:', { component: 'secureExport', operation: 'exportFailed:' }, error as Error);
       throw new Error('Failed to export data securely');
     }
   }
@@ -190,7 +191,7 @@ export class SecureExportManager {
       const checksumValid = calculatedChecksum === exportData.metadata.checksumHash;
 
       if (!checksumValid) {
-        console.warn('Checksum validation failed - data may be corrupted');
+        logger.warn('Checksum validation failed - data may be corrupted', { component: 'secureExport', operation: 'checksumValidationFailed' });
       }
 
       // Decrypt tasks
@@ -215,7 +216,7 @@ export class SecureExportManager {
         },
       };
     } catch (error) {
-      console.error('Import failed:', error);
+      logger.error('Import failed:', { component: 'secureExport', operation: 'importFailed:' }, error as Error);
       throw new Error('Failed to import data - invalid format or incorrect password');
     }
   }
@@ -498,7 +499,7 @@ export const exportDataSecurely = async (
     
     URL.revokeObjectURL(url);
   } catch (error) {
-    console.error('Secure export failed:', error);
+    logger.error('Secure export failed:', { component: 'secureExport', operation: 'secureExportFailed:' }, error as Error);
     throw error;
   }
 };
@@ -523,7 +524,7 @@ export const importDataSecurely = async (
     
     return await exportManager.importData(fileContent);
   } catch (error) {
-    console.error('Secure import failed:', error);
+    logger.error('Secure import failed:', { component: 'secureExport', operation: 'secureImportFailed:' }, error as Error);
     throw error;
   }
 };

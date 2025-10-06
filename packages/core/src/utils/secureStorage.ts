@@ -5,7 +5,8 @@
 
 /// <reference path="../types/electron.d.ts" />
 
-import { 
+import { logger } from './logger';
+import {
   CRYPTO_CONFIG, 
   getEnvironmentConfig, 
   validateSecurityPolicy,
@@ -35,7 +36,7 @@ if (typeof _global.crypto === 'undefined') {
 (() => {
   const cryptoSupport = validateCryptoSupport();
   if (!cryptoSupport.supported) {
-    console.error('🚨 Crypto API not supported. Missing:', cryptoSupport.missing.join(', '));
+    logger.error('🚨 Crypto API not supported', { component: 'secureStorage', operation: 'cryptoApiNotSupported', metadata: { missing: cryptoSupport.missing.join(', ') } }, new Error(`Missing crypto features: ${cryptoSupport.missing.join(', ')}`));
     throw new Error('Web Crypto API required for secure storage');
   }
   
@@ -43,7 +44,7 @@ if (typeof _global.crypto === 'undefined') {
     throw new Error('Security policy validation failed');
   }
   
-  console.log('🔒 Secure storage initialized with production-grade encryption');
+  logger.info('🔒 Secure storage initialized with production-grade encryption', { component: 'secureStorage', operation: 'secureStorageInitialized' });
 })();
 
 // Check if we're in an Electron environment
@@ -122,7 +123,7 @@ class LocalStorageEncryption {
       // Add prefix and convert to base64 for storage
       return this.CONFIG.ENCRYPTED_DATA_PREFIX + btoa(String.fromCharCode.apply(null, Array.from(combined)));
     } catch (error) {
-      console.error('Encryption failed:', error);
+      logger.error('Encryption failed:', { component: 'secureStorage', operation: 'encryptionFailed:' }, error as Error);
       throw new Error('Failed to encrypt data');
     }
   }
@@ -144,7 +145,7 @@ class LocalStorageEncryption {
       // Parse versioned format
       const version = new TextDecoder().decode(combined.slice(0, this.CONFIG.VERSION.length));
       if (version !== this.CONFIG.VERSION) {
-        console.warn(`Decrypting data with version ${version}, current version ${this.CONFIG.VERSION}`);
+        logger.warn(`Decrypting data with version ${version}, current version ${this.CONFIG.VERSION}`, { component: 'secureStorage', operation: 'operation' });
       }
 
       let offset = this.CONFIG.VERSION.length;
@@ -169,7 +170,7 @@ class LocalStorageEncryption {
       const decoder = new TextDecoder();
       return decoder.decode(decryptedData);
     } catch (error) {
-      console.error('Decryption failed:', error);
+      logger.error('Decryption failed:', { component: 'secureStorage', operation: 'decryptionFailed:' }, error as Error);
       throw new Error('Failed to decrypt data - possible corruption or wrong password');
     }
   }
@@ -198,7 +199,7 @@ class ElectronSecureStorage implements SecureStorage {
         throw new Error('Electron safeStorage not available');
       }
     } catch (error) {
-      console.error('Failed to store secure item:', error);
+      logger.error('Failed to store secure item:', { component: 'secureStorage', operation: 'failedStoreSecure' }, error as Error);
       throw new Error('Failed to store secure data');
     }
   }
@@ -214,7 +215,7 @@ class ElectronSecureStorage implements SecureStorage {
         throw new Error('Electron safeStorage not available');
       }
     } catch (error) {
-      console.error('Failed to retrieve secure item:', error);
+      logger.error('Failed to retrieve secure item:', { component: 'secureStorage', operation: 'failedRetrieveSecure' }, error as Error);
       return null;
     }
   }
@@ -259,8 +260,8 @@ class EncryptedLocalStorage implements SecureStorage {
       localStorage.setItem(EncryptedLocalStorage.MASTER_KEY, key);
       
       // Log security warning
-      console.warn('🔐 SECURITY: Generated fallback master key stored in localStorage. ' +
-                  'This is not secure for production. Please implement proper master password system.');
+      logger.warn('🔐 SECURITY: Generated fallback master key stored in localStorage. ' +
+                  'This is not secure for production. Please implement proper master password system.', { component: 'secureStorage', operation: 'security:GeneratedFallback' });
     }
     
     EncryptedLocalStorage.masterKeyString = key;
@@ -369,7 +370,7 @@ class EncryptedLocalStorage implements SecureStorage {
       const encrypted = await this.encryptWithKey(value, derivedKey);
       localStorage.setItem(`encrypted_${key}`, encrypted);
     } catch (error) {
-      console.error('Failed to store encrypted item:', error);
+      logger.error('Failed to store encrypted item:', { component: 'secureStorage', operation: 'failedStoreEncrypted' }, error as Error);
       throw new Error('Failed to store encrypted data');
     }
   }
@@ -382,7 +383,7 @@ class EncryptedLocalStorage implements SecureStorage {
       const derivedKey = await this.getDerivedKey();
       return await this.decryptWithKey(encrypted, derivedKey);
     } catch (error) {
-      console.error('Failed to retrieve encrypted item:', error);
+      logger.error('Failed to retrieve encrypted item:', { component: 'secureStorage', operation: 'failedRetrieveEncrypted' }, error as Error);
       return null;
     }
   }
@@ -469,7 +470,7 @@ export interface SecureDatabaseConnection {
 
 export const saveDatabaseConnectionSecure = async (connectionUrl: string): Promise<void> => {
   try {
-    console.log('🗄️ Saving database connection to secure storage:', connectionUrl);
+    logger.info('🗄️ Saving database connection to secure storage', { component: 'secureStorage', operation: 'savingDatabaseConnection', metadata: { connectionUrl } });
     
     // Note: We always use SQLite for secure settings storage, even if the user's 
     // main application database is PostgreSQL. This solves the bootstrap problem:
@@ -489,57 +490,57 @@ export const saveDatabaseConnectionSecure = async (connectionUrl: string): Promi
     
     const result = await window.electronAPI.auth.setSecureSetting('database_connection', JSON.stringify(connection));
     if (!result.success) throw new Error(result.error || 'Failed to save database connection');
-    console.log('✅ Database connection saved successfully to database');
+    logger.info('✅ Database connection saved successfully to database', { component: 'secureStorage', operation: 'databaseConnectionSaved' });
   } catch (error) {
-    console.error('Failed to save database connection to database:', error);
+    logger.error('Failed to save database connection to database:', { component: 'secureStorage', operation: 'failedSaveDatabase' }, error as Error);
     throw new Error('Failed to save connection details to database');
   }
 };
 
 export const getDatabaseConnectionSecure = async (): Promise<SecureDatabaseConnection | null> => {
   try {
-    console.log('🔒 Loading database connection from secure storage...');
+    logger.info('🔒 Loading database connection from secure storage...', { component: 'secureStorage', operation: 'loadingDatabaseConnection' });
     
     // Note: We always use SQLite for secure settings storage (see comment above)
     if (!window.electronAPI?.auth?.getSecureSetting) {
-      console.log('❌ Secure settings API not available');
+      logger.info('❌ Secure settings API not available', { component: 'secureStorage', operation: 'secureSettingsApi' });
       return null;
     }
     
     // Get database connection from database
     const result = await window.electronAPI.auth.getSecureSetting('database_connection');
     if (!result.success || !result.data || result.data.value == null) {
-      console.log('📝 No database connection found in database');
+      logger.info('📝 No database connection found in database', { component: 'secureStorage', operation: 'databaseConnectionFound' });
       return null;
     }
     
-    console.log('✅ Found database connection in database, parsing...');
+    logger.info('✅ Found database connection in database, parsing...', { component: 'secureStorage', operation: 'operation' });
     const connection = JSON.parse(result.data.value) as SecureDatabaseConnection;
-    console.log('🎯 Database connection loaded successfully from database');
+    logger.info('🎯 Database connection loaded successfully from database', { component: 'secureStorage', operation: 'databaseConnectionLoaded' });
     
     return connection;
   } catch (error) {
-    console.error('Failed to retrieve database connection from database:', error);
+    logger.error('Failed to retrieve database connection from database:', { component: 'secureStorage', operation: 'failedRetrieveDatabase' }, error as Error);
     return null;
   }
 };
 
 export const removeDatabaseConnectionSecure = async (): Promise<void> => {
   try {
-    console.log('🗑️ Removing database connection from database...');
+    logger.info('🗑️ Removing database connection from database...', { component: 'secureStorage', operation: '🗑️RemovingDatabase' });
     
     if (!window.electronAPI?.auth?.deleteSecureSetting) {
-      console.log('❌ Secure settings API not available');
+      logger.info('❌ Secure settings API not available', { component: 'secureStorage', operation: 'secureSettingsApi' });
       return;
     }
     const result = await window.electronAPI.auth.deleteSecureSetting('database_connection');
     if (!result.success) {
-      console.error('Failed to remove database connection:', result.error);
+      logger.error('Failed to remove database connection:', { component: 'secureStorage', operation: 'failedRemoveDatabase' }, new Error(result.error || 'Unknown error'));
     } else {
-      console.log('✅ Database connection removed successfully from database');
+      logger.info('✅ Database connection removed successfully from database', { component: 'secureStorage', operation: 'databaseConnectionRemoved' });
     }
   } catch (error) {
-    console.error('Failed to remove database connection from database:', error);
+    logger.error('Failed to remove database connection from database:', { component: 'secureStorage', operation: 'failedRemoveDatabase' }, error as Error);
   }
 };
 
@@ -563,7 +564,7 @@ export interface EnhancedPrivacySettings {
 
 export const savePrivacySettingsSecure = async (settings: EnhancedPrivacySettings): Promise<void> => {
   try {
-    console.log('🔐 Saving privacy settings to database:', settings);
+    logger.info('🔐 Saving privacy settings to database', { component: 'secureStorage', operation: 'savingPrivacySettings', metadata: { settings } });
     
     if (!window.electronAPI?.auth?.setSecureSetting) {
       throw new Error('Secure settings API not available');
@@ -573,36 +574,36 @@ export const savePrivacySettingsSecure = async (settings: EnhancedPrivacySetting
     
     const result = await window.electronAPI.auth.setSecureSetting('privacy_settings', JSON.stringify(settings));
     if (!result.success) throw new Error(result.error || 'Failed to save privacy settings to database');
-    console.log('✅ Privacy settings saved successfully to database');
+    logger.info('✅ Privacy settings saved successfully to database', { component: 'secureStorage', operation: 'privacySettingsSaved' });
   } catch (error) {
-    console.error('Failed to save privacy settings to database:', error);
+    logger.error('Failed to save privacy settings to database:', { component: 'secureStorage', operation: 'failedSavePrivacy' }, error as Error);
     throw new Error('Failed to save privacy settings to database');
   }
 };
 
 export const getPrivacySettingsSecure = async (): Promise<EnhancedPrivacySettings | null> => {
   try {
-    console.log('🔒 Loading privacy settings from database...');
+    logger.info('🔒 Loading privacy settings from database...', { component: 'secureStorage', operation: 'loadingPrivacySettings' });
     
     if (!window.electronAPI?.auth?.getSecureSetting) {
-      console.log('❌ Secure settings API not available');
+      logger.info('❌ Secure settings API not available', { component: 'secureStorage', operation: 'secureSettingsApi' });
       return null;
     }
     
     // Get privacy settings from database
     const result = await window.electronAPI.auth.getSecureSetting('privacy_settings');
     if (!result.success || !result.data || result.data.value == null) {
-      console.log('📝 No privacy settings found in database');
+      logger.info('📝 No privacy settings found in database', { component: 'secureStorage', operation: 'privacySettingsFound' });
       return null;
     }
     
-    console.log('✅ Found privacy settings in database, parsing...');
+    logger.info('✅ Found privacy settings in database, parsing...', { component: 'secureStorage', operation: 'operation' });
     const settings = JSON.parse(result.data.value) as EnhancedPrivacySettings;
-    console.log('🎯 Privacy settings loaded successfully from database');
+    logger.info('🎯 Privacy settings loaded successfully from database', { component: 'secureStorage', operation: 'privacySettingsLoaded' });
     
     return settings;
   } catch (error) {
-    console.error('❌ Failed to retrieve privacy settings from database:', error);
+    logger.error('❌ Failed to retrieve privacy settings from database:', { component: 'secureStorage', operation: 'failedRetrievePrivacy' }, error as Error);
     return null;
   }
 };
@@ -612,7 +613,7 @@ export const getPrivacySettingsSecure = async (): Promise<EnhancedPrivacySetting
  */
 export const saveMasterPasswordHashSecure = async (password: string): Promise<void> => {
   try {
-    console.log('🔑 Saving master password hash to database...');
+    logger.info('🔑 Saving master password hash to database...', { component: 'secureStorage', operation: 'savingMasterPassword' });
     
     // Generate a random salt
     const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -652,36 +653,36 @@ export const saveMasterPasswordHashSecure = async (password: string): Promise<vo
 
     // Store in database using secure settings API
     if (window.electronAPI?.auth?.setSecureSetting) {
-      console.log('💾 Storing master password hash in database...');
+      logger.info('💾 Storing master password hash in database...', { component: 'secureStorage', operation: 'storingMasterPassword' });
       const result = await window.electronAPI.auth.setSecureSetting('master_password_hash', JSON.stringify(passwordData));
       if (!result.success) throw new Error(result.error || 'Failed to save to database');
-      console.log('✅ Master password hash saved successfully to database');
+      logger.info('✅ Master password hash saved successfully to database', { component: 'secureStorage', operation: 'masterPasswordHash' });
     } else {
       throw new Error('Database API not available');
     }
   } catch (error) {
-    console.error('Failed to save master password hash to database:', error);
+    logger.error('Failed to save master password hash to database:', { component: 'secureStorage', operation: 'failedSaveMaster' }, error as Error);
     throw new Error('Failed to save master password to database');
   }
 };
 
 export const validateMasterPasswordSecure = async (password: string): Promise<boolean> => {
   try {
-    console.log('🔐 Validating master password from database...');
+    logger.info('🔐 Validating master password from database...', { component: 'secureStorage', operation: 'validatingMasterPassword' });
     
     if (!window.electronAPI?.auth?.getSecureSetting) {
-      console.log('❌ Secure settings API not available');
+      logger.info('❌ Secure settings API not available', { component: 'secureStorage', operation: 'secureSettingsApi' });
       return false;
     }
     
     // Get password hash from database
     const result = await window.electronAPI.auth.getSecureSetting('master_password_hash');
     if (!result.success || !result.data || result.data.value == null) {
-      console.log('❌ No stored password hash found in database');
+      logger.info('❌ No stored password hash found in database', { component: 'secureStorage', operation: 'storedPasswordHash' });
       return false;
     }
     
-    console.log('✅ Found stored password hash in database, validating...');
+    logger.info('✅ Found stored password hash in database, validating...', { component: 'secureStorage', operation: 'operation' });
     let stored = result.data.value;
     // Support both JSON (salted) and legacy plain hash
     let passwordData: any;
@@ -716,11 +717,11 @@ export const validateMasterPasswordSecure = async (password: string): Promise<bo
     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     
     const isValid = hashHex === passwordData.hash;
-    console.log('🔍 Password validation result:', isValid);
+    logger.info('🔍 Password validation result', { component: 'secureStorage', operation: 'passwordValidationResult', metadata: { isValid } });
     
     return isValid;
   } catch (error) {
-    console.error('Failed to validate master password from database:', error);
+    logger.error('Failed to validate master password from database:', { component: 'secureStorage', operation: 'failedValidateMaster' }, error as Error);
     return false;
   }
 };
@@ -752,7 +753,7 @@ export const savePostgreSQLConfigSecure = async (
   password: string
 ): Promise<void> => {
   try {
-    console.log('🗄️ Saving PostgreSQL config to secure storage...');
+    logger.info('🗄️ Saving PostgreSQL config to secure storage...', { component: 'secureStorage', operation: '🗄️SavingPostgresql' });
     
     if (!window.electronAPI?.auth?.setSecureSetting) {
       throw new Error('Secure settings API not available');
@@ -777,12 +778,12 @@ export const savePostgreSQLConfigSecure = async (
     ]);
 
     if (configResult.success && credentialsResult.success) {
-      console.log('✅ PostgreSQL config and credentials saved securely');
+      logger.info('✅ PostgreSQL config and credentials saved securely', { component: 'secureStorage', operation: 'postgresqlConfigAnd' });
     } else {
       throw new Error('Failed to save PostgreSQL configuration');
     }
   } catch (error) {
-    console.error('Failed to save PostgreSQL config securely:', error);
+    logger.error('Failed to save PostgreSQL config securely:', { component: 'secureStorage', operation: 'failedSavePostgresql' }, error as Error);
     throw new Error('Failed to save database configuration securely');
   }
 };
@@ -795,10 +796,10 @@ export const getPostgreSQLConfigSecure = async (): Promise<{
   password: string;
 } | null> => {
   try {
-    console.log('🔒 Loading PostgreSQL config from secure storage...');
+    logger.info('🔒 Loading PostgreSQL config from secure storage...', { component: 'secureStorage', operation: 'loadingPostgresqlConfig' });
     
     if (!window.electronAPI?.auth?.getSecureSetting) {
-      console.log('❌ Secure settings API not available');
+      logger.info('❌ Secure settings API not available', { component: 'secureStorage', operation: 'secureSettingsApi' });
       return null;
     }
 
@@ -812,7 +813,7 @@ export const getPostgreSQLConfigSecure = async (): Promise<{
       !configResult.success || !configResult.data || configResult.data.value == null ||
       !credentialsResult.success || !credentialsResult.data || credentialsResult.data.value == null
     ) {
-      console.log('📝 No PostgreSQL configuration found');
+      logger.info('📝 No PostgreSQL configuration found', { component: 'secureStorage', operation: 'postgresqlConfigurationFound' });
       return null;
     }
 
@@ -824,14 +825,14 @@ export const getPostgreSQLConfigSecure = async (): Promise<{
     const decryptedCredentialsJson = await decryptData(encryptedCredentials, encryptionKey);
     const credentials = JSON.parse(decryptedCredentialsJson) as PostgreSQLCredentials;
 
-    console.log('✅ PostgreSQL config loaded and decrypted successfully');
+    logger.info('✅ PostgreSQL config loaded and decrypted successfully', { component: 'secureStorage', operation: 'postgresqlConfigLoaded' });
     
     return {
       config,
       password: credentials.password,
     };
   } catch (error) {
-    console.error('Failed to retrieve PostgreSQL config securely:', error);
+    logger.error('Failed to retrieve PostgreSQL config securely:', { component: 'secureStorage', operation: 'failedRetrievePostgresql' }, error as Error);
     return null;
   }
 };
@@ -841,10 +842,10 @@ export const getPostgreSQLConfigSecure = async (): Promise<{
  */
 export const removePostgreSQLConfigSecure = async (): Promise<void> => {
   try {
-    console.log('🗑️ Removing PostgreSQL config from secure storage...');
+    logger.info('🗑️ Removing PostgreSQL config from secure storage...', { component: 'secureStorage', operation: '🗑️RemovingPostgresql' });
     
     if (!window.electronAPI?.auth?.deleteSecureSetting) {
-      console.log('❌ Secure settings API not available');
+      logger.info('❌ Secure settings API not available', { component: 'secureStorage', operation: 'secureSettingsApi' });
       return;
     }
 
@@ -853,9 +854,9 @@ export const removePostgreSQLConfigSecure = async (): Promise<void> => {
       window.electronAPI.auth.deleteSecureSetting('postgresql_credentials'),
     ]);
 
-    console.log('✅ PostgreSQL config removed successfully');
+    logger.info('✅ PostgreSQL config removed successfully', { component: 'secureStorage', operation: 'postgresqlConfigRemoved' });
   } catch (error) {
-    console.error('Failed to remove PostgreSQL config:', error);
+    logger.error('Failed to remove PostgreSQL config:', { component: 'secureStorage', operation: 'failedRemovePostgresql' }, error as Error);
   }
 };
 
@@ -879,7 +880,7 @@ async function generateEncryptionKey(): Promise<string> {
       }
     }
   } catch (error) {
-    console.log('Master password not available, using random key');
+    logger.info('Master password not available, using random key', { component: 'secureStorage', operation: 'operation' });
   }
 
   // Fallback: generate or retrieve random encryption key

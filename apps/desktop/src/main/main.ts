@@ -3,6 +3,7 @@ import { join } from 'path';
 import { isDev } from './utils';
 import { apiService } from './services/ApiService';
 import { registerAllIpcHandlers } from './ipc';
+import { logger } from '@serenity/core';
 
 class AppManager {
   private mainWindow: BrowserWindow | null = null;
@@ -67,10 +68,37 @@ class AppManager {
         }
       });
 
-      // Add strict CSP headers in production for all responses
+      // Add strict CSP headers and disable console in production
       if (!isDev) {
         try {
           const session = contents.session;
+
+          // Disable console methods in production to prevent logging leaks
+          contents.executeJavaScript(`
+            if (typeof window !== 'undefined') {
+              const noop = () => {};
+              window.console.log = noop;
+              window.console.debug = noop;
+              window.console.trace = noop;
+              // Keep error and warn for critical issues but sanitize them
+              const originalError = window.console.error;
+              const originalWarn = window.console.warn;
+              window.console.error = (...args) => {
+                // Only log errors in production, sanitized
+                const sanitized = args.map(arg =>
+                  typeof arg === 'string' ? arg.replace(/(['"]\w*(?:password|token|key|secret|auth|credential)\w*['"])\s*:\s*['"]\w+['"]/gi, '$1: "[REDACTED]"') : arg
+                );
+                originalError.apply(console, sanitized);
+              };
+              window.console.warn = (...args) => {
+                const sanitized = args.map(arg =>
+                  typeof arg === 'string' ? arg.replace(/(['"]\w*(?:password|token|key|secret|auth|credential)\w*['"])\s*:\s*['"]\w+['"]/gi, '$1: "[REDACTED]"') : arg
+                );
+                originalWarn.apply(console, sanitized);
+              };
+            }
+          `).catch(() => {});
+
           session.webRequest.onHeadersReceived((details, callback) => {
             const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: https://api.openai.com https://oauth2.googleapis.com https://www.googleapis.com https://generativelanguage.googleapis.com https://api.anthropic.com https://api.github.com https://github.com; frame-ancestors 'none'";
             const headers = { ...details.responseHeaders } as Record<string, string[]>;
@@ -230,7 +258,7 @@ class AppManager {
   }
 
   private setupIPC(): void {
-    console.log('🔐 Initializing secure business logic layer...');
+    logger.info('🔐 Initializing secure business logic layer...', { component: 'main', operation: 'initializingSecureBusiness' });
 
     // Register organized domain-specific IPC handlers
     registerAllIpcHandlers();
@@ -278,7 +306,7 @@ class AppManager {
           const canPromptTouchID = await systemPreferences.canPromptTouchID();
           return { available: canPromptTouchID, type: 'touchid' };
         } catch (error) {
-          console.error('Error checking Touch ID availability:', error);
+          logger.error('Error checking Touch ID availability:', { component: 'main', operation: 'errorCheckingTouch' }, error as Error);
           return { available: false, type: null };
         }
       } else {
@@ -293,7 +321,7 @@ class AppManager {
           await systemPreferences.promptTouchID(reason);
           return { success: true, error: null };
         } catch (error) {
-          console.error('Touch ID authentication failed:', error);
+          logger.error('Touch ID authentication failed:', { component: 'main', operation: 'touchAuthenticationFailed:' }, error as Error);
           return { 
             success: false, 
             error: error instanceof Error ? error.message : 'Authentication failed',
@@ -382,7 +410,7 @@ class AppManager {
         const encrypted = safeStorage.encryptString(plaintext);
         return encrypted.toString('base64'); // Convert to base64 for safe transport
       } catch (error) {
-        console.error('Failed to encrypt string:', error);
+        logger.error('Failed to encrypt string:', { component: 'main', operation: 'failedEncryptString:' }, error as Error);
         throw error;
       }
     });
@@ -396,12 +424,12 @@ class AppManager {
         const decrypted = safeStorage.decryptString(encrypted);
         return decrypted;
       } catch (error) {
-        console.error('Failed to decrypt string:', error);
+        logger.error('Failed to decrypt string:', { component: 'main', operation: 'failedDecryptString:' }, error as Error);
         throw error;
       }
     });
 
-    console.log('✅ All IPC handlers registered and ready');
+    logger.info('✅ All IPC handlers registered and ready', { component: 'main', operation: 'allIpcHandlers' });
   }
 
   private currentOAuthWindow: BrowserWindow | null = null;
@@ -512,11 +540,11 @@ class AppManager {
           if (credentials && credentials.clientId && credentials.clientSecret) {
             this.exchangeGoogleOAuthCode(code, credentials.clientId, credentials.clientSecret);
           } else {
-            console.error('OAuth credentials missing during token exchange');
+            logger.error('OAuth credentials missing during token exchange', { component: 'main', operation: 'oauthCredentialsMissing' });
             this.mainWindow?.webContents.send('oauth:google:error', 'Missing client credentials');
           }
         } else if (error) {
-          console.error('OAuth error:', error);
+          logger.error(`OAuth error: ${error}`, { component: 'main', operation: 'oauthError:' });
           this.mainWindow?.webContents.send('oauth:google:error', error);
         }
         
@@ -537,10 +565,10 @@ class AppManager {
 
   private async exchangeGoogleOAuthCode(code: string, clientId: string, clientSecret: string): Promise<void> {
     try {
-      console.log('🔄 Starting token exchange with Google...');
+      logger.info('🔄 Starting token exchange with Google...', { component: 'main', operation: 'startingTokenExchange' });
       const REDIRECT_URI = 'http://localhost:8080/oauth/callback';
 
-      console.log('📤 Sending token request to Google...');
+      logger.info('📤 Sending token request to Google...', { component: 'main', operation: 'sendingTokenRequest' });
       const response = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
@@ -557,7 +585,7 @@ class AppManager {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Token exchange failed:', response.status, response.statusText, errorText);
+        logger.error(`❌ Token exchange failed: ${response.statusText} - ${errorText}`, { component: 'main', operation: 'tokenExchangeFailed:' });
         throw new Error(`Token exchange failed: ${response.statusText} - ${errorText}`);
       }
 
@@ -575,12 +603,12 @@ class AppManager {
         picture?: string;
       }
 
-      console.log('✅ Token exchange successful, parsing response...');
+      logger.info('✅ Token exchange successful, parsing response...', { component: 'main', operation: 'operation' });
       const tokens: GoogleTokenResponse = await response.json() as GoogleTokenResponse;
-      console.log('📋 Received tokens from Google (access token length:', tokens.access_token?.length, ')');
+      logger.info(`📋 Received tokens from Google (access token length: ${tokens.access_token?.length})`, { component: 'main', operation: 'receivedTokensFrom' });
       
       // Get user info
-      console.log('👤 Fetching user info from Google...');
+      logger.info('👤 Fetching user info from Google...', { component: 'main', operation: 'fetchingUserInfo' });
       const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
         headers: {
           'Authorization': `Bearer ${tokens.access_token}`,
@@ -588,12 +616,12 @@ class AppManager {
       });
 
       if (!userResponse.ok) {
-        console.error('❌ User info fetch failed:', userResponse.status, userResponse.statusText);
+        logger.error(`❌ User info fetch failed: ${userResponse.statusText}`, { component: 'main', operation: 'userInfoFetch' });
         throw new Error(`User info fetch failed: ${userResponse.statusText}`);
       }
 
       const userInfo: GoogleUserInfo = await userResponse.json() as GoogleUserInfo;
-      console.log('✅ User info received for:', userInfo.email);
+      logger.info(`✅ User info received for: ${userInfo.email}`, { component: 'main', operation: 'userInfoReceived' });
 
       const authData = {
         accessToken: tokens.access_token,
@@ -602,11 +630,11 @@ class AppManager {
         userEmail: userInfo.email,
       };
 
-      console.log('📤 Sending OAuth success to renderer...');
+      logger.info('📤 Sending OAuth success to renderer...', { component: 'main', operation: 'sendingOauthSuccess' });
       // Send tokens back to renderer
       this.mainWindow?.webContents.send('oauth:google:success', authData);
     } catch (error) {
-      console.error('Token exchange failed:', error);
+      logger.error('Token exchange failed:', { component: 'main', operation: 'tokenExchangeFailed:' }, error as Error);
       this.mainWindow?.webContents.send('oauth:google:error', error instanceof Error ? error.message : 'Token exchange failed');
     }
   }

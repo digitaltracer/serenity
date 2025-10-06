@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { connectGoogleCalendar, EncryptedIntegrationService, store } from '@serenity/core';
+import { logger } from '@serenity/core';
 
 interface UseGoogleOAuthParams {
   googleClientId: string;
@@ -26,12 +27,12 @@ export const useGoogleOAuth = ({
     if (!(window as any).electronAPI?.oauth) return;
 
     const handleOAuthSuccess = async (authData: any) => {
-      console.log('📅 OAuth success received:', authData);
+      logger.info('📅 OAuth success received:', authData, { component: 'useGoogleOAuth', operation: 'oauthSuccessReceived:' });
 
       const tempKeyFromStorage = sessionStorage.getItem('serenity_oauth_temp_key');
       const sessionStoragePassword = tempKeyFromStorage ? sessionStorage.getItem(tempKeyFromStorage) : null;
 
-      console.log('🔍 Checking master password availability in OAuth callback:', {
+      logger.info('🔍 Checking master password availability in OAuth callback:', {
         hasCurrentMasterPassword: !!currentMasterPassword,
         currentMasterPasswordLength: currentMasterPassword?.length || 0,
         hasValidatedMasterPassword: !!validatedMasterPassword,
@@ -40,7 +41,7 @@ export const useGoogleOAuth = ({
         masterPasswordRefLength: masterPasswordRef.current?.length || 0,
         hasSessionStoragePassword: !!sessionStoragePassword,
         sessionStoragePasswordLength: sessionStoragePassword?.length || 0,
-      });
+      }, { component: 'useGoogleOAuth', operation: 'checkingMasterPassword' });
 
       // Connect to Google Calendar in Redux
       dispatch(
@@ -54,26 +55,26 @@ export const useGoogleOAuth = ({
       // Get the current session master password from Redux
       const currentState = (store as any).getState() as any;
       const sessionPassword = currentState.auth.sessionMasterPassword;
-      console.log('🔑 Session master password available:', !!sessionPassword);
+      logger.info('🔑 Session master password available:', !!sessionPassword, { component: 'useGoogleOAuth', operation: 'sessionMasterPassword' });
 
       if (sessionPassword) {
         try {
-          console.log(
+          logger.info(
             '🔐 Using session master password for Google Calendar encryption (length:',
             sessionPassword.length,
             ')'
-          );
+          , { component: 'useGoogleOAuth', operation: 'usingSessionMaster' });
           await EncryptedIntegrationService.saveEncryptedIntegrations(
             currentState.integrations,
             sessionPassword
           );
-          console.log('✅ Google Calendar tokens encrypted and stored successfully');
+          logger.info('✅ Google Calendar tokens encrypted and stored successfully', { component: 'useGoogleOAuth', operation: 'googleCalendarTokens' });
         } catch (error) {
-          console.error('❌ Failed to encrypt Google Calendar tokens:', error);
+          logger.error('❌ Failed to encrypt Google Calendar tokens:', { component: 'useGoogleOAuth', operation: 'failedEncryptGoogle' }, error);
           alert('Warning: Failed to encrypt integration tokens. Please try reconnecting.');
         }
       } else {
-        console.warn('⚠️ No session master password available for Google Calendar encryption');
+        logger.warn('⚠️ No session master password available for Google Calendar encryption', { component: 'useGoogleOAuth', operation: 'sessionMasterPassword' });
         alert(
           'Warning: Session master password not available. Integration tokens were not encrypted. Please unlock the app first.'
         );
@@ -83,13 +84,13 @@ export const useGoogleOAuth = ({
     };
 
     const handleOAuthError = (error: string) => {
-      console.error('OAuth error:', error);
+      logger.error('OAuth error:', { component: 'useGoogleOAuth', operation: 'oauthError:' }, error);
       alert(`Google Calendar connection failed: ${error}`);
       setIsConnecting(false);
     };
 
     const handleOAuthCancelled = () => {
-      console.log('OAuth cancelled by user');
+      logger.info('OAuth cancelled by user', { component: 'useGoogleOAuth', operation: 'oauthCancelledUser' });
       setIsConnecting(false);
     };
 
@@ -111,7 +112,7 @@ export const useGoogleOAuth = ({
   ]);
 
   const startOAuth = useCallback(async () => {
-    console.log('📅 startOAuth called');
+    logger.info('📅 startOAuth called', { component: 'useGoogleOAuth', operation: 'startoauthCalled' });
     if (!(window as any).electronAPI?.oauth) {
       alert('OAuth not available in this environment');
       return;
@@ -130,7 +131,7 @@ export const useGoogleOAuth = ({
           await (window as any).electronAPI.auth.setSecureSetting('google_client_id', googleClientId.trim());
           await (window as any).electronAPI.auth.setSecureSetting('google_client_secret', googleClientSecret.trim());
         } catch (e) {
-          console.warn('Failed to persist Google OAuth credentials securely:', e);
+          logger.warn('Failed to persist Google OAuth credentials securely:', e, { component: 'useGoogleOAuth', operation: 'failedPersistGoogle' });
         }
       }
 
@@ -140,9 +141,9 @@ export const useGoogleOAuth = ({
       if (!result.success) {
         throw new Error(result.error || 'Failed to start OAuth flow');
       }
-      console.log('📅 OAuth flow started successfully');
+      logger.info('📅 OAuth flow started successfully', { component: 'useGoogleOAuth', operation: 'oauthFlowStarted' });
     } catch (error) {
-      console.error('Google Calendar connection failed:', error);
+      logger.error('Google Calendar connection failed:', { component: 'useGoogleOAuth', operation: 'googleCalendarConnection' }, error);
       alert(`Failed to start Google Calendar connection: ${error}`);
       setIsConnecting(false);
     }

@@ -2,6 +2,7 @@ import { createSlice, createSelector, PayloadAction } from '@reduxjs/toolkit';
 import { Task } from '../../types';
 import { generateId } from '../../utils';
 import { loadTasks } from '../../utils/persistence';
+import { logger } from '../../utils/logger';
 
 export interface TasksState {
   tasks: Task[];
@@ -25,7 +26,7 @@ const initialTasks = (() => {
   try {
     return loadTasks();
   } catch (error) {
-    console.error('Failed to load tasks from storage:', error);
+    logger.error('Failed to load tasks from storage:', { component: 'tasksSlice', operation: 'failedLoadTasks' }, error as Error);
     return [];
   }
 })();

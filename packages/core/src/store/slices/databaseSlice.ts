@@ -12,6 +12,7 @@ import {
 } from '../../types/database';
 import { databaseManager } from '../../database/DatabaseManager';
 import { getDatabaseConnectionSecure, saveDatabaseConnectionSecure } from '../../utils/secureStorage';
+import { logger } from '../../utils/logger';
 
 export interface DatabaseState {
   config: DatabaseConfig | null;
@@ -53,17 +54,17 @@ export const initializeDatabaseConfig = createAsyncThunk(
   'database/initialize',
   async (_, { rejectWithValue }) => {
     try {
-      console.log('🔄 Initializing database configuration...');
+      logger.info('🔄 Initializing database configuration...', { component: 'databaseSlice', operation: 'initializingDatabaseConfiguration...' });
       
       // Load saved database connection from secure storage
       const savedConnection = await getDatabaseConnectionSecure();
       
       if (!savedConnection) {
-        console.log('📝 No saved database configuration found');
+        logger.info('📝 No saved database configuration found', { component: 'databaseSlice', operation: 'savedDatabaseConfiguration' });
         return { config: null, status: { connected: false, type: 'sqlite' as const } };
       }
       
-      console.log('🔍 Found saved database configuration:', savedConnection.url);
+      logger.info('🔍 Found saved database configuration', { component: 'databaseSlice', operation: 'foundSavedDatabase', metadata: { url: savedConnection.url } });
       
       // Parse the connection URL to create DatabaseConfig
       let config: DatabaseConfig;
@@ -90,21 +91,21 @@ export const initializeDatabaseConfig = createAsyncThunk(
           ssl: url.searchParams.get('sslmode') === 'require'
         };
       } else {
-        console.warn('⚠️ Unknown database connection format:', savedConnection.url);
+        logger.warn('⚠️ Unknown database connection format', { component: 'databaseSlice', operation: 'unknownDatabaseConnection', metadata: { url: savedConnection.url } });
         return { config: null, status: { connected: false, type: 'sqlite' as const } };
       }
       
       // Attempt to connect to the saved configuration
-      console.log(`🔌 Attempting to restore connection to ${config.type} database...`);
+      logger.info(`🔌 Attempting to restore connection to ${config.type} database...`, { component: 'databaseSlice', operation: 'attemptingRestoreConnection' });
       const success = await databaseManager.connect(config);
       
       if (success) {
         const status = databaseManager.getConnectionStatus();
         const stats = await databaseManager.getStats();
-        console.log(`✅ Successfully restored ${config.type} database connection`);
+        logger.info(`✅ Successfully restored ${config.type} database connection`, { component: 'databaseSlice', operation: 'successfullyRestored${config.type}' });
         return { config, status, stats };
       } else {
-        console.warn(`⚠️ Failed to restore ${config.type} database connection`);
+        logger.warn(`⚠️ Failed to restore ${config.type} database connection`, { component: 'databaseSlice', operation: 'failedRestore${config.type}' });
         return { 
           config, 
           status: { 
@@ -115,7 +116,7 @@ export const initializeDatabaseConfig = createAsyncThunk(
         };
       }
     } catch (error) {
-      console.error('❌ Failed to initialize database configuration:', error);
+      logger.error('❌ Failed to initialize database configuration:', { component: 'databaseSlice', operation: 'failedInitializeDatabase' }, error as Error);
       return rejectWithValue(error instanceof Error ? error.message : 'Initialization failed');
     }
   }
@@ -147,9 +148,9 @@ export const connectToDatabase = createAsyncThunk(
         }
         
         await saveDatabaseConnectionSecure(connectionUrl);
-        console.log('💾 Database configuration saved to secure storage');
+        logger.info('💾 Database configuration saved to secure storage', { component: 'databaseSlice', operation: 'databaseConfigurationSaved' });
       } catch (saveError) {
-        console.error('⚠️ Failed to save database configuration:', saveError);
+        logger.error('⚠️ Failed to save database configuration:', { component: 'databaseSlice', operation: 'failedSaveDatabase' }, saveError as Error);
         // Don't fail the connection if save fails, just log the warning
       }
       

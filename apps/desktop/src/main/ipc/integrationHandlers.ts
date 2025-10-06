@@ -5,6 +5,7 @@
 
 import { ipcMain } from 'electron';
 import { z } from 'zod';
+import { logger } from '@serenity/core';
 
 const EncryptedIntegrationSchema = z.object({
   id: z.string().min(1),
@@ -15,12 +16,12 @@ const EncryptedIntegrationSchema = z.object({
 });
 
 export function registerIntegrationHandlers(): void {
-  console.log('🔧 Registering integration IPC handlers...');
+  logger.info('🔧 Registering integration IPC handlers...', { component: 'integrationHandlers', operation: 'registeringIntegrationIpc' });
 
   // Initialize encrypted integrations table
   ipcMain.handle('integrations:initialize-table', async () => {
     try {
-      console.log('🔐 Initializing encrypted integrations table...');
+      logger.info('🔐 Initializing encrypted integrations table...', { component: 'integrationHandlers', operation: 'initializingEncryptedIntegrations' });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -37,7 +38,7 @@ export function registerIntegrationHandlers(): void {
       
       return { success: true, data: result, error: null };
     } catch (error) {
-      console.error('❌ Failed to initialize encrypted integrations table:', error);
+      logger.error('❌ Failed to initialize encrypted integrations table:', { component: 'integrationHandlers', operation: 'failedInitializeEncrypted' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to initialize table';
       return { success: false, data: null, error: errorMessage };
     }
@@ -48,7 +49,7 @@ export function registerIntegrationHandlers(): void {
     try {
       const valid = EncryptedIntegrationSchema.safeParse(integrationData);
       if (!valid.success) return { success: false, data: null, error: 'Invalid integration payload' };
-      console.log('🔐 Saving encrypted integration data:', integrationData.type, integrationData.id);
+      logger.info('🔐 Saving encrypted integration data:', {  component: 'integrationHandlers', operation: 'savingEncryptedIntegration' , metadata: { data1: integrationData.type, data2: integrationData.id } });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -68,7 +69,7 @@ export function registerIntegrationHandlers(): void {
       
       return { success: true, data: result, error: null };
     } catch (error) {
-      console.error('❌ Failed to save encrypted integration:', error);
+      logger.error('❌ Failed to save encrypted integration:', { component: 'integrationHandlers', operation: 'failedSaveEncrypted' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to save integration';
       return { success: false, data: null, error: errorMessage };
     }
@@ -77,7 +78,7 @@ export function registerIntegrationHandlers(): void {
   // Load encrypted integration data
   ipcMain.handle('integrations:load-encrypted', async () => {
     try {
-      console.log('🔐 Loading encrypted integration data...');
+      logger.info('🔐 Loading encrypted integration data...', { component: 'integrationHandlers', operation: 'loadingEncryptedIntegration' });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -88,7 +89,7 @@ export function registerIntegrationHandlers(): void {
       
       return { success: true, data: result, error: null };
     } catch (error) {
-      console.error('❌ Failed to load encrypted integrations:', error);
+      logger.error('❌ Failed to load encrypted integrations:', { component: 'integrationHandlers', operation: 'failedLoadEncrypted' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to load integrations';
       return { success: false, data: null, error: errorMessage };
     }
@@ -97,7 +98,7 @@ export function registerIntegrationHandlers(): void {
   // Check if encrypted integrations exist
   ipcMain.handle('integrations:has-encrypted', async () => {
     try {
-      console.log('🔍 Checking for encrypted integrations...');
+      logger.info('🔍 Checking for encrypted integrations...', { component: 'integrationHandlers', operation: 'checkingForEncrypted' });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -110,7 +111,7 @@ export function registerIntegrationHandlers(): void {
       
       return { success: true, data: { hasEncrypted: count > 0, count }, error: null };
     } catch (error) {
-      console.error('❌ Failed to check encrypted integrations:', error);
+      logger.error('❌ Failed to check encrypted integrations:', { component: 'integrationHandlers', operation: 'failedCheckEncrypted' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to check integrations';
       return { success: false, data: { hasEncrypted: false, count: 0 }, error: errorMessage };
     }
@@ -119,7 +120,7 @@ export function registerIntegrationHandlers(): void {
   // Clear all encrypted integration data
   ipcMain.handle('integrations:clear-encrypted', async () => {
     try {
-      console.log('🧹 Clearing encrypted integration data...');
+      logger.info('🧹 Clearing encrypted integration data...', { component: 'integrationHandlers', operation: 'clearingEncryptedIntegration' });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -130,7 +131,7 @@ export function registerIntegrationHandlers(): void {
       
       return { success: true, data: result, error: null };
     } catch (error) {
-      console.error('❌ Failed to clear encrypted integrations:', error);
+      logger.error('❌ Failed to clear encrypted integrations:', { component: 'integrationHandlers', operation: 'failedClearEncrypted' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to clear integrations';
       return { success: false, data: null, error: errorMessage };
     }
@@ -139,7 +140,7 @@ export function registerIntegrationHandlers(): void {
   // Verify encrypted integrations table exists
   ipcMain.handle('integrations:verify-table', async () => {
     try {
-      console.log('🔍 Verifying encrypted integrations table...');
+      logger.info('🔍 Verifying encrypted integrations table...', { component: 'integrationHandlers', operation: 'verifyingEncryptedIntegrations' });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -152,7 +153,7 @@ export function registerIntegrationHandlers(): void {
       
       return { success: true, data: { exists: tableExists }, error: null };
     } catch (error) {
-      console.error('❌ Failed to verify integrations table:', error);
+      logger.error('❌ Failed to verify integrations table:', { component: 'integrationHandlers', operation: 'failedVerifyIntegrations' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to verify table';
       return { success: false, data: { exists: false }, error: errorMessage };
     }
@@ -161,7 +162,7 @@ export function registerIntegrationHandlers(): void {
   // Get verification data for integrations
   ipcMain.handle('integrations:get-verification', async () => {
     try {
-      console.log('🔍 Getting integration verification data...');
+      logger.info('🔍 Getting integration verification data...', { component: 'integrationHandlers', operation: 'gettingIntegrationVerification' });
       
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -172,11 +173,11 @@ export function registerIntegrationHandlers(): void {
       
       return { success: true, data: result, error: null };
     } catch (error) {
-      console.error('❌ Failed to get verification data:', error);
+      logger.error('❌ Failed to get verification data:', { component: 'integrationHandlers', operation: 'failedGetVerification' }, error as Error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to get verification data';
       return { success: false, data: null, error: errorMessage };
     }
   });
 
-  console.log('✅ Integration IPC handlers registered');
+  logger.info('✅ Integration IPC handlers registered', { component: 'integrationHandlers', operation: 'integrationIpcHandlers' });
 }

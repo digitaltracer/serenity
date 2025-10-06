@@ -136,8 +136,8 @@ export class SQLiteTaskQueries {
    * Create a new task
    */
   createTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Task {
-    console.log('📝 SQLite: Creating new task:', task.title);
-    console.log('🏷️ SQLite: Task tags:', task.tags);
+    logger.info('Creating new task', { component: 'SQLiteTaskQueries', operation: 'createTask', metadata: { title: task.title } });
+    logger.debug('Task tags', { component: 'SQLiteTaskQueries', operation: 'createTask', metadata: { tags: task.tags } });
     
     const id = this.generateUniqueId();
     const now = new Date().toISOString();
@@ -146,7 +146,7 @@ export class SQLiteTaskQueries {
     if (projectId) {
       const project = this.db.prepare('SELECT id FROM projects WHERE id = ?').get(projectId) as { id: string } | undefined;
       if (!project) {
-        console.warn(`⚠️ SQLite: Provided project_id ${projectId} does not exist. Setting project_id to NULL for task ${id}.`);
+        logger.warn(`Provided project_id ${projectId} does not exist, setting to NULL for task ${id}`, { component: 'SQLiteTaskQueries', operation: 'createTask', metadata: { projectId, taskId: id } });
         projectId = null;
       }
     }
@@ -170,15 +170,15 @@ export class SQLiteTaskQueries {
       now,
       now
     );
-    
-    console.log(`✅ SQLite: Task inserted with ID ${id}, changes: ${insertResult.changes}`);
+
+    logger.info('Task inserted successfully', { component: 'SQLiteTaskQueries', operation: 'createTask', metadata: { taskId: id, changes: insertResult.changes } });
 
     // Insert tags if provided
     if (task.tags && task.tags.length > 0) {
-      console.log(`🏷️ SQLite: Inserting ${task.tags.length} tags for task ${id}`);
+      logger.debug('Inserting tags for task', { component: 'SQLiteTaskQueries', operation: 'createTask', metadata: { taskId: id, tagCount: task.tags.length } });
       this.updateTaskTags(id, task.tags);
     } else {
-      console.log('⚠️ SQLite: No tags to insert for task', id);
+      logger.debug('No tags to insert for task', { component: 'SQLiteTaskQueries', operation: 'createTask', metadata: { taskId: id } });
     }
 
     // Insert subtasks if provided
@@ -187,8 +187,8 @@ export class SQLiteTaskQueries {
     }
 
     const createdTask = this.getTaskById(id)!;
-    console.log('📤 SQLite: Returning created task:', { id: createdTask.id, title: createdTask.title, tags: createdTask.tags });
-    
+    logger.debug('Returning created task', { component: 'SQLiteTaskQueries', operation: 'createTask', metadata: { id: createdTask.id, title: createdTask.title, tagCount: createdTask.tags.length } });
+
     return createdTask;
   }
 
@@ -196,9 +196,9 @@ export class SQLiteTaskQueries {
    * Create a task with a specific ID (used by middleware to preserve Redux IDs)
    */
   createTaskWithId(task: Task): Task {
-    console.log('📝 SQLite: Creating task with ID:', task.id);
-    console.log('🏷️ SQLite: Task tags:', task.tags);
-    console.log('📋 SQLite: Full task object:', JSON.stringify(task, null, 2));
+    logger.info('Creating task with specific ID', { component: 'SQLiteTaskQueries', operation: 'createTaskWithId', metadata: { taskId: task.id } });
+    logger.debug('Task tags', { component: 'SQLiteTaskQueries', operation: 'createTaskWithId', metadata: { tags: task.tags } });
+    logger.trace('Full task object', { component: 'SQLiteTaskQueries', operation: 'createTaskWithId', metadata: { task: JSON.stringify(task) } });
     
     try {
       // Validate optional foreign keys
@@ -206,7 +206,7 @@ export class SQLiteTaskQueries {
       if (projectId) {
         const project = this.db.prepare('SELECT id FROM projects WHERE id = ?').get(projectId) as { id: string } | undefined;
         if (!project) {
-          console.warn(`⚠️ SQLite: Provided project_id ${projectId} does not exist. Setting project_id to NULL for task ${task.id}.`);
+          logger.warn(`Provided project_id ${projectId} does not exist, setting to NULL for task ${task.id}`, { component: 'SQLiteTaskQueries', operation: 'createTaskWithId', metadata: { projectId, taskId: task.id } });
           projectId = null;
         }
       }
@@ -229,24 +229,24 @@ export class SQLiteTaskQueries {
         task.createdAt instanceof Date ? task.createdAt.toISOString() : new Date(task.createdAt).toISOString(),
         task.updatedAt instanceof Date ? task.updatedAt.toISOString() : new Date(task.updatedAt).toISOString()
       );
-      
-      console.log(`✅ SQLite: Task inserted with ID ${task.id}, changes: ${insertResult.changes}`);
-      
+
+      logger.info('Task inserted successfully with ID', { component: 'SQLiteTaskQueries', operation: 'createTaskWithId', metadata: { taskId: task.id, changes: insertResult.changes } });
+
       if (insertResult.changes === 0) {
-        console.error('❌ SQLite: Task insertion failed - no changes made');
+        logger.error('Task insertion failed - no rows affected', { component: 'SQLiteTaskQueries', operation: 'createTaskWithId', metadata: { taskId: task.id } });
         throw new Error('Task insertion failed - no rows affected');
       }
     } catch (error) {
-      console.error('❌ SQLite: Task insertion error:', error);
+      logger.error('Task insertion error', { component: 'SQLiteTaskQueries', operation: 'createTaskWithId' }, error as Error);
       throw error;
     }
 
     // Insert tags if provided
     if (task.tags && task.tags.length > 0) {
-      console.log(`🏷️ SQLite: Inserting ${task.tags.length} tags for task ${task.id}`);
+      logger.debug('Inserting tags for task', { component: 'SQLiteTaskQueries', operation: 'createTaskWithId', metadata: { taskId: task.id, tagCount: task.tags.length } });
       this.updateTaskTags(task.id, task.tags);
     } else {
-      console.log('⚠️ SQLite: No tags to insert for task', task.id);
+      logger.debug('No tags to insert for task', { component: 'SQLiteTaskQueries', operation: 'createTaskWithId', metadata: { taskId: task.id } });
     }
 
     // Insert subtasks if provided
@@ -255,7 +255,7 @@ export class SQLiteTaskQueries {
     }
 
     const savedTask = this.getTaskById(task.id)!;
-    console.log('📤 SQLite: Returning saved task:', { id: savedTask.id, title: savedTask.title, tags: savedTask.tags });
+    logger.debug('Returning saved task', { component: 'SQLiteTaskQueries', operation: 'createTaskWithId', metadata: { id: savedTask.id, title: savedTask.title, tagCount: savedTask.tags.length } });
     
     return savedTask;
   }
@@ -295,7 +295,7 @@ export class SQLiteTaskQueries {
       if (nextProjectId) {
         const project = this.db.prepare('SELECT id FROM projects WHERE id = ?').get(nextProjectId) as { id: string } | undefined;
         if (!project) {
-          console.warn(`⚠️ SQLite: Provided project_id ${nextProjectId} does not exist. Setting project_id to NULL for task ${id}.`);
+          logger.warn(`Provided project_id ${nextProjectId} does not exist, setting to NULL for task ${id}`, { component: 'SQLiteTaskQueries', operation: 'updateTask', metadata: { projectId: nextProjectId, taskId: id } });
           nextProjectId = null;
         }
       }
@@ -385,20 +385,20 @@ export class SQLiteTaskQueries {
    * Update task tags
    */
   private updateTaskTags(taskId: string, tags: string[]): void {
-    console.log(`🏷️ Updating tags for task ${taskId}:`, tags);
-    
+    logger.debug('Updating tags for task', { component: 'SQLiteTaskQueries', operation: 'updateTaskTags', metadata: { taskId, tags } });
+
     // Delete existing tags
     const deleteStmt = this.db.prepare('DELETE FROM task_tags WHERE task_id = ?');
     const deleteResult = deleteStmt.run(taskId);
-    console.log(`🗑️ Deleted ${deleteResult.changes} existing tags for task ${taskId}`);
+    logger.debug('Deleted existing tags', { component: 'SQLiteTaskQueries', operation: 'updateTaskTags', metadata: { taskId, deletedCount: deleteResult.changes } });
 
     // Insert new tags
     if (tags.length > 0) {
       const insertStmt = this.db.prepare('INSERT INTO task_tags (task_id, tag) VALUES (?, ?)');
-      
+
       for (const tag of tags) {
         const insertResult = insertStmt.run(taskId, tag);
-        console.log(`➕ Inserted tag "${tag}" for task ${taskId}, changes: ${insertResult.changes}`);
+        logger.trace('Inserted tag', { component: 'SQLiteTaskQueries', operation: 'updateTaskTags', metadata: { taskId, tag, changes: insertResult.changes } });
       }
     }
   }
@@ -475,7 +475,7 @@ export class SQLiteTaskQueries {
   private rowToTask(row: any): Task {
     const rawTags = row.tags;
     const parsedTags = rawTags ? rawTags.split(',').filter(Boolean) : [];
-    console.log(`🏷️ Raw tags for task ${row.id}: "${rawTags}" -> Parsed:`, parsedTags);
+    logger.trace('Parsed tags from database row', { component: 'SQLiteTaskQueries', operation: 'rowToTask', metadata: { taskId: row.id, rawTags, parsedTags } });
     
     const task: Task = {
       id: row.id,

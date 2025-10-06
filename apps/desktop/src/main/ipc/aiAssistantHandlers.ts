@@ -7,6 +7,7 @@ import { ipcMain, safeStorage, app } from 'electron';
 import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
+import { logger } from '@serenity/core';
 
 interface AIApiKeyStorage {
   openai?: string;
@@ -94,10 +95,10 @@ function loadApiKeysFromDisk(): void {
     const filePath = getApiKeysFilePath();
     if (fs.existsSync(filePath)) {
       encryptedApiKeys = fs.readFileSync(filePath);
-      console.log('🔐 Loaded encrypted API keys from disk');
+      logger.info('🔐 Loaded encrypted API keys from disk', { component: 'Aiassistanthandlers', operation: 'loadApiKeysFromDisk' });
     }
   } catch (error) {
-    console.error('❌ Failed to load API keys from disk:', error);
+    logger.error('❌ Failed to load API keys from disk:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
     encryptedApiKeys = null;
   }
 }
@@ -114,9 +115,9 @@ function storeApiKeys(keys: AIApiKeyStorage): void {
     const filePath = getApiKeysFilePath();
     fs.writeFileSync(filePath, encryptedApiKeys);
     
-    console.log('🔐 AI API keys encrypted and stored securely to disk');
+    logger.info('🔐 AI API keys encrypted and stored securely to disk', { component: 'Aiassistanthandlers', operation: 'execute' });
   } catch (error) {
-    console.error('❌ Failed to encrypt and save AI API keys:', error);
+    logger.error('❌ Failed to encrypt and save AI API keys:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
     throw new Error('Failed to secure API keys');
   }
 }
@@ -138,7 +139,7 @@ function getApiKeys(): AIApiKeyStorage {
     const keysJson = safeStorage.decryptString(encryptedApiKeys);
     return JSON.parse(keysJson);
   } catch (error) {
-    console.error('❌ Failed to decrypt AI API keys:', error);
+    logger.error('❌ Failed to decrypt AI API keys:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
     return {};
   }
 }
@@ -151,10 +152,10 @@ function loadModelInfoFromDisk(): void {
     const filePath = getModelInfoFilePath();
     if (fs.existsSync(filePath)) {
       encryptedModelInfo = fs.readFileSync(filePath);
-      console.log('🔐 Loaded encrypted model info from disk');
+      logger.info('🔐 Loaded encrypted model info from disk', { component: 'Aiassistanthandlers', operation: 'loadModelInfoFromDisk' });
     }
   } catch (error) {
-    console.error('❌ Failed to load model info from disk:', error);
+    logger.error('❌ Failed to load model info from disk:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
     encryptedModelInfo = null;
   }
 }
@@ -171,9 +172,9 @@ function storeModelInfo(info: AIModelInfo): void {
     const filePath = getModelInfoFilePath();
     fs.writeFileSync(filePath, encryptedModelInfo);
     
-    console.log('🔐 AI model info encrypted and stored securely to disk');
+    logger.info('🔐 AI model info encrypted and stored securely to disk', { component: 'Aiassistanthandlers', operation: 'execute' });
   } catch (error) {
-    console.error('❌ Failed to encrypt and save AI model info:', error);
+    logger.error('❌ Failed to encrypt and save AI model info:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
     throw new Error('Failed to secure model info');
   }
 }
@@ -195,7 +196,7 @@ function getModelInfo(): AIModelInfo {
     const infoJson = safeStorage.decryptString(encryptedModelInfo);
     return JSON.parse(infoJson);
   } catch (error) {
-    console.error('❌ Failed to decrypt AI model info:', error);
+    logger.error('❌ Failed to decrypt AI model info:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
     return {};
   }
 }
@@ -209,11 +210,11 @@ function loadAISettings(): AISettings {
     if (fs.existsSync(filePath)) {
       const settingsJson = fs.readFileSync(filePath, 'utf8');
       const settings = JSON.parse(settingsJson);
-      console.log('⚙️ Loaded AI settings from disk');
+      logger.info('⚙️ Loaded AI settings from disk', { component: 'Aiassistanthandlers', operation: 'load' });
       return settings;
     }
   } catch (error) {
-    console.error('❌ Failed to load AI settings from disk:', error);
+    logger.error('❌ Failed to load AI settings from disk:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
   }
   
   // Return default settings
@@ -237,9 +238,9 @@ function saveAISettings(settings: AISettings): void {
     const filePath = getSettingsFilePath();
     const settingsJson = JSON.stringify(settings, null, 2);
     fs.writeFileSync(filePath, settingsJson, 'utf8');
-    console.log('⚙️ AI settings saved to disk');
+    logger.info('⚙️ AI settings saved to disk', { component: 'Aiassistanthandlers', operation: 'saveAISettings' });
   } catch (error) {
-    console.error('❌ Failed to save AI settings to disk:', error);
+    logger.error('❌ Failed to save AI settings to disk:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
     throw new Error('Failed to save AI settings');
   }
 }
@@ -260,9 +261,9 @@ async function persistAISettingsToDatabase(settings: AISettings): Promise<void> 
         new Date().toISOString(),
       ]
     );
-    console.log('💾 AI settings saved to database (secure_settings)');
+    logger.info('💾 AI settings saved to database (secure_settings)', { component: 'Aiassistanthandlers', operation: 'save' });
   } catch (error) {
-    console.warn('⚠️ Failed to persist AI settings to database:', error);
+    logger.error('⚠️ Failed to persist AI settings to database:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
   }
 }
 
@@ -273,29 +274,29 @@ async function loadAISettingsFromDatabase(): Promise<AISettings | null> {
   try {
     const { sqliteService } = await import('@serenity/database');
     await sqliteService.initialize();
-    console.log('🔍 [loadAISettingsFromDatabase] Querying secure_settings for ai_settings...');
+    logger.info('🔍 [loadAISettingsFromDatabase] Querying secure_settings for ai_settings...', { component: 'Aiassistanthandlers', operation: 'loadAISettingsFromDatabase' });
     const result = await sqliteService.executeRawQuery(
       `SELECT value FROM secure_settings WHERE key = ? ORDER BY updated_at DESC LIMIT 1`,
       ['ai_settings']
     );
-    console.log('🔍 [loadAISettingsFromDatabase] Query result:', result);
-    console.log('🔍 [loadAISettingsFromDatabase] Result type:', typeof result, 'isArray:', Array.isArray(result));
+    logger.info('🔍 [loadAISettingsFromDatabase] Query result:', {  component: 'Aiassistanthandlers', operation: 'query' , metadata: { value: result } });
+    logger.info('🔍 [loadAISettingsFromDatabase] Result type:' + ' type: ' + typeof result + ' isArray ' + Array.isArray(result), {  component: 'Aiassistanthandlers', operation: 'execute'  });
 
     const row = Array.isArray(result) ? result[0] : (result && (result as any)[0]);
-    console.log('🔍 [loadAISettingsFromDatabase] Extracted row:', row);
+    logger.info('🔍 [loadAISettingsFromDatabase] Extracted row:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: row } });
 
     if (row && (row.value || row["value"])) {
       const value = row.value ?? row["value"];
-      console.log('🔍 [loadAISettingsFromDatabase] Raw value from DB:', value);
+      logger.info('🔍 [loadAISettingsFromDatabase] Raw value from DB:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: value } });
       const parsed = JSON.parse(value);
-      console.log('💾 [loadAISettingsFromDatabase] Parsed AI settings:', parsed);
-      console.log('💾 [loadAISettingsFromDatabase] Parsed activeProvider:', parsed?.activeProvider);
+      logger.info('💾 [loadAISettingsFromDatabase] Parsed AI settings:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: parsed } });
+      logger.info(`💾 [loadAISettingsFromDatabase] Parsed activeProvider: ${parsed?.activeProvider}`, { component: 'Aiassistanthandlers', operation: 'execute' });
       return parsed;
     } else {
-      console.log('⚠️ [loadAISettingsFromDatabase] No ai_settings found in secure_settings table');
+      logger.info('⚠️ [loadAISettingsFromDatabase] No ai_settings found in secure_settings table', { component: 'Aiassistanthandlers', operation: 'execute' });
     }
   } catch (error) {
-    console.warn('⚠️ [loadAISettingsFromDatabase] Failed to load AI settings from database:', error);
+    logger.error('⚠️ [loadAISettingsFromDatabase] Failed to load AI settings from database:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
   }
   return null;
 }
@@ -304,18 +305,18 @@ async function loadAISettingsFromDatabase(): Promise<AISettings | null> {
  * Get current AI settings from DB or file (DB preferred)
  */
 async function getCurrentAISettings(): Promise<AISettings> {
-  console.log('🔍 [getCurrentAISettings] Loading AI settings...');
+  logger.info('🔍 [getCurrentAISettings] Loading AI settings...', { component: 'Aiassistanthandlers', operation: 'getCurrentAISettings' });
 
   const db = await loadAISettingsFromDatabase();
 
   if (db) {
-    console.log('✅ [getCurrentAISettings] Using database settings - activeProvider:', db?.activeProvider);
+    logger.info(`✅ [getCurrentAISettings] Using database settings - activeProvider: ${db?.activeProvider}`, { component: 'Aiassistanthandlers', operation: 'if' });
     return db;
   }
 
-  console.log('⚠️ [getCurrentAISettings] No database settings found, falling back to file settings');
+  logger.info('⚠️ [getCurrentAISettings] No database settings found, falling back to file settings', { component: 'Aiassistanthandlers', operation: 'if' });
   const file = loadAISettings();
-  console.log('📁 [getCurrentAISettings] Using file settings - activeProvider:', file?.activeProvider);
+  logger.info(`📁 [getCurrentAISettings] Using file settings - activeProvider: ${file?.activeProvider}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
   return file;
 }
@@ -463,7 +464,7 @@ async function listAvailableModels(provider: 'openai' | 'gemini' | 'anthropic'):
         return [];
     }
   } catch (e) {
-    console.warn('Failed to list models for', provider, e);
+    logger.error(`Failed to list models for ${provider}`, { component: 'Aiassistanthandlers', operation: 'catch' }, e as Error);
     // set cooldown to prevent tight retry loops
     const previous = modelListCache[cacheKey]?.models || [];
     modelListCache[cacheKey] = { models: previous, fetchedAt: now, failUntil: now + 2 * 60 * 1000 };
@@ -675,7 +676,7 @@ async function validateApiKeyPermissions(provider: 'openai' | 'gemini' | 'anthro
                       : modelName.includes('1.5')
                         ? (modelName.includes('flash') ? '1.5 Flash' : modelName.includes('pro') ? '1.5 Pro' : '1.5')
                         : modelName;
-                  console.log(`🔍 Detected working Gemini model: ${modelName} (${versionName})`);
+                  logger.info(`🔍 Detected working Gemini model: ${modelName} (${versionName})`, { component: 'Aiassistanthandlers', operation: 'execute' });
                   return { valid: true, modelInfo: { model: modelName, version: versionName } };
                 }
               } catch {}
@@ -818,7 +819,7 @@ async function callOpenAI(apiKey: string, prompt: string): Promise<any> {
       usage: data.usage,
     };
   } catch (error) {
-    console.error('❌ OpenAI API call failed:', error);
+    logger.error('❌ OpenAI API call failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'OpenAI API call failed',
@@ -918,7 +919,7 @@ async function callGemini(apiKey: string, prompt: string): Promise<any> {
       usage: { promptTokens, completionTokens, totalTokens },
     };
   } catch (error) {
-    console.error('❌ Gemini API call failed:', error);
+    logger.error('❌ Gemini API call failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Gemini API call failed',
@@ -970,7 +971,7 @@ async function callAnthropic(apiKey: string, prompt: string): Promise<any> {
       },
     };
   } catch (error) {
-    console.error('❌ Anthropic API call failed:', error);
+    logger.error('❌ Anthropic API call failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Anthropic API call failed',
@@ -992,7 +993,7 @@ async function makeAIApiCall(provider: 'openai' | 'gemini' | 'anthropic', prompt
     };
   }
 
-  console.log(`🤖 Making ${provider} API call...`);
+  logger.info(`🤖 Making ${provider} API call...`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
   switch (provider) {
     case 'openai':
@@ -1013,7 +1014,7 @@ async function makeAIApiCall(provider: 'openai' | 'gemini' | 'anthropic', prompt
  * Register AI Assistant IPC handlers
  */
 export function registerAIAssistantHandlers(): void {
-  console.log('🧠 Registering AI Assistant IPC handlers...');
+  logger.info('🧠 Registering AI Assistant IPC handlers...', { component: 'Aiassistanthandlers', operation: 'registerAIAssistantHandlers' });
 
   // Set API Key
   ipcMain.handle('ai-assistant:set-api-key', async (event, provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => {
@@ -1025,7 +1026,7 @@ export function registerAIAssistantHandlers(): void {
       if (typeof apiKey !== 'string' || apiKey.trim().length === 0) {
         return { success: false, error: 'API key must be a non-empty string' };
       }
-      console.log(`🔑 Setting API key for ${provider}...`);
+      logger.info(`🔑 Setting API key for ${provider}...`, { component: 'Aiassistanthandlers', operation: 'execute' });
       
       // Enhanced format validation
       const formatValidation = validateApiKey(provider, apiKey);
@@ -1036,7 +1037,7 @@ export function registerAIAssistantHandlers(): void {
       const trimmedKey = apiKey.trim();
 
       // Test API key permissions
-      console.log(`🧪 Testing API key permissions for ${provider}...`);
+      logger.info(`🧪 Testing API key permissions for ${provider}...`, { component: 'Aiassistanthandlers', operation: 'execute' });
       const permissionValidation = await validateApiKeyPermissions(provider, trimmedKey);
       if (!permissionValidation.valid) {
         return { success: false, error: permissionValidation.error };
@@ -1058,9 +1059,9 @@ export function registerAIAssistantHandlers(): void {
         };
         saveAISettings(updated);
         await persistAISettingsToDatabase(updated);
-        console.log('⚙️ Active provider persisted during set-api-key:', provider);
+        logger.info('⚙️ Active provider persisted during set-api-key:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: provider } });
       } catch (e) {
-        console.warn('⚠️ Failed to persist activeProvider during set-api-key:', e);
+        logger.error('⚠️ Failed to persist activeProvider during set-api-key:', { component: 'Aiassistanthandlers', operation: 'catch' }, e as Error);
       }
 
       // Store model info if detected for any provider
@@ -1068,23 +1069,23 @@ export function registerAIAssistantHandlers(): void {
         const existingModelInfo = getModelInfo();
         existingModelInfo[provider] = permissionValidation.modelInfo;
         storeModelInfo(existingModelInfo);
-        console.log(`🔍 Detected ${provider} model: ${permissionValidation.modelInfo.version}`);
+        logger.info(`🔍 Detected ${provider} model: ${permissionValidation.modelInfo.version}`, { component: 'Aiassistanthandlers', operation: 'if' });
         // Make a tiny usage-capturing call to surface token usage on setup
         const testPrompt = 'Respond with only: {"setup":"ok"}';
         const testResult = await makeAIApiCall(provider, testPrompt);
-        console.log('📊 Setup usage (with model info):', testResult.usage);
-        console.log(`✅ API key for ${provider} set and validated successfully`);
+        logger.info('📊 Setup usage (with model info):', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { usage: testResult.usage } });
+        logger.info(`✅ API key for ${provider} set and validated successfully`, { component: 'Aiassistanthandlers', operation: 'validate' });
         return { success: true, modelInfo: permissionValidation.modelInfo, usage: normalizeUsage(testResult.usage) };
       }
 
       // Even if no model info, still do a tiny usage-capturing call
       const testPrompt = 'Respond with only: {"setup":"ok"}';
       const testResult = await makeAIApiCall(provider, testPrompt);
-      console.log('📊 Setup usage (no model info):', testResult.usage);
-      console.log(`✅ API key for ${provider} set and validated successfully`);
+      logger.info('📊 Setup usage (no model info):', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { usage: testResult.usage } });
+      logger.info(`✅ API key for ${provider} set and validated successfully`, { component: 'Aiassistanthandlers', operation: 'validate' });
       return { success: true, usage: normalizeUsage(testResult.usage) };
     } catch (error) {
-      console.error(`❌ Failed to set API key for ${provider}:`, error);
+      logger.error(`❌ Failed to set API key for ${provider}:`, { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to set API key' 
@@ -1097,21 +1098,21 @@ export function registerAIAssistantHandlers(): void {
     try {
       const p = ProviderSchema.safeParse(provider);
       if (!p.success) return { success: false, error: 'Invalid provider' };
-      console.log(`🧪 Testing API key for ${provider}...`);
+      logger.info(`🧪 Testing API key for ${provider}...`, { component: 'Aiassistanthandlers', operation: 'execute' });
       
       // Make a simple test call
       const testPrompt = 'Say "Hello, this is a test" in JSON format: {"message": "Hello, this is a test"}';
       const result = await makeAIApiCall(provider, testPrompt);
 
       if (result.success) {
-        console.log(`✅ API key for ${provider} is valid`);
+        logger.info(`✅ API key for ${provider} is valid`, { component: 'Aiassistanthandlers', operation: 'if' });
         return { success: true };
       } else {
-        console.log(`❌ API key for ${provider} test failed:`, result.error);
+        logger.info(`❌ API key for ${provider} test failed: ${result.error}`, { component: 'Aiassistanthandlers', operation: 'if' });
         return { success: false, error: result.error };
       }
     } catch (error) {
-      console.error(`❌ API key test failed for ${provider}:`, error);
+      logger.error(`❌ API key test failed for ${provider}:`, { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'API key test failed' 
@@ -1132,7 +1133,7 @@ export function registerAIAssistantHandlers(): void {
 
     // Intelligent task sampling: prioritize recent, high-priority, and incomplete tasks
     if (tasks.length > MAX_TASKS) {
-      console.log(`📊 Applying intelligent task sampling: ${tasks.length} → ${MAX_TASKS} tasks`);
+      logger.info(`📊 Applying intelligent task sampling: ${tasks.length} → ${MAX_TASKS} tasks`, { component: 'Aiassistanthandlers', operation: 'if' });
 
       // Sort tasks by priority and recency for better analysis
       const sortedTasks = [...tasks].sort((a, b) => {
@@ -1166,7 +1167,7 @@ export function registerAIAssistantHandlers(): void {
 
     // Intelligent journal sampling: prioritize recent entries and those with tags
     if (journalEntries.length > MAX_JOURNAL_ENTRIES) {
-      console.log(`📝 Applying intelligent journal sampling: ${journalEntries.length} → ${MAX_JOURNAL_ENTRIES} entries`);
+      logger.info(`📝 Applying intelligent journal sampling: ${journalEntries.length} → ${MAX_JOURNAL_ENTRIES} entries`, { component: 'Aiassistanthandlers', operation: 'if' });
 
       // Sort journal entries by recency and content richness
       const sortedEntries = [...journalEntries].sort((a, b) => {
@@ -1209,7 +1210,7 @@ export function registerAIAssistantHandlers(): void {
       if (!valid.success) {
         return { success: false, error: 'Invalid analyze-data options' };
       }
-      console.log(`🔍 Analyzing data with ${options.provider}...`);
+      logger.info(`🔍 Analyzing data with ${options.provider}...`, { component: 'Aiassistanthandlers', operation: 'if' });
       
       // Import AI Assistant Service (use package export to support both CJS and ESM)
       const { AIAssistantService } = await import('@serenity/core');
@@ -1226,7 +1227,7 @@ export function registerAIAssistantHandlers(): void {
             const taskResult = await queryTasksIPC();
             if (taskResult.success) {
               tasks = taskResult.data || [];
-              console.log(`📊 Fetched ${tasks.length} tasks from database`);
+              logger.info(`📊 Fetched ${tasks.length} tasks from database`, { component: 'Aiassistanthandlers', operation: 'if' });
             }
           }
           
@@ -1235,11 +1236,11 @@ export function registerAIAssistantHandlers(): void {
             const journalResult = await queryJournalEntriesIPC();
             if (journalResult.success) {
               journalEntries = journalResult.data || [];
-              console.log(`📝 Fetched ${journalEntries.length} journal entries from database`);
+              logger.info(`📝 Fetched ${journalEntries.length} journal entries from database`, { component: 'Aiassistanthandlers', operation: 'execute' });
             }
           }
         } catch (dbError) {
-          console.warn('⚠️ Failed to fetch data from database:', dbError);
+          logger.error('⚠️ Failed to fetch data from database:', { component: 'Aiassistanthandlers', operation: 'catch' }, dbError as Error);
         }
       }
       
@@ -1248,7 +1249,7 @@ export function registerAIAssistantHandlers(): void {
       let analyzeJournalEntries = journalEntries;
       
       if (!options.forceReAnalyze && options.analysisTracker) {
-        console.log(`🔍 Filtering data based on analysis tracker...`);
+        logger.info(`🔍 Filtering data based on analysis tracker...`, { component: 'Aiassistanthandlers', operation: 'if' });
         const filtered = AIAssistantService.filterUnanalyzedData(
           tasks,
           journalEntries,
@@ -1257,15 +1258,15 @@ export function registerAIAssistantHandlers(): void {
         analyzeTasks = filtered.newTasks;
         analyzeJournalEntries = filtered.newJournalEntries;
         
-        console.log(`📊 After filtering: ${analyzeTasks.length} new tasks, ${analyzeJournalEntries.length} new journal entries`);
-        console.log(`📈 Previously analyzed: ${options.analysisTracker.totalTasksAnalyzed} tasks, ${options.analysisTracker.totalJournalEntriesAnalyzed} journal entries`);
+        logger.info(`📊 After filtering: ${analyzeTasks.length} new tasks, ${analyzeJournalEntries.length} new journal entries`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`📈 Previously analyzed: ${options.analysisTracker.totalTasksAnalyzed} tasks, ${options.analysisTracker.totalJournalEntriesAnalyzed} journal entries`, { component: 'Aiassistanthandlers', operation: 'analyze' });
       } else if (options.forceReAnalyze) {
-        console.log(`🔄 Force re-analysis enabled, analyzing all ${tasks.length} tasks and ${journalEntries.length} journal entries`);
+        logger.info(`🔄 Force re-analysis enabled, analyzing all ${tasks.length} tasks and ${journalEntries.length} journal entries`, { component: 'Aiassistanthandlers', operation: 'if' });
       }
       
       // Check if we have data to analyze
       if (analyzeTasks.length === 0 && analyzeJournalEntries.length === 0) {
-        console.log(`✅ No new data to analyze - all data has been processed`);
+        logger.info(`✅ No new data to analyze - all data has been processed`, { component: 'Aiassistanthandlers', operation: 'if' });
         return {
           success: true,
           insights: [],
@@ -1276,7 +1277,7 @@ export function registerAIAssistantHandlers(): void {
 
       // Apply intelligent data limiting to prevent token overflow and ensure quality analysis
       const { limitedTasks, limitedJournalEntries } = applyDataLimitsForAnalysis(analyzeTasks, analyzeJournalEntries);
-      console.log(`📊 Data limiting: ${analyzeTasks.length} → ${limitedTasks.length} tasks, ${analyzeJournalEntries.length} → ${limitedJournalEntries.length} journal entries`);
+      logger.info(`📊 Data limiting: ${analyzeTasks.length} → ${limitedTasks.length} tasks, ${analyzeJournalEntries.length} → ${limitedJournalEntries.length} journal entries`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
       // Preprocess the limited data for AI analysis
       const preprocessedTasks = AIAssistantService.preprocessTasks(limitedTasks);
@@ -1298,7 +1299,7 @@ export function registerAIAssistantHandlers(): void {
       let usageTotals = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
       
       for (const [promptType, prompt] of Object.entries(prompts)) {
-        console.log(`🤖 Running ${promptType} analysis...`);
+        logger.info(`🤖 Running ${promptType} analysis...`, { component: 'Aiassistanthandlers', operation: 'execute' });
         const result = await makeAIApiCall(options.provider, prompt);
         
         if (result.success && result.content) {
@@ -1310,14 +1311,14 @@ export function registerAIAssistantHandlers(): void {
             insight.source = options.provider;
           });
           allInsights.push(...insights);
-          console.log(`✅ Generated ${insights.length} insights from ${promptType}`);
+          logger.info(`✅ Generated ${insights.length} insights from ${promptType}`, { component: 'Aiassistanthandlers', operation: 'execute' });
           const u = normalizeUsage(result.usage);
           usageTotals.promptTokens += u.promptTokens;
           usageTotals.completionTokens += u.completionTokens;
           usageTotals.totalTokens += u.totalTokens;
         } else {
           try { console.error(`[AI][${options.provider}] ${String(promptType)} call failed. Raw result:`, result); } catch {}
-          console.warn(`⚠️ ${promptType} analysis failed:`, result.error);
+          logger.warn(`⚠️ ${promptType} analysis failed: ${result.error}`, { component: 'Aiassistanthandlers', operation: 'execute' });
         }
       }
       
@@ -1327,7 +1328,7 @@ export function registerAIAssistantHandlers(): void {
         analyzeJournalEntries
       );
       
-      console.log(`✅ Analysis complete: ${allInsights.length} insights generated`);
+      logger.info(`✅ Analysis complete: ${allInsights.length} insights generated`, { component: 'Aiassistanthandlers', operation: 'execute' });
       // Persist insights and usage to SQLite for durability
       try {
         const { sqliteService } = await import('@serenity/database');
@@ -1345,15 +1346,15 @@ export function registerAIAssistantHandlers(): void {
               metadata: insight.metadata || {},
             }))
           );
-          console.log(`💾 Persisted ${allInsights.length} AI insights to database`);
+          logger.info(`💾 Persisted ${allInsights.length} AI insights to database`, { component: 'Aiassistanthandlers', operation: 'execute' });
           try {
             const sample = allInsights.slice(0,3).map((i: any) => ({ title: i.title, type: i.type, confidence: i.confidence }));
-            console.log('🧪 Persisted insights sample (first 3):', sample);
+            logger.info('🧪 Persisted insights sample (first 3):', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: sample } });
           } catch {}
         }
         // Usage will be persisted via Redux middleware when fulfilled action is dispatched
       } catch (persistError) {
-        console.warn('⚠️ Failed to persist AI insights to database:', persistError);
+        logger.error('⚠️ Failed to persist AI insights to database:', { component: 'Aiassistanthandlers', operation: 'catch' }, persistError as Error);
       }
 
       return {
@@ -1363,7 +1364,7 @@ export function registerAIAssistantHandlers(): void {
         usage: usageTotals,
       };
     } catch (error) {
-      console.error('❌ Data analysis failed:', error);
+      logger.error('❌ Data analysis failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Data analysis failed' 
@@ -1382,7 +1383,7 @@ export function registerAIAssistantHandlers(): void {
     try {
       const valid = RecapOptionsSchema.safeParse(options);
       if (!valid.success) return { success: false, error: 'Invalid recap options' };
-      console.log(`📝 Generating ${options.type} recap with ${options.provider}...`);
+      logger.info(`📝 Generating ${options.type} recap with ${options.provider}...`, { component: 'Aiassistanthandlers', operation: 'execute' });
       
       // Import AI Assistant Service (use package export to support both CJS and ESM)
       const { AIAssistantService } = await import('@serenity/core');
@@ -1418,7 +1419,7 @@ export function registerAIAssistantHandlers(): void {
             });
           }
         } catch (dbError) {
-          console.warn('⚠️ Failed to fetch data from database for recap:', dbError);
+          logger.error('⚠️ Failed to fetch data from database for recap:', { component: 'Aiassistanthandlers', operation: 'catch' }, dbError as Error);
         }
       }
       
@@ -1443,7 +1444,7 @@ export function registerAIAssistantHandlers(): void {
       });
       
       // Generate recap with AI provider
-      console.log(`🤖 Generating ${options.type} recap with ${options.provider}...`);
+      logger.info(`🤖 Generating ${options.type} recap with ${options.provider}...`, { component: 'Aiassistanthandlers', operation: 'execute' });
       const result = await makeAIApiCall(options.provider, prompt);
       
       if (result.success && result.content) {
@@ -1457,7 +1458,7 @@ export function registerAIAssistantHandlers(): void {
           // Set correct source provider
           recap.source = options.provider;
           
-          console.log(`✅ ${options.type} recap generated successfully`);
+          logger.info(`✅ ${options.type} recap generated successfully`, { component: 'Aiassistanthandlers', operation: 'if' });
           // Persist recap and usage to SQLite for durability
           try {
             const { sqliteService } = await import('@serenity/database');
@@ -1473,13 +1474,13 @@ export function registerAIAssistantHandlers(): void {
               period: recap.period,
               metadata: recap.metadata || {},
             });
-            console.log('💾 Persisted AI recap to database');
+            logger.info('💾 Persisted AI recap to database', { component: 'Aiassistanthandlers', operation: 'execute' });
             try {
-              console.log('🧪 Recap persisted summary:', { title: recap.title, type: recap.type, period: recap.period });
+              logger.info('🧪 Recap persisted summary:', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { title: recap.title, type: recap.type, period: recap.period } });
             } catch {}
             // Usage will be persisted via Redux middleware when fulfilled action is dispatched
           } catch (persistError) {
-            console.warn('⚠️ Failed to persist AI recap to database:', persistError);
+            logger.error('⚠️ Failed to persist AI recap to database:', { component: 'Aiassistanthandlers', operation: 'catch' }, persistError as Error);
           }
 
           return {
@@ -1488,18 +1489,18 @@ export function registerAIAssistantHandlers(): void {
             usage: normalizeUsage(result.usage),
           };
         } else {
-          console.error('❌ Failed to parse recap response');
+          logger.error('❌ Failed to parse recap response', { component: 'Aiassistanthandlers', operation: 'execute' });
           return {
             success: false,
             error: 'Failed to parse AI response for recap'
           };
         }
       } else {
-        console.error('❌ AI recap generation failed:', result.error);
+        logger.error('❌ AI recap generation failed:', { component: 'Aiassistanthandlers', operation: 'execute' }, result.error);
         return { success: false, error: result.error };
       }
     } catch (error) {
-      console.error('❌ Recap generation failed:', error);
+      logger.error('❌ Recap generation failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Recap generation failed' 
@@ -1510,20 +1511,20 @@ export function registerAIAssistantHandlers(): void {
   // Get AI Settings
   ipcMain.handle('ai-assistant:get-settings', async (event) => {
     try {
-      console.log('🔍 [get-settings] AI Assistant settings request received');
+      logger.info('🔍 [get-settings] AI Assistant settings request received', { component: 'Aiassistanthandlers', operation: 'execute' });
 
       // Prefer DB if present, fallback to file defaults
       const dbSettings = await loadAISettingsFromDatabase();
-      console.log('🔍 [get-settings] Database settings loaded:', dbSettings);
-      console.log('🔍 [get-settings] Database activeProvider:', dbSettings?.activeProvider);
+      logger.info('🔍 [get-settings] Database settings loaded:', {  component: 'Aiassistanthandlers', operation: 'load' , metadata: { value: dbSettings } });
+      logger.info(`🔍 [get-settings] Database activeProvider: ${dbSettings?.activeProvider}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
       const fileSettings = loadAISettings();
-      console.log('🔍 [get-settings] File settings loaded:', fileSettings);
-      console.log('🔍 [get-settings] File activeProvider:', fileSettings?.activeProvider);
+      logger.info('🔍 [get-settings] File settings loaded:', {  component: 'Aiassistanthandlers', operation: 'load' , metadata: { value: fileSettings } });
+      logger.info(`🔍 [get-settings] File activeProvider: ${fileSettings?.activeProvider}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
       const settings = dbSettings || fileSettings;
-      console.log('🔍 [get-settings] Final settings chosen:', settings);
-      console.log('🔍 [get-settings] Final activeProvider:', settings?.activeProvider);
+      logger.info('🔍 [get-settings] Final settings chosen:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: settings } });
+      logger.info(`🔍 [get-settings] Final activeProvider: ${settings?.activeProvider}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
       const apiKeys = getApiKeys();
       let modelInfo = getModelInfo();
@@ -1547,15 +1548,15 @@ export function registerAIAssistantHandlers(): void {
               existing[p] = r.modelInfo;
               storeModelInfo(existing);
               modelInfo = existing;
-              console.log(`🔍 Backfilled ${p} model info: ${r.modelInfo.version}`);
+              logger.info(`🔍 Backfilled ${p} model info: ${r.modelInfo.version}`, { component: 'Aiassistanthandlers', operation: 'if' });
             }
           }
         }
       } catch (e) {
-        console.warn('⚠️ Model info backfill failed:', e);
+        logger.error('⚠️ Model info backfill failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, e as Error);
       }
 
-      console.log('✅ AI Assistant settings loaded successfully');
+      logger.info('✅ AI Assistant settings loaded successfully', { component: 'Aiassistanthandlers', operation: 'catch' });
       return { 
         success: true, 
         settings: {
@@ -1565,7 +1566,7 @@ export function registerAIAssistantHandlers(): void {
         }
       };
     } catch (error) {
-      console.error('❌ Failed to load AI Assistant settings:', error);
+      logger.error('❌ Failed to load AI Assistant settings:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to load settings' 
@@ -1578,7 +1579,7 @@ export function registerAIAssistantHandlers(): void {
     try {
       const valid = AISettingsSchema.safeParse(settings);
       if (!valid.success) return { success: false, error: 'Invalid AI settings' };
-      console.log('⚙️ Saving AI Assistant settings...');
+      logger.info('⚙️ Saving AI Assistant settings...', { component: 'Aiassistanthandlers', operation: 'save' });
       // Merge with currently persisted settings to avoid wiping fields (e.g., activeProvider)
       const current = await getCurrentAISettings();
       const merged: AISettings = {
@@ -1591,15 +1592,15 @@ export function registerAIAssistantHandlers(): void {
       if (lastSavedSettingsSignature === signature && now - lastSavedAtMs < 5000) {
         return { success: true, skipped: true };
       }
-      console.log('⚙️ Merged settings to persist:', merged);
+      logger.info('⚙️ Merged settings to persist:', {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: merged } });
       saveAISettings(merged);
       await persistAISettingsToDatabase(merged);
       lastSavedSettingsSignature = signature;
       lastSavedAtMs = now;
-      console.log('✅ AI Assistant settings saved successfully');
+      logger.info('✅ AI Assistant settings saved successfully', { component: 'Aiassistanthandlers', operation: 'save' });
       return { success: true };
     } catch (error) {
-      console.error('❌ Failed to save AI Assistant settings:', error);
+      logger.error('❌ Failed to save AI Assistant settings:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to save settings' 
@@ -1610,14 +1611,14 @@ export function registerAIAssistantHandlers(): void {
   // List persisted AI insights
   ipcMain.handle('ai-assistant:list-insights', async () => {
     try {
-      console.log('🔎 Fetching AI insights from SQLite...');
+      logger.info('🔎 Fetching AI insights from SQLite...', { component: 'Aiassistanthandlers', operation: 'fetch' });
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
       const rows = await sqliteService.listAIInsights(500);
-      console.log(`✅ Retrieved ${rows?.length || 0} AI insights from SQLite`);
+      logger.info(`✅ Retrieved ${rows?.length || 0} AI insights from SQLite`, { component: 'Aiassistanthandlers', operation: 'execute' });
       if (rows && rows.length > 0) {
         const sample = rows.slice(0, 3).map(r => ({ id: r.id, title: r.title, type: r.type, created_at: r.created_at }));
-        console.log('🧪 Insights sample (first 3):', sample);
+        logger.info('🧪 Insights sample (first 3):', {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: sample } });
       }
       return { success: true, data: rows };
     } catch (error) {
@@ -1628,14 +1629,14 @@ export function registerAIAssistantHandlers(): void {
   // List persisted AI recaps
   ipcMain.handle('ai-assistant:list-recaps', async () => {
     try {
-      console.log('🔎 Fetching AI recaps from SQLite...');
+      logger.info('🔎 Fetching AI recaps from SQLite...', { component: 'Aiassistanthandlers', operation: 'fetch' });
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
       const rows = await sqliteService.listAIRecaps(200);
-      console.log(`✅ Retrieved ${rows?.length || 0} AI recaps from SQLite`);
+      logger.info(`✅ Retrieved ${rows?.length || 0} AI recaps from SQLite`, { component: 'Aiassistanthandlers', operation: 'execute' });
       if (rows && rows.length > 0) {
         const sample = rows.slice(0, 3).map(r => ({ id: r.id, title: r.title, type: r.type, created_at: r.created_at }));
-        console.log('🧪 Recaps sample (first 3):', sample);
+        logger.info('🧪 Recaps sample (first 3):', {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: sample } });
       }
       return { success: true, data: rows };
     } catch (error) {
@@ -1648,12 +1649,12 @@ export function registerAIAssistantHandlers(): void {
     try {
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
-      console.log('🔎 Fetching AI token usage from SQLite...');
+      logger.info('🔎 Fetching AI token usage from SQLite...', { component: 'Aiassistanthandlers', operation: 'fetch' });
       const rows = await sqliteService.listAIUsage(500);
-      console.log(`✅ Retrieved ${rows?.length || 0} AI usage rows from SQLite`);
+      logger.info(`✅ Retrieved ${rows?.length || 0} AI usage rows from SQLite`, { component: 'Aiassistanthandlers', operation: 'execute' });
       if (rows && rows.length > 0) {
         const sample = rows.slice(0, 3);
-        console.log('🧪 Usage sample (first 3):', sample);
+        logger.info('🧪 Usage sample (first 3):', {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: sample } });
       }
       return { success: true, data: rows };
     } catch (error) {
@@ -1677,13 +1678,13 @@ export function registerAIAssistantHandlers(): void {
         metadata: i.metadata || {},
       }));
       if (rows.length > 0) {
-        console.log(`💾 Saving ${rows.length} insights via IPC to SQLite...`);
+        logger.info(`💾 Saving ${rows.length} insights via IPC to SQLite...`, { component: 'Aiassistanthandlers', operation: 'if' });
         await sqliteService.addAIInsights(rows as any);
-        console.log('✅ Insights saved via IPC');
+        logger.info('✅ Insights saved via IPC', { component: 'Aiassistanthandlers', operation: 'if' });
       }
       return { success: true };
     } catch (error) {
-      console.error('❌ Failed to save insights via IPC:', error);
+      logger.error('❌ Failed to save insights via IPC:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
       return { success: false, error: error instanceof Error ? error.message : 'Failed to save insights' };
     }
   });
@@ -1693,12 +1694,12 @@ export function registerAIAssistantHandlers(): void {
     try {
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
-      console.log('💾 Saving usage via IPC:', payload);
+      logger.info('💾 Saving usage via IPC:', {  component: 'Aiassistanthandlers', operation: 'save' , metadata: { value: payload } });
       await sqliteService.addAIUsage([{ ...payload } as any]);
-      console.log('✅ Usage saved via IPC');
+      logger.info('✅ Usage saved via IPC', { component: 'Aiassistanthandlers', operation: 'save' });
       return { success: true };
     } catch (error) {
-      console.error('❌ Failed to save usage via IPC:', error);
+      logger.error('❌ Failed to save usage via IPC:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
       return { success: false, error: error instanceof Error ? error.message : 'Failed to save usage' };
     }
   });
@@ -1722,10 +1723,10 @@ export function registerAIAssistantHandlers(): void {
       if (!p.success) return { success: false, error: 'Invalid provider' };
       const apiKeys = getApiKeys();
       const hasKey = !!apiKeys[provider];
-      console.log(`🔍 Provider ${provider} has API key: ${hasKey}`);
+      logger.info(`🔍 Provider ${provider} has API key: ${hasKey}`, { component: 'Aiassistanthandlers', operation: 'execute' });
       return { success: true, hasKey };
     } catch (error) {
-      console.error(`❌ Failed to check API key for ${provider}:`, error);
+      logger.error(`❌ Failed to check API key for ${provider}:`, { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to check API key' 
@@ -1738,8 +1739,8 @@ export function registerAIAssistantHandlers(): void {
     try {
       const p = ProviderSchema.safeParse(provider);
       if (!p.success) return { success: false, error: 'Invalid provider' };
-      console.log(`🗑️ Removing API key for ${provider}...`);
-      
+      logger.info(`🗑️ Removing API key for ${provider}...`, { component: 'Aiassistanthandlers', operation: 'execute' });
+
       const existingKeys = getApiKeys();
       delete existingKeys[provider];
       storeApiKeys(existingKeys);
@@ -1749,7 +1750,7 @@ export function registerAIAssistantHandlers(): void {
       if (existingModelInfo && existingModelInfo[provider]) {
         delete existingModelInfo[provider];
         storeModelInfo(existingModelInfo);
-        console.log(`🧹 Cleared stored model info for ${provider}`);
+        logger.info(`🧹 Cleared stored model info for ${provider}`, { component: 'Aiassistanthandlers', operation: 'if' });
       }
 
       // If this provider was active, clear selection in settings and persist
@@ -1758,13 +1759,13 @@ export function registerAIAssistantHandlers(): void {
         const updated = { ...currentSettings, activeProvider: undefined };
         saveAISettings(updated);
         await persistAISettingsToDatabase(updated);
-        console.log(`🔄 Cleared active provider selection (${provider})`);
+        logger.info(`🔄 Cleared active provider selection (${provider})`, { component: 'Aiassistanthandlers', operation: 'if' });
       }
 
-      console.log(`✅ API key for ${provider} removed successfully`);
+      logger.info(`✅ API key for ${provider} removed successfully`, { component: 'Aiassistanthandlers', operation: 'execute' });
       return { success: true };
     } catch (error) {
-      console.error(`❌ Failed to remove API key for ${provider}:`, error);
+      logger.error(`❌ Failed to remove API key for ${provider}:`, { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to remove API key' 
@@ -1783,7 +1784,7 @@ export function registerAIAssistantHandlers(): void {
       const apiKey = (keys as any)[provider];
       const debug = !!payload?.debug;
 
-      console.log(`🤖 [QuickAdd] Using provider: ${provider}, hasKey: ${!!apiKey}`);
+      logger.info(`🤖 [QuickAdd] Using provider: ${provider}, hasKey: ${!!apiKey}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
       if (!apiKey) return { success: false, error: `Missing API key for ${provider}`, debug: { stage: 'no_api_key', provider } } as any;
 
@@ -1865,10 +1866,10 @@ The JSON object must have two top-level keys:
 **User Input:** ${text}
 **Your Output:**`;
 
-      console.log(`🎯 [QuickAdd] Prompt being sent to ${provider}:`);
-      console.log('---START PROMPT---');
-      console.log(instruction);
-      console.log('---END PROMPT---');
+      logger.info(`🎯 [QuickAdd] Prompt being sent to ${provider}:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+      logger.info('---START PROMPT---', { component: 'Aiassistanthandlers', operation: 'execute' });
+      logger.info(instruction, { component: 'Aiassistanthandlers', operation: 'execute' });
+      logger.info('---END PROMPT---', { component: 'Aiassistanthandlers', operation: 'execute' });
 
       if (provider === 'openai') {
         const model = await resolveModelForProvider('openai', 'gpt-4o-mini');
@@ -1889,100 +1890,100 @@ The JSON object must have two top-level keys:
         if (!r.ok) return { success: false, error: `Provider error ${r.status}` };
         const data: any = await r.json();
 
-        console.log(`📥 [QuickAdd][${provider}] COMPLETE API RESPONSE:`);
-        console.log('---START FULL RESPONSE---');
-        console.log(JSON.stringify(data, null, 2));
-        console.log('---END FULL RESPONSE---');
+        logger.info(`📥 [QuickAdd][${provider}] COMPLETE API RESPONSE:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('---START FULL RESPONSE---', { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(JSON.stringify(data, null, 2), { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('---END FULL RESPONSE---', { component: 'Aiassistanthandlers', operation: 'execute' });
 
         const content = data?.choices?.[0]?.message?.content || '';
-        console.log(`📥 [QuickAdd][${provider}] EXTRACTED CONTENT:`);
-        console.log('---START CONTENT---');
-        console.log(content);
-        console.log('---END CONTENT---');
+        logger.info(`📥 [QuickAdd][${provider}] EXTRACTED CONTENT:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('---START CONTENT---', { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(content, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('---END CONTENT---', { component: 'Aiassistanthandlers', operation: 'execute' });
 
-        console.log(`📥 [QuickAdd][${provider}] RESPONSE ANALYSIS:`);
-        console.log('- data exists:', !!data);
-        console.log('- data.choices exists:', !!data?.choices);
-        console.log('- data.choices is array:', Array.isArray(data?.choices));
-        console.log('- data.choices length:', data?.choices?.length || 0);
-        console.log('- first choice exists:', !!data?.choices?.[0]);
-        console.log('- message exists:', !!data?.choices?.[0]?.message);
-        console.log('- content exists:', !!data?.choices?.[0]?.message?.content);
-        console.log('- content type:', typeof content);
-        console.log('- content length:', content?.length || 0);
+        logger.info(`📥 [QuickAdd][${provider}] RESPONSE ANALYSIS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- data exists: ${!!data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- data.choices exists: ${!!data?.choices}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- data.choices is array: ${Array.isArray(data?.choices)}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- data.choices length: ${data?.choices?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- first choice exists: ${!!data?.choices?.[0]}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- message exists: ${!!data?.choices?.[0]?.message}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- content exists: ${!!data?.choices?.[0]?.message?.content}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- content type: ${typeof content}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- content length: ${content?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
-        console.log(`🔍 [QuickAdd][${provider}] STARTING JSON PARSING:`);
-        console.log('- Raw content to parse:', JSON.stringify(content));
-        console.log('- Trimmed content:', JSON.stringify(content.trim()));
+        logger.info(`🔍 [QuickAdd][${provider}] STARTING JSON PARSING:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- Raw content to parse: ${JSON.stringify(content)}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- Trimmed content: ${JSON.stringify(content.trim())}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
         let parsed: any = null;
         let parseMethod = '';
 
         try {
-          console.log(`🔍 [QuickAdd][${provider}] Attempting direct JSON.parse...`);
+          logger.info(`🔍 [QuickAdd][${provider}] Attempting direct JSON.parse...`, { component: 'Aiassistanthandlers', operation: 'execute' });
           parsed = JSON.parse(content.trim());
           parseMethod = 'direct';
-          console.log(`✅ [QuickAdd][${provider}] Direct JSON.parse succeeded`);
+          logger.info(`✅ [QuickAdd][${provider}] Direct JSON.parse succeeded`, { component: 'Aiassistanthandlers', operation: 'execute' });
         } catch (directError) {
-          console.log(`❌ [QuickAdd][${provider}] Direct JSON.parse failed:`, directError);
+          logger.info(`❌ [QuickAdd][${provider}] Direct JSON.parse failed:`, {  component: 'Aiassistanthandlers', operation: 'catch' , metadata: { value: directError } });
 
           // Try to extract from markdown code blocks first
-          console.log(`🔍 [QuickAdd][${provider}] Attempting markdown extraction...`);
+          logger.info(`🔍 [QuickAdd][${provider}] Attempting markdown extraction...`, { component: 'Aiassistanthandlers', operation: 'catch' });
           const markdownMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
 
           if (markdownMatch && markdownMatch[1]) {
-            console.log(`🔍 [QuickAdd][${provider}] Found markdown-wrapped content:`, JSON.stringify(markdownMatch[1]));
+            logger.info(`🔍 [QuickAdd][${provider}] Found markdown-wrapped content: ${JSON.stringify(markdownMatch[1])}`, { component: 'Aiassistanthandlers', operation: 'if' });
             try {
               parsed = JSON.parse(markdownMatch[1].trim());
               parseMethod = 'markdown';
-              console.log(`✅ [QuickAdd][${provider}] Markdown JSON.parse succeeded`);
+              logger.info(`✅ [QuickAdd][${provider}] Markdown JSON.parse succeeded`, { component: 'Aiassistanthandlers', operation: 'if' });
             } catch (markdownError) {
-              console.error(`❌ [QuickAdd][${provider}] Markdown JSON.parse failed:`, markdownError);
+              logger.error(`❌ [QuickAdd][${provider}] Markdown JSON.parse failed:`, { component: 'Aiassistanthandlers', operation: 'catch' }, markdownError as Error);
             }
           }
 
           // Fallback to regex extraction if markdown didn't work
           if (!parsed) {
-            console.log(`🔍 [QuickAdd][${provider}] Attempting regex extraction...`);
+            logger.info(`🔍 [QuickAdd][${provider}] Attempting regex extraction...`, { component: 'Aiassistanthandlers', operation: 'if' });
             const m = content.match(/\{[\s\S]*\}/);
-            console.log(`🔍 [QuickAdd][${provider}] Regex match result:`, m ? 'found' : 'not found');
+            logger.info(`🔍 [QuickAdd][${provider}] Regex match result: ${m ? 'found' : 'not found'}`, { component: 'Aiassistanthandlers', operation: 'if' });
 
             if (m) {
-              console.log(`🔍 [QuickAdd][${provider}] Extracted JSON string:`, JSON.stringify(m[0]));
+              logger.info(`🔍 [QuickAdd][${provider}] Extracted JSON string: ${JSON.stringify(m[0])}`, { component: 'Aiassistanthandlers', operation: 'if' });
               try {
                 parsed = JSON.parse(m[0]);
                 parseMethod = 'regex';
-                console.log(`✅ [QuickAdd][${provider}] Regex JSON.parse succeeded`);
+                logger.info(`✅ [QuickAdd][${provider}] Regex JSON.parse succeeded`, { component: 'Aiassistanthandlers', operation: 'if' });
               } catch (regexError) {
-                console.error(`❌ [QuickAdd][${provider}] Regex JSON.parse failed:`, regexError);
+                logger.error(`❌ [QuickAdd][${provider}] Regex JSON.parse failed:`, { component: 'Aiassistanthandlers', operation: 'catch' }, regexError as Error);
               }
             }
           }
         }
 
-        console.log(`🔍 [QuickAdd][${provider}] PARSING RESULTS:`);
-        console.log('- Parse method used:', parseMethod);
-        console.log('- Parsed result exists:', !!parsed);
-        console.log('- Parsed result type:', typeof parsed);
-        console.log('- Parsed result:', parsed);
+        logger.info(`🔍 [QuickAdd][${provider}] PARSING RESULTS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('- Parse method used:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: parseMethod } });
+        logger.info(`- Parsed result exists: ${!!parsed}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- Parsed result type: ${typeof parsed}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('- Parsed result:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: parsed } });
 
         if (!parsed) {
-          console.error(`❌ [QuickAdd][${provider}] No parsed result - both direct and regex parsing failed`);
+          logger.error(`❌ [QuickAdd][${provider}] No parsed result - both direct and regex parsing failed`, { component: 'Aiassistanthandlers', operation: 'if' });
           return { success: false, error: 'Failed to parse JSON response', debug: { provider, model, contentSample: content?.slice?.(0, 1000) } } as any;
         }
 
-        console.log(`🔍 [QuickAdd][${provider}] VALIDATION CHECKS:`);
-        console.log('- parsed.intent exists:', !!parsed.intent);
-        console.log('- parsed.intent value:', parsed.intent);
-        console.log('- parsed.data exists:', !!parsed.data);
-        console.log('- parsed.data value:', parsed.data);
+        logger.info(`🔍 [QuickAdd][${provider}] VALIDATION CHECKS:`, { component: 'Aiassistanthandlers', operation: 'if' });
+        logger.info(`- parsed.intent exists: ${!!parsed.intent}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- parsed.intent value: ${parsed.intent}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- parsed.data exists: ${!!parsed.data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('- parsed.data value:', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { value: parsed.data } });
 
         if (!parsed.intent || !parsed.data) {
-          console.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, parsed);
+          logger.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, { component: 'Aiassistanthandlers', operation: 'if', metadata: { parsed } });
           return { success: false, error: 'Malformed LLM response structure', debug: { provider, model, contentSample: content?.slice?.(0, 1000), parsed } } as any;
         }
 
-        console.log(`✅ [QuickAdd][${provider}] Successfully parsed and validated:`, parsed);
+        logger.info(`✅ [QuickAdd][${provider}] Successfully parsed and validated:`, {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: parsed } });
 
         // Convert new format to old format for backwards compatibility
         const result = {
@@ -1995,22 +1996,22 @@ The JSON object must have two top-level keys:
           project: parsed.data.project || null
         };
 
-        console.log(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, result);
+        logger.info(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: result } });
 
         // Record token usage (map to 'analyze' channel for now)
         try {
-          console.log(`💾 [QuickAdd][${provider}] USAGE TRACKING ANALYSIS:`);
-          console.log('- data exists:', !!data);
-          console.log('- data.usage exists:', !!data?.usage);
-          console.log('- data.usage value:', data?.usage);
-          console.log('- data.usage type:', typeof data?.usage);
+          logger.info(`💾 [QuickAdd][${provider}] USAGE TRACKING ANALYSIS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- data exists: ${!!data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- data.usage exists: ${!!data?.usage}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info('- data.usage value:', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { value: data?.usage } });
+          logger.info(`- data.usage type: ${typeof data?.usage}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
           const u = normalizeUsage(data?.usage);
-          console.log(`💾 [QuickAdd][${provider}] NORMALIZED USAGE:`, u);
-          console.log('- promptTokens:', u.promptTokens);
-          console.log('- completionTokens:', u.completionTokens);
-          console.log('- totalTokens:', u.totalTokens);
-          console.log('- totalTokens > 0:', u.totalTokens > 0);
+          logger.info(`💾 [QuickAdd][${provider}] NORMALIZED USAGE:`, {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: u } });
+          logger.info(`- promptTokens: ${u.promptTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- completionTokens: ${u.completionTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- totalTokens: ${u.totalTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- totalTokens > 0: ${u.totalTokens > 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
           if (u.totalTokens > 0) {
             const usageEntry = {
@@ -2021,17 +2022,17 @@ The JSON object must have two top-level keys:
               totalTokens: u.totalTokens,
               timestamp: new Date().toISOString(),
             };
-            console.log(`💾 [QuickAdd][${provider}] Saving usage entry with deduplication:`, usageEntry);
+            logger.info(`💾 [QuickAdd][${provider}] Saving usage entry with deduplication:`, {  component: 'Aiassistanthandlers', operation: 'save' , metadata: { value: usageEntry } });
 
             const { sqliteService } = await import('@serenity/database');
             await sqliteService.initialize();
             await sqliteService.addAIUsage([usageEntry]);
-            console.log(`✅ [QuickAdd][${provider}] Usage saved to database`);
+            logger.info(`✅ [QuickAdd][${provider}] Usage saved to database`, { component: 'Aiassistanthandlers', operation: 'save' });
           } else {
-            console.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`);
+            logger.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`, { component: 'Aiassistanthandlers', operation: 'save' });
           }
         } catch (e) {
-          console.warn(`⚠️ [QuickAdd][${provider}] Failed to save quick-add usage:`, e);
+          logger.error(`⚠️ [QuickAdd][${provider}] Failed to save quick-add usage:`, { component: 'Aiassistanthandlers', operation: 'catch' }, e as Error);
         }
 
         return { success: true, data: result, debug: debug ? { provider, model, contentSample: content?.slice?.(0, 500) } : undefined } as any;
@@ -2041,9 +2042,9 @@ The JSON object must have two top-level keys:
         const model = await resolveModelForProvider('gemini', defaultModel);
         if (debug) console.log('[QuickAdd][gemini] model=', model);
 
-        console.log(`📡 [QuickAdd][${provider}] Making API call to Gemini...`);
-        console.log(`📡 [QuickAdd][${provider}] URL: https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`);
-        console.log(`📡 [QuickAdd][${provider}] API key available: ${!!apiKey}`);
+        logger.info(`📡 [QuickAdd][${provider}] Making API call to Gemini...`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`📡 [QuickAdd][${provider}] URL: https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`📡 [QuickAdd][${provider}] API key available: ${!!apiKey}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
         let r: Response;
         try {
@@ -2056,45 +2057,45 @@ The JSON object must have two top-level keys:
             }),
           });
 
-          console.log(`📡 [QuickAdd][${provider}] API response status: ${r.status} ${r.statusText}`);
+          logger.info(`📡 [QuickAdd][${provider}] API response status: ${r.status} ${r.statusText}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
           if (!r.ok) {
             const errorText = await r.text().catch(() => 'Failed to read error response');
-            console.error(`❌ [QuickAdd][${provider}] API error response:`, errorText);
+            logger.error(`❌ [QuickAdd][${provider}] API error response: ${errorText}`, { component: 'Aiassistanthandlers', operation: 'if' });
             return { success: false, error: `Provider error ${r.status}: ${errorText}` };
           }
         } catch (fetchError) {
-          console.error(`❌ [QuickAdd][${provider}] Fetch error:`, fetchError);
+          logger.error(`❌ [QuickAdd][${provider}] Fetch error:`, { component: 'Aiassistanthandlers', operation: 'catch' }, fetchError as Error);
           return { success: false, error: `Network error: ${fetchError instanceof Error ? fetchError.message : 'Unknown fetch error'}` };
         }
 
         const data: any = await r.json();
 
-        console.log(`📥 [QuickAdd][${provider}] COMPLETE API RESPONSE:`);
-        console.log('---START FULL RESPONSE---');
-        console.log(JSON.stringify(data, null, 2));
-        console.log('---END FULL RESPONSE---');
+        logger.info(`📥 [QuickAdd][${provider}] COMPLETE API RESPONSE:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('---START FULL RESPONSE---', { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(JSON.stringify(data, null, 2), { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('---END FULL RESPONSE---', { component: 'Aiassistanthandlers', operation: 'execute' });
 
         const parts = data?.candidates?.[0]?.content?.parts || [];
         const content = (Array.isArray(parts) ? parts.map((p: any) => p?.text).filter(Boolean) : []).join('\n');
 
-        console.log(`📥 [QuickAdd][${provider}] EXTRACTED CONTENT:`);
-        console.log('---START CONTENT---');
-        console.log(content);
-        console.log('---END CONTENT---');
+        logger.info(`📥 [QuickAdd][${provider}] EXTRACTED CONTENT:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('---START CONTENT---', { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(content, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('---END CONTENT---', { component: 'Aiassistanthandlers', operation: 'execute' });
 
-        console.log(`📥 [QuickAdd][${provider}] RESPONSE ANALYSIS:`);
-        console.log('- data exists:', !!data);
-        console.log('- data.candidates exists:', !!data?.candidates);
-        console.log('- data.candidates is array:', Array.isArray(data?.candidates));
-        console.log('- data.candidates length:', data?.candidates?.length || 0);
-        console.log('- first candidate exists:', !!data?.candidates?.[0]);
-        console.log('- candidate.content exists:', !!data?.candidates?.[0]?.content);
-        console.log('- candidate.content.parts exists:', !!data?.candidates?.[0]?.content?.parts);
-        console.log('- parts is array:', Array.isArray(parts));
-        console.log('- parts length:', parts?.length || 0);
-        console.log('- content type:', typeof content);
-        console.log('- content length:', content?.length || 0);
+        logger.info(`📥 [QuickAdd][${provider}] RESPONSE ANALYSIS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- data exists: ${!!data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- data.candidates exists: ${!!data?.candidates}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- data.candidates is array: ${Array.isArray(data?.candidates)}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- data.candidates length: ${data?.candidates?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- first candidate exists: ${!!data?.candidates?.[0]}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- candidate.content exists: ${!!data?.candidates?.[0]?.content}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- candidate.content.parts exists: ${!!data?.candidates?.[0]?.content?.parts}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- parts is array: ${Array.isArray(parts)}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- parts length: ${parts?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- content type: ${typeof content}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- content length: ${content?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
         let parsed: any = null;
         try {
@@ -2104,19 +2105,19 @@ The JSON object must have two top-level keys:
           if (m) {
             try {
               parsed = JSON.parse(m[0]);
-              console.log(`🔧 [QuickAdd][${provider}] Extracted JSON from response`);
+              logger.info(`🔧 [QuickAdd][${provider}] Extracted JSON from response`, { component: 'Aiassistanthandlers', operation: 'if' });
             } catch {
-              console.error(`❌ [QuickAdd][${provider}] Failed to parse extracted JSON`);
+              logger.error(`❌ [QuickAdd][${provider}] Failed to parse extracted JSON`, { component: 'Aiassistanthandlers', operation: 'catch' });
             }
           }
         }
 
         if (!parsed || !parsed.intent || !parsed.data) {
-          console.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, parsed);
+          logger.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, { component: 'Aiassistanthandlers', operation: 'if', metadata: { parsed } });
           return { success: false, error: 'Malformed LLM response', debug: { provider, model, contentSample: content?.slice?.(0, 1000) } } as any;
         }
 
-        console.log(`✅ [QuickAdd][${provider}] Successfully parsed:`, parsed);
+        logger.info(`✅ [QuickAdd][${provider}] Successfully parsed:`, {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: parsed } });
 
         // Convert new format to old format for backwards compatibility
         const result = {
@@ -2129,37 +2130,37 @@ The JSON object must have two top-level keys:
           project: parsed.data.project || null
         };
 
-        console.log(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, result);
+        logger.info(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: result } });
         try {
-          console.log(`💾 [QuickAdd][${provider}] USAGE TRACKING ANALYSIS:`);
-          console.log('- data exists:', !!data);
-          console.log('- data.usageMetadata exists:', !!data?.usageMetadata);
-          console.log('- data.usageMetadata value:', data?.usageMetadata);
+          logger.info(`💾 [QuickAdd][${provider}] USAGE TRACKING ANALYSIS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- data exists: ${!!data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- data.usageMetadata exists: ${!!data?.usageMetadata}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info('- data.usageMetadata value:', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { value: data?.usageMetadata } });
 
           const um = data?.usageMetadata || {};
           const promptTokens = Number(um.promptTokenCount || 0);
           const completionTokens = Number(um.candidatesTokenCount || 0);
           const totalTokens = Number(um.totalTokenCount || (promptTokens + completionTokens));
 
-          console.log(`💾 [QuickAdd][${provider}] EXTRACTED USAGE VALUES:`);
-          console.log('- promptTokens:', promptTokens);
-          console.log('- completionTokens:', completionTokens);
-          console.log('- totalTokens:', totalTokens);
-          console.log('- totalTokens > 0:', totalTokens > 0);
+          logger.info(`💾 [QuickAdd][${provider}] EXTRACTED USAGE VALUES:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- promptTokens: ${promptTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- completionTokens: ${completionTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- totalTokens: ${totalTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- totalTokens > 0: ${totalTokens > 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
           if (totalTokens > 0) {
             const usageEntry = { provider: 'gemini' as const, operation: 'quickadd' as const, promptTokens, completionTokens, totalTokens, timestamp: new Date().toISOString() };
-            console.log(`💾 [QuickAdd][${provider}] Saving usage entry with deduplication:`, usageEntry);
+            logger.info(`💾 [QuickAdd][${provider}] Saving usage entry with deduplication:`, {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: usageEntry } });
 
             const { sqliteService } = await import('@serenity/database');
             await sqliteService.initialize();
             await sqliteService.addAIUsage([usageEntry]);
-            console.log(`✅ [QuickAdd][${provider}] Usage saved to database`);
+            logger.info(`✅ [QuickAdd][${provider}] Usage saved to database`, { component: 'Aiassistanthandlers', operation: 'save' });
           } else {
-            console.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`);
+            logger.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`, { component: 'Aiassistanthandlers', operation: 'save' });
           }
         } catch (e) {
-          console.warn(`⚠️ [QuickAdd][${provider}] Failed to save quick-add usage:`, e);
+          logger.error(`⚠️ [QuickAdd][${provider}] Failed to save quick-add usage:`, { component: 'Aiassistanthandlers', operation: 'catch' }, e as Error);
         }
         return { success: true, data: result, debug: debug ? { provider, model, contentSample: content?.slice?.(0, 500) } : undefined } as any;
       } else if (provider === 'anthropic') {
@@ -2179,27 +2180,27 @@ The JSON object must have two top-level keys:
         if (!r.ok) return { success: false, error: `Provider error ${r.status}` };
         const data: any = await r.json();
 
-        console.log(`📥 [QuickAdd][${provider}] COMPLETE API RESPONSE:`);
-        console.log('---START FULL RESPONSE---');
-        console.log(JSON.stringify(data, null, 2));
-        console.log('---END FULL RESPONSE---');
+        logger.info(`📥 [QuickAdd][${provider}] COMPLETE API RESPONSE:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('---START FULL RESPONSE---', { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(JSON.stringify(data, null, 2), { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('---END FULL RESPONSE---', { component: 'Aiassistanthandlers', operation: 'execute' });
 
         const content = data?.content?.[0]?.text || '';
 
-        console.log(`📥 [QuickAdd][${provider}] EXTRACTED CONTENT:`);
-        console.log('---START CONTENT---');
-        console.log(content);
-        console.log('---END CONTENT---');
+        logger.info(`📥 [QuickAdd][${provider}] EXTRACTED CONTENT:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('---START CONTENT---', { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(content, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info('---END CONTENT---', { component: 'Aiassistanthandlers', operation: 'execute' });
 
-        console.log(`📥 [QuickAdd][${provider}] RESPONSE ANALYSIS:`);
-        console.log('- data exists:', !!data);
-        console.log('- data.content exists:', !!data?.content);
-        console.log('- data.content is array:', Array.isArray(data?.content));
-        console.log('- data.content length:', data?.content?.length || 0);
-        console.log('- first content exists:', !!data?.content?.[0]);
-        console.log('- content.text exists:', !!data?.content?.[0]?.text);
-        console.log('- content type:', typeof content);
-        console.log('- content length:', content?.length || 0);
+        logger.info(`📥 [QuickAdd][${provider}] RESPONSE ANALYSIS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- data exists: ${!!data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- data.content exists: ${!!data?.content}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- data.content is array: ${Array.isArray(data?.content)}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- data.content length: ${data?.content?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- first content exists: ${!!data?.content?.[0]}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- content.text exists: ${!!data?.content?.[0]?.text}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- content type: ${typeof content}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+        logger.info(`- content length: ${content?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
         let parsed: any = null;
         try {
@@ -2209,19 +2210,19 @@ The JSON object must have two top-level keys:
           if (m) {
             try {
               parsed = JSON.parse(m[0]);
-              console.log(`🔧 [QuickAdd][${provider}] Extracted JSON from response`);
+              logger.info(`🔧 [QuickAdd][${provider}] Extracted JSON from response`, { component: 'Aiassistanthandlers', operation: 'if' });
             } catch {
-              console.error(`❌ [QuickAdd][${provider}] Failed to parse extracted JSON`);
+              logger.error(`❌ [QuickAdd][${provider}] Failed to parse extracted JSON`, { component: 'Aiassistanthandlers', operation: 'catch' });
             }
           }
         }
 
         if (!parsed || !parsed.intent || !parsed.data) {
-          console.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, parsed);
+          logger.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, { component: 'Aiassistanthandlers', operation: 'if', metadata: { parsed } });
           return { success: false, error: 'Malformed LLM response', debug: { provider, model, contentSample: content?.slice?.(0, 1000) } } as any;
         }
 
-        console.log(`✅ [QuickAdd][${provider}] Successfully parsed:`, parsed);
+        logger.info(`✅ [QuickAdd][${provider}] Successfully parsed:`, {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: parsed } });
 
         // Convert new format to old format for backwards compatibility
         const result = {
@@ -2234,53 +2235,53 @@ The JSON object must have two top-level keys:
           project: parsed.data.project || null
         };
 
-        console.log(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, result);
+        logger.info(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: result } });
         try {
-          console.log(`💾 [QuickAdd][${provider}] USAGE TRACKING ANALYSIS:`);
-          console.log('- data exists:', !!data);
-          console.log('- data.usage exists:', !!data?.usage);
-          console.log('- data.usage value:', data?.usage);
-          console.log('- data.usage type:', typeof data?.usage);
+          logger.info(`💾 [QuickAdd][${provider}] USAGE TRACKING ANALYSIS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- data exists: ${!!data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- data.usage exists: ${!!data?.usage}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info('- data.usage value:', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { value: data?.usage } });
+          logger.info(`- data.usage type: ${typeof data?.usage}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
           const u = normalizeUsage(data?.usage);
-          console.log(`💾 [QuickAdd][${provider}] NORMALIZED USAGE:`, u);
-          console.log('- promptTokens:', u.promptTokens);
-          console.log('- completionTokens:', u.completionTokens);
-          console.log('- totalTokens:', u.totalTokens);
-          console.log('- totalTokens > 0:', u.totalTokens > 0);
+          logger.info(`💾 [QuickAdd][${provider}] NORMALIZED USAGE:`, {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: u } });
+          logger.info(`- promptTokens: ${u.promptTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- completionTokens: ${u.completionTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- totalTokens: ${u.totalTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          logger.info(`- totalTokens > 0: ${u.totalTokens > 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
 
           if (u.totalTokens > 0) {
             const usageEntry = { provider: 'anthropic' as const, operation: 'quickadd' as const, promptTokens: u.promptTokens, completionTokens: u.completionTokens, totalTokens: u.totalTokens, timestamp: new Date().toISOString() };
-            console.log(`💾 [QuickAdd][${provider}] Saving usage entry with deduplication:`, usageEntry);
+            logger.info(`💾 [QuickAdd][${provider}] Saving usage entry with deduplication:`, {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: usageEntry } });
 
             const { sqliteService } = await import('@serenity/database');
             await sqliteService.initialize();
             await sqliteService.addAIUsage([usageEntry]);
-            console.log(`✅ [QuickAdd][${provider}] Usage saved to database`);
+            logger.info(`✅ [QuickAdd][${provider}] Usage saved to database`, { component: 'Aiassistanthandlers', operation: 'save' });
           } else {
-            console.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`);
+            logger.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`, { component: 'Aiassistanthandlers', operation: 'save' });
           }
         } catch (e) {
-          console.warn(`⚠️ [QuickAdd][${provider}] Failed to save quick-add usage:`, e);
+          logger.error(`⚠️ [QuickAdd][${provider}] Failed to save quick-add usage:`, { component: 'Aiassistanthandlers', operation: 'catch' }, e as Error);
         }
         return { success: true, data: result, debug: debug ? { provider, model, contentSample: content?.slice?.(0, 500) } : undefined } as any;
       }
 
       return { success: false, error: `Provider ${provider} not supported for quick-add`, debug: { stage: 'unsupported_provider', provider } } as any;
     } catch (e) {
-      console.error('[QuickAdd] error:', e);
+      logger.error('[QuickAdd] error:', { component: 'Aiassistanthandlers', operation: 'catch', metadata: { e } });
       return { success: false, error: (e as Error)?.message || 'LLM error' } as any;
     }
   });
 
-  console.log('✅ AI Assistant IPC handlers registered successfully');
+  logger.info('✅ AI Assistant IPC handlers registered successfully', { component: 'Aiassistanthandlers', operation: 'register' });
 }
 
 /**
  * Unregister AI Assistant IPC handlers
  */
 export function unregisterAIAssistantHandlers(): void {
-  console.log('🧠 Unregistering AI Assistant IPC handlers...');
+  logger.info('🧠 Unregistering AI Assistant IPC handlers...', { component: 'Aiassistanthandlers', operation: 'unregister' });
   
   ipcMain.removeHandler('ai-assistant:set-api-key');
   ipcMain.removeHandler('ai-assistant:test-api-key');
@@ -2295,5 +2296,5 @@ export function unregisterAIAssistantHandlers(): void {
   encryptedApiKeys = null;
   encryptedModelInfo = null;
   
-  console.log('✅ AI Assistant IPC handlers unregistered');
+  logger.info('✅ AI Assistant IPC handlers unregistered', { component: 'Aiassistanthandlers', operation: 'execute' });
 }

@@ -2,6 +2,7 @@ import { createSlice, createSelector, PayloadAction } from '@reduxjs/toolkit';
 import { JournalEntry } from '../../types';
 import { generateId } from '../../utils';
 import { loadJournalEntries } from '../../utils/persistence';
+import { logger } from '../../utils/logger';
 
 export interface JournalState {
   entries: JournalEntry[];
@@ -22,7 +23,7 @@ const initialEntries = (() => {
   try {
     return loadJournalEntries();
   } catch (error) {
-    console.error('Failed to load journal entries from storage:', error);
+    logger.error('Failed to load journal entries from storage:', { component: 'journalSlice', operation: 'failedLoadJournal' }, error as Error);
     return [];
   }
 })();

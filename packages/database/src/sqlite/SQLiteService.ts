@@ -10,6 +10,7 @@ import { SQLiteJournalQueries } from '../queries/sqlite/journal';
 import { SQLiteAIQueries } from '../queries/sqlite/ai';
 import { SQLiteGoalQueries } from '../queries/sqlite/goals';
 import { Task, Project, JournalEntry, Goal } from '@serenity/core';
+import { logger } from '@serenity/core';
 
 export class SQLiteService {
   private adapter: SQLiteAdapter;
@@ -42,9 +43,9 @@ export class SQLiteService {
       this.goals = new SQLiteGoalQueries(db);
 
       this.initialized = true;
-      console.log('✅ SQLite service initialized successfully');
+      logger.info('✅ SQLite service initialized successfully', { component: 'SQLiteService', operation: 'sqliteServiceInitialized' });
     } catch (error) {
-      console.error('Failed to initialize SQLite service:', error);
+      logger.error('Failed to initialize SQLite service:', { component: 'SQLiteService', operation: 'failedInitializeSqlite' }, error as Error);
       throw error;
     }
   }

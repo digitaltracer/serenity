@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useDispatch } from 'react-redux';
+import { logger } from '@serenity/core';
 import {
   GitHubService,
   GitHubToken,
@@ -65,7 +66,7 @@ export const useGitHubTokens = ({
           );
           showSuccess('GitHub Token Added', `GitHub token for ${userInfo.login} has been added and encrypted successfully.`);
         } catch (error: any) {
-          console.error('Failed to encrypt GitHub tokens:', error);
+          logger.error('Failed to encrypt GitHub tokens:', { component: 'useGitHubTokens', operation: 'failedEncryptGithub' }, error);
           showError('Encryption Failed', `Failed to encrypt integration tokens: ${error}. Please try reconnecting.`);
         }
       } else {
@@ -103,7 +104,7 @@ export const useGitHubTokens = ({
           await anyDispatch(persistIntegrationsState(sessionMasterPassword));
           showSuccess('Token Removed', `GitHub token for ${token.username} has been removed successfully.`);
         } catch (error) {
-          console.error('Failed to persist token removal:', error);
+          logger.error('Failed to persist token removal:', { component: 'useGitHubTokens', operation: 'failedPersistToken' }, error);
           showError('Persistence Failed', 'Token removed locally but could not be saved permanently.');
         }
       } else {
@@ -125,7 +126,7 @@ export const useGitHubTokens = ({
             showSuccess('Token Updated', `GitHub token for ${token.username} ${token.isActive ? 'disabled' : 'enabled'} successfully.`);
           }
         } catch (error) {
-          console.error('Failed to persist token status change:', error);
+          logger.error('Failed to persist token status change:', { component: 'useGitHubTokens', operation: 'failedPersistToken' }, error);
           showError('Persistence Failed', 'Token status changed locally but could not be saved permanently.');
         }
       } else {

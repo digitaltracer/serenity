@@ -4,6 +4,7 @@
  */
 
 import type { JournalEntry } from '@serenity/core';
+import { logger } from '@serenity/core';
 
 interface JournalEntryData {
   title: string;
@@ -49,7 +50,7 @@ export class JournalService {
    */
   async getAllJournalEntries() {
     try {
-      console.log('📖 JournalService: Getting all journal entries');
+      logger.info('📖 JournalService: Getting all journal entries', { component: 'JournalService', operation: 'journalservice:GettingAll' });
       const service = await this.getSqliteService();
       const entries = await service.getJournalEntries();
       
@@ -64,10 +65,10 @@ export class JournalService {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       });
       
-      console.log(`✅ JournalService: Retrieved ${sortedEntries.length} journal entries`);
+      logger.info(`✅ JournalService: Retrieved ${sortedEntries.length} journal entries`, { component: 'JournalService', operation: 'journalservice:Retrieved${sortedentries.length}' });
       return { success: true, data: sortedEntries };
     } catch (error) {
-      console.error('❌ JournalService: Failed to get journal entries:', error);
+      logger.error('❌ JournalService: Failed to get journal entries:', { component: 'JournalService', operation: 'journalservice:FailedGet' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to retrieve journal entries' 
@@ -80,7 +81,7 @@ export class JournalService {
    */
   async createJournalEntry(entryData: JournalEntryData) {
     try {
-      console.log('📝 JournalService: Creating new journal entry:', entryData.title);
+      logger.info(`📝 JournalService: Creating new journal entry: ${entryData.title}`, { component: 'JournalService', operation: 'journalservice:CreatingNew' });
       
       // Validation
       if (!entryData.title || entryData.title.trim().length === 0) {
@@ -128,10 +129,10 @@ export class JournalService {
       const service = await this.getSqliteService();
       const newEntry = await service.createJournalEntry(sanitizedEntry);
       
-      console.log('✅ JournalService: Journal entry created successfully:', newEntry.id);
+      logger.info(`✅ JournalService: Journal entry created successfully: ${newEntry.id}`, { component: 'JournalService', operation: 'journalservice:JournalEntry' });
       return { success: true, data: newEntry };
     } catch (error) {
-      console.error('❌ JournalService: Failed to create journal entry:', error);
+      logger.error('❌ JournalService: Failed to create journal entry:', { component: 'JournalService', operation: 'journalservice:FailedCreate' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to create journal entry' 
@@ -144,7 +145,7 @@ export class JournalService {
    */
   async updateJournalEntry(id: string, updates: JournalEntryUpdate) {
     try {
-      console.log('📝 JournalService: Updating journal entry:', id);
+      logger.info('📝 JournalService: Updating journal entry:', {  component: 'JournalService', operation: 'journalservice:UpdatingJournal' , metadata: { value: id } });
       
       // Validation
       if (!id || id.trim().length === 0) {
@@ -203,10 +204,10 @@ export class JournalService {
       const service = await this.getSqliteService();
       const updatedEntry = await service.updateJournalEntry(id, sanitizedUpdates);
       
-      console.log('✅ JournalService: Journal entry updated successfully:', id);
+      logger.info('✅ JournalService: Journal entry updated successfully:', {  component: 'JournalService', operation: 'journalservice:JournalEntry' , metadata: { value: id } });
       return { success: true, data: updatedEntry };
     } catch (error) {
-      console.error('❌ JournalService: Failed to update journal entry:', error);
+      logger.error('❌ JournalService: Failed to update journal entry:', { component: 'JournalService', operation: 'journalservice:FailedUpdate' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to update journal entry' 
@@ -219,7 +220,7 @@ export class JournalService {
    */
   async deleteJournalEntry(id: string) {
     try {
-      console.log('🗑️ JournalService: Deleting journal entry:', id);
+      logger.info('🗑️ JournalService: Deleting journal entry:', {  component: 'JournalService', operation: '🗑️Journalservice:Deleting' , metadata: { value: id } });
       
       // Validation
       if (!id || id.trim().length === 0) {
@@ -229,10 +230,10 @@ export class JournalService {
       const service = await this.getSqliteService();
       const deleted = await service.deleteJournalEntry(id);
       
-      console.log('✅ JournalService: Journal entry deleted successfully:', id);
+      logger.info('✅ JournalService: Journal entry deleted successfully:', {  component: 'JournalService', operation: 'journalservice:JournalEntry' , metadata: { value: id } });
       return { success: true, data: deleted };
     } catch (error) {
-      console.error('❌ JournalService: Failed to delete journal entry:', error);
+      logger.error('❌ JournalService: Failed to delete journal entry:', { component: 'JournalService', operation: 'journalservice:FailedDelete' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to delete journal entry' 
@@ -244,7 +245,7 @@ export class JournalService {
    * Pin a journal entry (business logic wrapper)
    */
   async pinJournalEntry(id: string) {
-    console.log('📌 JournalService: Pinning journal entry:', id);
+    logger.info('📌 JournalService: Pinning journal entry:', {  component: 'JournalService', operation: 'journalservice:PinningJournal' , metadata: { value: id } });
     return this.updateJournalEntry(id, { pinned: true });
   }
 
@@ -252,7 +253,7 @@ export class JournalService {
    * Unpin a journal entry (business logic wrapper)
    */
   async unpinJournalEntry(id: string) {
-    console.log('📌 JournalService: Unpinning journal entry:', id);
+    logger.info('📌 JournalService: Unpinning journal entry:', {  component: 'JournalService', operation: 'journalservice:UnpinningJournal' , metadata: { value: id } });
     return this.updateJournalEntry(id, { pinned: false });
   }
 
@@ -261,7 +262,7 @@ export class JournalService {
    */
   async getJournalEntriesByDateRange(startDate: string, endDate: string) {
     try {
-      console.log('📅 JournalService: Getting journal entries by date range:', startDate, 'to', endDate);
+      logger.info(`📅 JournalService: Getting journal entries by date range: ${startDate} to ${endDate}`, { component: 'JournalService', operation: 'journalservice:GettingJournal' });
       
       // Validation
       const start = new Date(startDate);
@@ -293,10 +294,10 @@ export class JournalService {
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
       
-      console.log(`✅ JournalService: Retrieved ${sortedEntries.length} entries for date range`);
+      logger.info(`✅ JournalService: Retrieved ${sortedEntries.length} entries for date range`, { component: 'JournalService', operation: 'journalservice:Retrieved${sortedentries.length}' });
       return { success: true, data: sortedEntries };
     } catch (error) {
-      console.error('❌ JournalService: Failed to get journal entries by date range:', error);
+      logger.error('❌ JournalService: Failed to get journal entries by date range:', { component: 'JournalService', operation: 'journalservice:FailedGet' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to get journal entries by date range' 
@@ -309,7 +310,7 @@ export class JournalService {
    */
   async getJournalStats() {
     try {
-      console.log('📊 JournalService: Getting journal statistics');
+      logger.info('📊 JournalService: Getting journal statistics', { component: 'JournalService', operation: 'journalservice:GettingJournal' });
 
       const service = await this.getSqliteService();
       const entries = await service.getJournalEntries();
@@ -331,10 +332,10 @@ export class JournalService {
         writingStreak: this.calculateWritingStreak(entries)
       };
       
-      console.log('✅ JournalService: Journal statistics calculated');
+      logger.info('✅ JournalService: Journal statistics calculated', { component: 'JournalService', operation: 'journalservice:JournalStatistics' });
       return { success: true, data: stats };
     } catch (error) {
-      console.error('❌ JournalService: Failed to get journal statistics:', error);
+      logger.error('❌ JournalService: Failed to get journal statistics:', { component: 'JournalService', operation: 'journalservice:FailedGet' }, error as Error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to get journal statistics' 

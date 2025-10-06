@@ -2,11 +2,12 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from './Button';
 import { Input } from './Input';
-import { 
-  Lock, 
-  Eye, 
-  EyeOff, 
-  AlertCircle, 
+import { logger } from '@serenity/core';
+import {
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
   Loader,
   Shield,
   KeyRound,
@@ -49,7 +50,7 @@ export const AppLockScreen: React.FC<AppLockScreenProps> = ({
           const result = await (window.electronAPI as any).biometric.isAvailable();
           setTouchIdAvailable(result.available);
         } catch (error) {
-          console.error('Failed to check Touch ID availability:', error);
+          logger.error('Failed to check Touch ID availability:', { component: 'AppLockScreen', operation: 'failedCheckTouch' }, error as Error);
           setTouchIdAvailable(false);
         }
       }
@@ -71,11 +72,11 @@ export const AppLockScreen: React.FC<AppLockScreenProps> = ({
           await onUnlock(''); // Empty password since we used biometric auth
         } else if (!result.cancelled) {
           // Only show error if not cancelled by user
-          console.error('Touch ID failed:', result.error);
+          logger.error('Touch ID failed:', { component: 'AppLockScreen', operation: 'touchFailed:' }, result.error);
         }
       }
     } catch (error) {
-      console.error('Touch ID error:', error);
+      logger.error('Touch ID error:', { component: 'AppLockScreen', operation: 'touchError:' }, error as Error);
     } finally {
       setTouchIdAuthenticating(false);
     }
@@ -113,7 +114,7 @@ export const AppLockScreen: React.FC<AppLockScreenProps> = ({
         setPassword('');
       }
     } catch (error) {
-      console.error('Unlock failed:', error);
+      logger.error('Unlock failed:', { component: 'AppLockScreen', operation: 'unlockFailed:' }, error as Error);
     } finally {
       setIsSubmitting(false);
     }

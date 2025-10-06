@@ -1,5 +1,6 @@
 import { getDatabase } from '../connection';
 import { Goal } from '@serenity/core';
+import { logger } from '@serenity/core';
 
 export const createGoal = async (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>): Promise<Goal> => {
   const db = getDatabase();
@@ -158,7 +159,7 @@ const mapGoalFromDB = (row: any): Goal => {
     try {
       return JSON.parse(jsonString);
     } catch (error) {
-      console.warn('Failed to parse JSON:', error, 'Using fallback:', fallback);
+      logger.warn('Failed to parse JSON, using fallback', { component: 'goals', operation: 'failedParseJson:' });
       return fallback;
     }
   };

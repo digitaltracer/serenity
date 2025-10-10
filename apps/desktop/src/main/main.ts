@@ -367,23 +367,19 @@ class AppManager {
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
               )`
             );
-            interface SettingRow {
-              value: string;
-            }
-            
             const idRows = await sqliteService.executeRawQuery(
               'SELECT value FROM secure_settings WHERE key = ? LIMIT 1',
               ['google_client_id']
-            ) as SettingRow[];
+            );
             const secretRows = await sqliteService.executeRawQuery(
               'SELECT value FROM secure_settings WHERE key = ? LIMIT 1',
-              ['google_client_secret']  
-            ) as SettingRow[];
-            
+              ['google_client_secret']
+            );
+
             const idRow = Array.isArray(idRows) ? idRows[0] : null;
             const secretRow = Array.isArray(secretRows) ? secretRows[0] : null;
-            clientId = clientId || idRow?.value;
-            clientSecret = clientSecret || secretRow?.value;
+            clientId = clientId || (idRow?.value as string | undefined);
+            clientSecret = clientSecret || (secretRow?.value as string | undefined);
           } catch (e) {
             // Ignore and fail below if missing
           }

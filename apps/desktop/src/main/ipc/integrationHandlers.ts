@@ -106,9 +106,9 @@ export function registerIntegrationHandlers(): void {
       const result = await sqliteService.executeRawQuery(
         'SELECT COUNT(*) as count FROM encrypted_integrations'
       );
-      
-      const count = result && result.length > 0 ? result[0].count || 0 : 0;
-      
+
+      const count = result && result.length > 0 ? (result[0].count as number) || 0 : 0;
+
       return { success: true, data: { hasEncrypted: count > 0, count }, error: null };
     } catch (error) {
       logger.error('❌ Failed to check encrypted integrations:', { component: 'integrationHandlers', operation: 'failedCheckEncrypted' }, error as Error);

@@ -1,3 +1,5 @@
+/// <reference path="./types/electron.d.ts" />
+
 export * from './types';
 export * from './utils';
 export * from './validation';
@@ -9,7 +11,9 @@ export * from './hooks/useDragDrop';
 export * from './services/googleCalendarService';
 export * from './services/githubService';
 export * from './services/integrationSyncService';
-export * from './services/encryptedIntegrationService';
+// Export only the service class, not the EncryptedIntegrationData type
+// (EncryptedIntegrationData is exported from ./types/ipc)
+export { EncryptedIntegrationService } from './services/encryptedIntegrationService';
 // biometricAuthService is only used dynamically to avoid bundle conflicts
 export * from './services/aiAssistantService';
 // Export secure storage functions

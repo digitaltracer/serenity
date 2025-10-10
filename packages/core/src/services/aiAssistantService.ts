@@ -7,9 +7,9 @@ import { Task, JournalEntry } from '../types';
 import { AIInsight, AIRecap } from '../store/slices/aiAssistantSlice';
 import { logger } from '../utils/logger';
 
-export interface AIApiResponse {
+export interface AIApiResponse<T = unknown> {
   success: boolean;
-  data?: any;
+  data?: T;
   error?: string;
   usage?: {
     promptTokens: number;
@@ -41,12 +41,39 @@ export interface RecapRequest {
   journalEntries: JournalEntry[];
 }
 
+export interface PreprocessedTask {
+  id: string;
+  title: string;
+  description: string;
+  completed: boolean;
+  priority: string;
+  tags: string[];
+  createdAt: Date;
+  updatedAt: Date;
+  dueDate?: Date;
+  daysSinceCreated: number;
+  isOverdue: boolean;
+  completionTime: number | null;
+}
+
+export interface PreprocessedJournalEntry {
+  id: string;
+  content: string;
+  mood?: string;
+  tags: string[];
+  createdAt: Date;
+  updatedAt: Date;
+  wordCount: number;
+  dayOfWeek: number;
+  hourOfDay: number;
+}
+
 export class AIAssistantService {
   /**
    * Preprocess tasks for AI analysis
    * Removes sensitive information and structures data
    */
-  static preprocessTasks(tasks: Task[]): any[] {
+  static preprocessTasks(tasks: Task[]): PreprocessedTask[] {
     return tasks.map(task => ({
       id: task.id,
       title: task.title,
@@ -79,7 +106,7 @@ export class AIAssistantService {
       category: 'tasks' | 'journal' | 'habits' | 'goals';
       actionable?: boolean;
       confidence: number;
-      metadata?: any;
+      metadata?: Record<string, unknown>;
     }> = [];
 
     const totalTasks = tasks.length;
@@ -177,7 +204,7 @@ export class AIAssistantService {
    * Preprocess journal entries for AI analysis
    * Removes sensitive information and structures data
    */
-  static preprocessJournalEntries(entries: JournalEntry[]): any[] {
+  static preprocessJournalEntries(entries: JournalEntry[]): PreprocessedJournalEntry[] {
     return entries.map(entry => ({
       id: entry.id,
       // Only include first 200 chars of content to limit token usage and maintain privacy
@@ -197,10 +224,10 @@ export class AIAssistantService {
    * Generate prompts for behavioral analysis
    */
   static generateInsightPrompts(data: {
-    tasks: any[];
-    journalEntries: any[];
+    tasks: PreprocessedTask[];
+    journalEntries: PreprocessedJournalEntry[];
     dataTypes: string[];
-  }): { [key: string]: string } {
+  }): Record<string, string> {
     const prompts: { [key: string]: string } = {};
 
     if (data.dataTypes.includes('tasks') && data.tasks.length > 0) {
@@ -280,8 +307,8 @@ Keep insights supportive, constructive, and respectful of personal reflection.
   static generateRecapPrompts(data: {
     type: 'weekly' | 'monthly';
     period: { start: string; end: string };
-    tasks: any[];
-    journalEntries: any[];
+    tasks: PreprocessedTask[];
+    journalEntries: PreprocessedJournalEntry[];
   }): string {
     const timeframe = data.type === 'weekly' ? 'week' : 'month';
     
@@ -451,32 +478,38 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
       const parsed = JSON.parse(working);
 
       if (parsed && parsed.insights && Array.isArray(parsed.insights)) {
-        return parsed.insights.map((insight: any) => ({
-          id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          type: insight.type || 'recommendation',
-          title: insight.title || 'AI Recommendation',
-          description: insight.description || '',
-          confidence: Math.max(0, Math.min(1, insight.confidence || 0.5)),
-          createdAt: new Date().toISOString(),
-          source: 'openai', // This will be set by the calling function
-          category: insight.category || 'tasks',
-          actionable: insight.actionable !== false,
-          metadata: insight.metadata || {},
-        }));
+        return parsed.insights.map((insight: unknown) => {
+          const insightObj = insight as Record<string, unknown>;
+          return {
+            id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            type: (insightObj.type as string) || 'recommendation',
+            title: (insightObj.title as string) || 'AI Recommendation',
+            description: (insightObj.description as string) || '',
+            confidence: Math.max(0, Math.min(1, (insightObj.confidence as number) || 0.5)),
+            createdAt: new Date().toISOString(),
+            source: 'openai', // This will be set by the calling function
+            category: (insightObj.category as string) || 'tasks',
+            actionable: insightObj.actionable !== false,
+            metadata: (insightObj.metadata as Record<string, unknown>) || {},
+          } as AIInsight;
+        });
       }
       if (Array.isArray(parsed)) {
-        return parsed.map((insight: any) => ({
-          id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          type: insight.type || 'recommendation',
-          title: insight.title || 'AI Recommendation',
-          description: insight.description || '',
-          confidence: Math.max(0, Math.min(1, insight.confidence || 0.5)),
-          createdAt: new Date().toISOString(),
-          source: 'openai',
-          category: insight.category || 'tasks',
-          actionable: insight.actionable !== false,
-          metadata: insight.metadata || {},
-        }));
+        return parsed.map((insight: unknown) => {
+          const insightObj = insight as Record<string, unknown>;
+          return {
+            id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            type: (insightObj.type as string) || 'recommendation',
+            title: (insightObj.title as string) || 'AI Recommendation',
+            description: (insightObj.description as string) || '',
+            confidence: Math.max(0, Math.min(1, (insightObj.confidence as number) || 0.5)),
+            createdAt: new Date().toISOString(),
+            source: 'openai',
+            category: (insightObj.category as string) || 'tasks',
+            actionable: insightObj.actionable !== false,
+            metadata: (insightObj.metadata as Record<string, unknown>) || {},
+          } as AIInsight;
+        });
       }
     } catch (error) {
       try {

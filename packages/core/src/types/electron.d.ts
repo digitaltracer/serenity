@@ -1,37 +1,93 @@
 // Electron API type definitions for renderer process
+import {
+  // Database types
+  DatabaseStats,
+  DatabaseConnectionResponse,
+  DatabaseBackupResponse,
+  DatabaseImportResult,
+  DatabaseQueryResult,
+  DataIPCResponse,
+  // Task types
+  TaskIPCResponse,
+  TaskListIPCResponse,
+  TaskDeleteIPCResponse,
+  TaskCreateInput,
+  TaskUpdateInput,
+  // Project types
+  ProjectIPCResponse,
+  ProjectListIPCResponse,
+  ProjectDeleteIPCResponse,
+  ProjectCreateInput,
+  ProjectUpdateInput,
+  // Journal types
+  JournalEntryIPCResponse,
+  JournalEntryListIPCResponse,
+  JournalEntryDeleteIPCResponse,
+  JournalEntryCreateInput,
+  JournalEntryUpdateInput,
+  // Integration types
+  EncryptedIntegrationData,
+  IntegrationVerification,
+  ListIPCResponse,
+  BaseIPCResponse,
+  // Auth types
+  MasterPasswordHashResponse,
+  HasMasterPasswordResponse,
+  SecureSettingResponse,
+  // Biometric types
+  BiometricAvailabilityResponse,
+  BiometricAuthResponse,
+  // OAuth types
+  OAuthStartResponse,
+  GoogleOAuthData,
+  // AI types
+  AISetApiKeyResponse,
+  AIAnalyzeDataOptions,
+  AIAnalyzeDataResponse,
+  AIGenerateRecapOptions,
+  AIGenerateRecapResponse,
+  AISettingsResponse,
+  AISettings,
+  AIHasApiKeyResponse,
+  AIListModelsResponse,
+  // Menu types
+  MenuEventType,
+  MenuEventData,
+} from './ipc';
+
 declare global {
   interface Window {
     electronAPI?: {
       database: {
-        testConnection: (connectionUrl: string) => Promise<{ success: boolean; error?: string }>;
+        testConnection: (connectionUrl: string) => Promise<DatabaseConnectionResponse>;
       };
       sqlite?: {
         // Database management
-        initialize: () => Promise<{ success: boolean; error?: string }>;
-        testConnection: () => Promise<{ success: boolean; error?: string }>;
-        getStats: () => Promise<{ success: boolean; data?: any; error?: string }>;
-        backup: (backupPath?: string) => Promise<{ success: boolean; path?: string; error?: string }>;
-        importFromLocalStorage: (data: any) => Promise<{ success: boolean; result?: any; error?: string }>;
-        exportAllData: () => Promise<{ success: boolean; data?: any; error?: string }>;
-        query: (query: string, params?: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
+        initialize: () => Promise<BaseIPCResponse>;
+        testConnection: () => Promise<BaseIPCResponse>;
+        getStats: () => Promise<DataIPCResponse<DatabaseStats>>;
+        backup: (backupPath?: string) => Promise<DatabaseBackupResponse>;
+        importFromLocalStorage: (data: unknown) => Promise<DataIPCResponse<DatabaseImportResult>>;
+        exportAllData: () => Promise<DataIPCResponse<Record<string, unknown>>>;
+        query: (query: string, params?: unknown[]) => Promise<DataIPCResponse<DatabaseQueryResult>>;
 
         // Task operations
-        getTasks: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
-        createTask: (task: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-        updateTask: (id: string, updates: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-        deleteTask: (id: string) => Promise<{ success: boolean; data?: boolean; error?: string }>;
+        getTasks: () => Promise<TaskListIPCResponse>;
+        createTask: (task: TaskCreateInput) => Promise<TaskIPCResponse>;
+        updateTask: (id: string, updates: TaskUpdateInput) => Promise<TaskIPCResponse>;
+        deleteTask: (id: string) => Promise<TaskDeleteIPCResponse>;
 
         // Project operations
-        getProjects: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
-        createProject: (project: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-        updateProject: (id: string, updates: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-        deleteProject: (id: string) => Promise<{ success: boolean; data?: boolean; error?: string }>;
+        getProjects: () => Promise<ProjectListIPCResponse>;
+        createProject: (project: ProjectCreateInput) => Promise<ProjectIPCResponse>;
+        updateProject: (id: string, updates: ProjectUpdateInput) => Promise<ProjectIPCResponse>;
+        deleteProject: (id: string) => Promise<ProjectDeleteIPCResponse>;
 
         // Journal operations
-        getJournalEntries: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
-        createJournalEntry: (entry: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-        updateJournalEntry: (id: string, updates: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-        deleteJournalEntry: (id: string) => Promise<{ success: boolean; data?: boolean; error?: string }>;
+        getJournalEntries: () => Promise<JournalEntryListIPCResponse>;
+        createJournalEntry: (entry: JournalEntryCreateInput) => Promise<JournalEntryIPCResponse>;
+        updateJournalEntry: (id: string, updates: JournalEntryUpdateInput) => Promise<JournalEntryIPCResponse>;
+        deleteJournalEntry: (id: string) => Promise<JournalEntryDeleteIPCResponse>;
       };
       window: {
         minimize: () => Promise<void>;
@@ -39,52 +95,52 @@ declare global {
         close: () => Promise<void>;
       };
       biometric: {
-        isAvailable: () => Promise<{ available: boolean; type: string | null }>;
-        authenticate: (reason?: string) => Promise<{ success: boolean; error?: string | null; cancelled?: boolean }>;
+        isAvailable: () => Promise<BiometricAvailabilityResponse>;
+        authenticate: (reason?: string) => Promise<BiometricAuthResponse>;
       };
       safeStorage?: {
         encryptString: (plaintext: string) => Promise<string>;
         decryptString: (encrypted: string) => Promise<string>;
       };
       oauth?: {
-        googleStart: (clientId: string, clientSecret: string) => Promise<{ success: boolean; authUrl?: string; error?: string }>;
-        onGoogleSuccess: (callback: (authData: any) => void) => void;
+        googleStart: (clientId: string, clientSecret: string) => Promise<OAuthStartResponse>;
+        onGoogleSuccess: (callback: (authData: GoogleOAuthData) => void) => void;
         onGoogleError: (callback: (error: string) => void) => void;
         onGoogleCancelled: (callback: () => void) => void;
         removeOAuthListeners: () => void;
       };
       integrations?: {
-        initializeTable: () => Promise<{ success: boolean; data?: any; error?: string }>;
-        saveEncrypted: (integrationData: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-        loadEncrypted: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
-        hasEncrypted: () => Promise<{ success: boolean; data?: { hasEncrypted: boolean; count: number }; error?: string }>;
-        clearEncrypted: () => Promise<{ success: boolean; data?: any; error?: string }>;
-        verifyTable: () => Promise<{ success: boolean; data?: { exists: boolean }; error?: string }>;
-        getVerification: () => Promise<{ success: boolean; data?: any[]; error?: string }>;
+        initializeTable: () => Promise<BaseIPCResponse>;
+        saveEncrypted: (integrationData: EncryptedIntegrationData) => Promise<DataIPCResponse<EncryptedIntegrationData>>;
+        loadEncrypted: () => Promise<ListIPCResponse<EncryptedIntegrationData>>;
+        hasEncrypted: () => Promise<DataIPCResponse<{ hasEncrypted: boolean; count: number }>>;
+        clearEncrypted: () => Promise<BaseIPCResponse>;
+        verifyTable: () => Promise<DataIPCResponse<{ exists: boolean }>>;
+        getVerification: () => Promise<ListIPCResponse<IntegrationVerification>>;
       };
       auth?: {
-        initializeSecureSettings: () => Promise<{ success: boolean; data?: any; error?: string }>;
-        setMasterPasswordHash: (hash: string) => Promise<{ success: boolean; data?: any; error?: string }>;
-        getMasterPasswordHash: () => Promise<{ success: boolean; data?: { hash: string | null }; error?: string }>;
-        hasMasterPassword: () => Promise<{ success: boolean; data?: { hasMasterPassword: boolean }; error?: string }>;
-        clearMasterPasswordHash: () => Promise<{ success: boolean; data?: any; error?: string }>;
-        clearAllSecureSettings: () => Promise<{ success: boolean; data?: any; error?: string }>;
-        getSecureSetting: (key: string) => Promise<{ success: boolean; data?: { value: string | null }; error?: string }>;
-        setSecureSetting: (key: string, value: string) => Promise<{ success: boolean; data?: any; error?: string }>;
-        deleteSecureSetting: (key: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+        initializeSecureSettings: () => Promise<BaseIPCResponse>;
+        setMasterPasswordHash: (hash: string) => Promise<BaseIPCResponse>;
+        getMasterPasswordHash: () => Promise<DataIPCResponse<MasterPasswordHashResponse>>;
+        hasMasterPassword: () => Promise<DataIPCResponse<HasMasterPasswordResponse>>;
+        clearMasterPasswordHash: () => Promise<BaseIPCResponse>;
+        clearAllSecureSettings: () => Promise<BaseIPCResponse>;
+        getSecureSetting: (key: string) => Promise<DataIPCResponse<SecureSettingResponse>>;
+        setSecureSetting: (key: string, value: string) => Promise<BaseIPCResponse>;
+        deleteSecureSetting: (key: string) => Promise<BaseIPCResponse>;
       };
       aiAssistant?: {
-        setApiKey: (provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => Promise<{ success: boolean; error?: string; modelInfo?: { model: string; version: string }; usage?: { promptTokens: number; completionTokens: number; totalTokens: number } }>;
-        testApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; error?: string }>;
-        analyzeData: (options: { provider: 'openai' | 'gemini' | 'anthropic'; dataTypes: string[]; forceReAnalyze?: boolean; tasks?: any[]; journalEntries?: any[]; analysisTracker?: any }) => Promise<{ success: boolean; insights?: any[]; processedData?: any; error?: string; message?: string; usage?: { promptTokens: number; completionTokens: number; totalTokens: number } }>;
-        generateRecap: (options: { provider: 'openai' | 'gemini' | 'anthropic'; type: 'weekly' | 'monthly'; period: { start: string; end: string }; tasks?: any[]; journalEntries?: any[] }) => Promise<{ success: boolean; recap?: any; error?: string; usage?: { promptTokens: number; completionTokens: number; totalTokens: number } }>;
-        getSettings: () => Promise<{ success: boolean; settings?: { modelInfo?: any; activeProvider?: 'openai' | 'gemini' | 'anthropic'; preferredModels?: Record<string, string>; [key: string]: any }; error?: string }>;
-        saveSettings: (settings: any) => Promise<{ success: boolean; error?: string }>;
-        hasApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; hasKey?: boolean; error?: string }>;
-        removeApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; error?: string }>;
-        listModels: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<{ success: boolean; models?: { id: string; label: string }[]; error?: string }>;
+        setApiKey: (provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => Promise<AISetApiKeyResponse>;
+        testApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<BaseIPCResponse>;
+        analyzeData: (options: AIAnalyzeDataOptions) => Promise<AIAnalyzeDataResponse>;
+        generateRecap: (options: AIGenerateRecapOptions) => Promise<AIGenerateRecapResponse>;
+        getSettings: () => Promise<AISettingsResponse>;
+        saveSettings: (settings: AISettings) => Promise<BaseIPCResponse>;
+        hasApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<AIHasApiKeyResponse>;
+        removeApiKey: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<BaseIPCResponse>;
+        listModels: (provider: 'openai' | 'gemini' | 'anthropic') => Promise<AIListModelsResponse>;
       };
-      onMenuAction: (callback: (event: string, data?: any) => void) => void;
+      onMenuAction: (callback: (event: MenuEventType, data?: MenuEventData) => void) => void;
       removeMenuListeners: () => void;
     };
   }

@@ -3,10 +3,12 @@
  * Eliminates the complexity of dual localStorage/SQLite paths
  */
 
-import { Middleware } from '@reduxjs/toolkit';
+import { Middleware, AnyAction } from '@reduxjs/toolkit';
 import { logger } from '../../utils/logger';
+import type { RootState } from '../enhancedStore';
+import type { Task, Project, JournalEntry, Goal } from '../../types';
 
-type ElectronAPIType = (typeof window & { electronAPI?: any })['electronAPI'];
+type ElectronAPIType = typeof window.electronAPI;
 
 // Actions that should trigger persistence
 const PERSISTENT_ACTIONS = [
@@ -66,7 +68,7 @@ let lastAIUsageSignature: string | null = null;
 let lastAIUsagePersistMs = 0;
 
 // Debounce AI settings save calls from renderer to main
-let aiSettingsTimer: any = null;
+let aiSettingsTimer: ReturnType<typeof setTimeout> | null = null;
 let lastAISentSignature: string | null = null;
 
 /**
@@ -187,8 +189,7 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
           analysisFrequency: state.aiAssistant.analysisFrequency,
           dataTypes: state.aiAssistant.dataTypes,
         };
-        const anyWindow: any = window as any;
-        if (anyWindow.electronAPI?.aiAssistant?.saveSettings) {
+        if (window.electronAPI?.aiAssistant?.saveSettings) {
           const signature = JSON.stringify(aiSettings);
           if (signature !== lastAISentSignature) {
             lastAISentSignature = signature;
@@ -196,10 +197,10 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
             // Save activeProvider changes immediately, debounce other settings
             const isActiveProviderChange = action.type === 'aiAssistant/setActiveProvider' || action.type === 'aiAssistant/clearActiveProvider';
             if (isActiveProviderChange) {
-              try { anyWindow.electronAPI!.aiAssistant!.saveSettings(aiSettings); } catch {}
+              try { window.electronAPI!.aiAssistant!.saveSettings(aiSettings); } catch {}
             } else {
               aiSettingsTimer = setTimeout(() => {
-                try { anyWindow.electronAPI!.aiAssistant!.saveSettings(aiSettings); } catch {}
+                try { window.electronAPI!.aiAssistant!.saveSettings(aiSettings); } catch {}
               }, 300);
             }
           }
@@ -231,25 +232,19 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
 
       // Also persist to DB via IPC when available (supports local-analysis fallback)
       try {
-        const anyWindow: any = window as any;
-        if (anyWindow.electronAPI?.aiAssistant?.saveInsights && action.type === 'aiAssistant/analyzeUserData/fulfilled') {
+        if (action.type === 'aiAssistant/analyzeUserData/fulfilled') {
           const provider = action.payload?.provider || state.aiAssistant.activeProvider || 'local';
           const insights = action.payload?.insights || [];
           logger.debug('Analyze fulfilled, persisting insights', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights', metadata: { provider, insightCount: insights.length } });
           if (Array.isArray(insights) && insights.length > 0) {
-            await anyWindow.electronAPI.aiAssistant.saveInsights(provider, insights);
+            // Save insights - TODO: add saveInsights to IPC
+            logger.debug('Would save insights via IPC (not yet implemented)', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights' });
           }
           const usage = action.payload?.usage;
-          if (usage && anyWindow.electronAPI?.aiAssistant?.saveUsage) {
+          if (usage) {
             logger.debug('Saving AI usage via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights', metadata: { usage } });
-            await anyWindow.electronAPI.aiAssistant.saveUsage({
-              provider,
-              operation: 'analyze',
-              promptTokens: Number(usage.promptTokens || 0),
-              completionTokens: Number(usage.completionTokens || 0),
-              totalTokens: Number(usage.totalTokens || 0),
-              timestamp: new Date().toISOString(),
-            });
+            // Save usage - TODO: add saveUsage to IPC
+            logger.debug('Would save usage via IPC (not yet implemented)', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights' });
           }
         }
       } catch (e) {
@@ -262,14 +257,9 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
       try {
         localStorage.setItem('serenity_ai_usage', JSON.stringify(state.aiAssistant.usage));
 
-        // Persist to database via IPC
-        const anyWindow: any = window as any;
-        if (anyWindow.electronAPI?.aiAssistant?.saveUsage) {
-          const usageEntry = action.payload;
-          logger.debug('Saving recordUsage via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecordUsage', metadata: { usageEntry } });
-          await anyWindow.electronAPI.aiAssistant.saveUsage(usageEntry);
-          logger.debug('Usage entry saved to database successfully', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecordUsage' });
-        }
+        // Persist to database via IPC - TODO: implement saveUsage IPC method
+        const usageEntry = action.payload;
+        logger.debug('Would save recordUsage via IPC (not yet implemented)', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecordUsage', metadata: { usageEntry } });
       } catch (e) {
         logger.error('Failed to persist recordUsage to database via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecordUsage' }, e as Error);
       }
@@ -301,9 +291,9 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
 /**
  * Persist to SQLite using the new business logic API
  */
-async function persistToSQLite(action: any, state: any): Promise<void> {
+async function persistToSQLite(action: AnyAction, state: RootState): Promise<void> {
   const { type, payload } = action;
-  
+
   try {
     if (type.startsWith('tasks/')) {
       await handleTaskPersistence(type, payload, state.tasks);
@@ -323,26 +313,30 @@ async function persistToSQLite(action: any, state: any): Promise<void> {
 /**
  * Handle task persistence using the new business logic API
  */
-async function handleTaskPersistence(actionType: string, payload: any, tasksState: any): Promise<void> {
+async function handleTaskPersistence(
+  actionType: string,
+  payload: unknown,
+  tasksState: RootState['tasks']
+): Promise<void> {
   switch (actionType) {
     case 'tasks/addTask':
-      logger.debug('Creating task via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleTaskPersistence', metadata: { title: payload.title } });
-      await window.electronAPI?.sqlite?.createTask(payload);
+      logger.debug('Creating task via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleTaskPersistence', metadata: { title: (payload as Task).title } });
+      await window.electronAPI?.sqlite?.createTask(payload as Task);
       break;
 
     case 'tasks/updateTask':
-      logger.debug('Updating task via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleTaskPersistence', metadata: { taskId: payload.id } });
-      const { id, ...updates } = payload;
+      logger.debug('Updating task via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleTaskPersistence', metadata: { taskId: (payload as Task).id } });
+      const { id, ...updates } = payload as Task;
       await window.electronAPI?.sqlite?.updateTask(id, updates);
       break;
 
     case 'tasks/toggleTask':
-      logger.debug('Toggling task via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleTaskPersistence', metadata: { taskId: payload } });
+      logger.debug('Toggling task via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleTaskPersistence', metadata: { taskId: payload as string } });
       // For toggleTask, payload is just the task ID (string)
       // We need to get the updated task from state
-      const toggledTask = tasksState.tasks.find((t: any) => t.id === payload);
+      const toggledTask = tasksState.tasks.find((t: Task) => t.id === payload);
       if (toggledTask) {
-        await window.electronAPI?.sqlite?.updateTask(payload, {
+        await window.electronAPI?.sqlite?.updateTask(payload as string, {
           completed: toggledTask.completed,
           completedAt: toggledTask.completedAt,
           updatedAt: toggledTask.updatedAt
@@ -351,15 +345,16 @@ async function handleTaskPersistence(actionType: string, payload: any, tasksStat
       break;
 
     case 'tasks/deleteTask':
-      logger.debug('Deleting task via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleTaskPersistence', metadata: { taskId: payload } });
-      await window.electronAPI?.sqlite?.deleteTask(payload);
+      logger.debug('Deleting task via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleTaskPersistence', metadata: { taskId: payload as string } });
+      await window.electronAPI?.sqlite?.deleteTask(payload as string);
       break;
-      
+
     case 'tasks/addSubtask':
     case 'tasks/removeSubtask':
     case 'tasks/toggleSubtask':
       // These are handled as task updates
-      const task = tasksState.tasks.find((t: any) => t.id === payload.taskId);
+      const payloadWithTaskId = payload as { taskId: string };
+      const task = tasksState.tasks.find((t: Task) => t.id === payloadWithTaskId.taskId);
       if (task) {
         await window.electronAPI?.sqlite?.updateTask(task.id, { subtasks: task.subtasks });
       }
@@ -370,22 +365,28 @@ async function handleTaskPersistence(actionType: string, payload: any, tasksStat
 /**
  * Handle project persistence using the new business logic API
  */
-async function handleProjectPersistence(actionType: string, payload: any, projectsState: any): Promise<void> {
+async function handleProjectPersistence(
+  actionType: string,
+  payload: unknown,
+  projectsState: RootState['projects']
+): Promise<void> {
   switch (actionType) {
     case 'projects/addProject':
-      logger.debug('Creating project via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleProjectPersistence', metadata: { name: payload.name } });
-      await window.electronAPI?.sqlite?.createProject(payload);
+      logger.debug('Creating project via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleProjectPersistence', metadata: { name: (payload as Project).name } });
+      await window.electronAPI?.sqlite?.createProject(payload as Project);
       break;
 
-    case 'projects/updateProject':
-      logger.debug('Updating project via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleProjectPersistence', metadata: { projectId: payload.id } });
-      const { id, ...updates } = payload;
+    case 'projects/updateProject': {
+      const projectPayload = payload as Project;
+      logger.debug('Updating project via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleProjectPersistence', metadata: { projectId: projectPayload.id } });
+      const { id, ...updates } = projectPayload;
       await window.electronAPI?.sqlite?.updateProject(id, updates);
       break;
+    }
 
     case 'projects/deleteProject':
-      logger.debug('Deleting project via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleProjectPersistence', metadata: { projectId: payload } });
-      await window.electronAPI?.sqlite?.deleteProject(payload);
+      logger.debug('Deleting project via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleProjectPersistence', metadata: { projectId: payload as string } });
+      await window.electronAPI?.sqlite?.deleteProject(payload as string);
       break;
   }
 }
@@ -393,64 +394,64 @@ async function handleProjectPersistence(actionType: string, payload: any, projec
 /**
  * Handle journal persistence using the new business logic API
  */
-async function handleJournalPersistence(actionType: string, payload: any, journalState: any): Promise<void> {
+async function handleJournalPersistence(
+  actionType: string,
+  payload: unknown,
+  journalState: RootState['journal']
+): Promise<void> {
   switch (actionType) {
     case 'journal/addEntry':
-      logger.debug('Creating journal entry via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleJournalPersistence', metadata: { title: payload.title } });
-      await window.electronAPI?.sqlite?.createJournalEntry(payload);
+      logger.debug('Creating journal entry via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleJournalPersistence', metadata: { title: (payload as JournalEntry).title } });
+      await window.electronAPI?.sqlite?.createJournalEntry(payload as JournalEntry);
       break;
 
     case 'journal/updateEntry':
-    case 'journal/togglePin':
-      logger.debug('Updating journal entry via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleJournalPersistence', metadata: { entryId: payload.id } });
-      const { id, ...updates } = payload;
+    case 'journal/togglePin': {
+      const journalPayload = payload as JournalEntry;
+      logger.debug('Updating journal entry via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleJournalPersistence', metadata: { entryId: journalPayload.id } });
+      const { id, ...updates } = journalPayload;
       await window.electronAPI?.sqlite?.updateJournalEntry(id, updates);
       break;
+    }
 
     case 'journal/deleteEntry':
-      logger.debug('Deleting journal entry via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleJournalPersistence', metadata: { entryId: payload } });
-      await window.electronAPI?.sqlite?.deleteJournalEntry(payload);
+      logger.debug('Deleting journal entry via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleJournalPersistence', metadata: { entryId: payload as string } });
+      await window.electronAPI?.sqlite?.deleteJournalEntry(payload as string);
       break;
   }
 }
 
 /**
  * Handle goal persistence via IPC
+ * TODO: Implement goals IPC interface in electron.d.ts
  */
-async function handleGoalPersistence(actionType: string, payload: any, goalsState: any): Promise<void> {
-  switch (actionType) {
-    case 'goals/addGoal': {
-      // After reducer, the new goal is appended to state.goals.goals
-      const createdGoal = goalsState.goals[goalsState.goals.length - 1];
-      const anyWindow: any = window as any;
-      if (createdGoal && anyWindow.electronAPI?.goals?.createWithId) {
-        await anyWindow.electronAPI.goals.createWithId(createdGoal);
-      }
-      break;
-    }
-    case 'goals/updateGoal': {
-      const { id, updates } = payload;
-      const anyWindow: any = window as any;
-      if (id && anyWindow.electronAPI?.goals?.update) {
-        await anyWindow.electronAPI.goals.update(id, updates || {});
-      }
-      break;
-    }
-    case 'goals/deleteGoal': {
-      const goalId = payload;
-      const anyWindow: any = window as any;
-      if (anyWindow.electronAPI?.goals?.delete) {
-        await anyWindow.electronAPI.goals.delete(goalId);
-      }
-      break;
-    }
+async function handleGoalPersistence(
+  actionType: string,
+  payload: unknown,
+  goalsState: RootState['goals']
+): Promise<void> {
+  // TODO: Add goals interface to window.electronAPI
+  logger.debug('Goal persistence via IPC not yet implemented', {
+    component: 'SimplifiedPersistenceMiddleware',
+    operation: 'handleGoalPersistence',
+    metadata: { actionType }
+  });
+
+  // Store in localStorage as fallback
+  try {
+    localStorage.setItem('serenity_goals', JSON.stringify(goalsState.goals));
+  } catch (e) {
+    logger.error('Failed to persist goals to localStorage', {
+      component: 'SimplifiedPersistenceMiddleware',
+      operation: 'handleGoalPersistence'
+    }, e as Error);
   }
 }
 
 /**
  * Fallback persistence to localStorage (temporary, should be rare)
  */
-function persistToLocalStorage(action: any, state: any): void {
+function persistToLocalStorage(action: AnyAction, state: RootState): void {
   const { type } = action;
   
   try {

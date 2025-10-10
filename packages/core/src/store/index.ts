@@ -15,6 +15,51 @@ export * from './slices/searchSlice';
 export * from './slices/dragDropSlice';
 export * from './slices/integrationsSlice';
 export { initializeIntegrations } from './slices/integrationsSlice';
-export * from './slices/aiAssistantSlice';
+// Export AI assistant slice items except AIInsight and AIRecap (exported from types/ipc)
+export type { AIProvider, AnalysisTracker, AIUsageEntry, AIAssistantState } from './slices/aiAssistantSlice';
+export {
+  // Async thunks
+  setApiKey,
+  testApiKey,
+  analyzeUserData,
+  generateRecap,
+  // Actions
+  setActiveProvider,
+  clearActiveProvider,
+  setAutoAnalyze,
+  setAnalysisFrequency,
+  setDataTypes,
+  addInsight,
+  removeInsight,
+  clearInsights,
+  restoreInsights,
+  addRecap,
+  removeRecap,
+  restoreRecaps,
+  updateAnalysisTracker,
+  clearAIError,
+  clearAllErrors,
+  updateProvidersWithModelInfo,
+  updateProvidersWithApiKeys,
+  clearProviderModelInfo,
+  recordUsage,
+  clearUsage,
+  restoreUsage,
+  // Selectors
+  selectAIProviders,
+  selectActiveProvider,
+  selectIsAnalyzing,
+  selectAnalysisProgress,
+  selectAnalysisStatus,
+  selectLastAnalysis,
+  selectAIInsights,
+  selectAIRecaps,
+  selectAnalysisTracker,
+  selectAIConfiguration,
+  selectAIErrors,
+  selectLastAIError,
+  selectAIUsage,
+} from './slices/aiAssistantSlice';
+export { default as aiAssistantReducer } from './slices/aiAssistantSlice';
 export * from './slices/goalsSlice';
 export * from './slices/sampleData';

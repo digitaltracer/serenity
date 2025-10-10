@@ -3,7 +3,7 @@
  * Wrapper that adds bulk selection capability to any item
  */
 
-import React from 'react';
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   selectIsBulkModeActive,
@@ -24,7 +24,7 @@ interface SelectableItemProps {
   disabled?: boolean;
 }
 
-export const SelectableItem: React.FC<SelectableItemProps> = ({
+const SelectableItemComponent: React.FC<SelectableItemProps> = ({
   id,
   type,
   children,
@@ -34,58 +34,62 @@ export const SelectableItem: React.FC<SelectableItemProps> = ({
 }) => {
   const dispatch = useDispatch();
   const isBulkModeActive = useSelector(selectIsBulkModeActive);
-  
-  // Get the appropriate selector based on type
-  const isSelectedSelector = type === 'tasks' ? selectIsTaskSelected(id) :
-                           type === 'journalEntries' ? selectIsJournalEntrySelected(id) :
-                           selectIsProjectSelected(id);
+
+  // Memoize selector to prevent recreation on every render
+  const isSelectedSelector = useMemo(() => {
+    return type === 'tasks' ? selectIsTaskSelected(id) :
+           type === 'journalEntries' ? selectIsJournalEntrySelected(id) :
+           selectIsProjectSelected(id);
+  }, [type, id]);
+
   const isSelected = useSelector(isSelectedSelector);
 
-  const handleSelectionToggle = (e: React.MouseEvent) => {
+  // Long press detection
+  const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null);
+
+  // Memoize event handlers
+  const handleSelectionToggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (disabled) return;
-    
+
     if (!isBulkModeActive) {
       dispatch(enterBulkMode());
     }
-    
-    dispatch(toggleItemSelection({ type, id }));
-  };
 
-  const handleLongPress = () => {
+    dispatch(toggleItemSelection({ type, id }));
+  }, [disabled, isBulkModeActive, dispatch, type, id]);
+
+  const handleLongPress = useCallback(() => {
     if (disabled) return;
-    
+
     if (!isBulkModeActive) {
       dispatch(enterBulkMode());
       dispatch(toggleItemSelection({ type, id }));
     }
     onLongPress?.();
-  };
+  }, [disabled, isBulkModeActive, dispatch, type, id, onLongPress]);
 
-  // Long press detection
-  const [pressTimer, setPressTimer] = React.useState<NodeJS.Timeout | null>(null);
-  
-  const handleMouseDown = () => {
+  const handleMouseDown = useCallback(() => {
     if (disabled) return;
     const timer = setTimeout(handleLongPress, 500); // 500ms for long press
     setPressTimer(timer);
-  };
+  }, [disabled, handleLongPress]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     if (pressTimer) {
       clearTimeout(pressTimer);
       setPressTimer(null);
     }
-  };
+  }, [pressTimer]);
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     if (pressTimer) {
       clearTimeout(pressTimer);
       setPressTimer(null);
     }
-  };
+  }, [pressTimer]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       if (pressTimer) {
         clearTimeout(pressTimer);
@@ -143,6 +147,9 @@ export const SelectableItem: React.FC<SelectableItemProps> = ({
   );
 };
 
+// Export memoized version to prevent unnecessary re-renders
+export const SelectableItem = React.memo(SelectableItemComponent);
+
 /**
  * Selectable Task Card
  */
@@ -153,7 +160,7 @@ interface SelectableTaskCardProps {
   disabled?: boolean;
 }
 
-export const SelectableTaskCard: React.FC<SelectableTaskCardProps> = ({
+const SelectableTaskCardComponent: React.FC<SelectableTaskCardProps> = ({
   task,
   children,
   className = '',
@@ -171,6 +178,8 @@ export const SelectableTaskCard: React.FC<SelectableTaskCardProps> = ({
   );
 };
 
+export const SelectableTaskCard = React.memo(SelectableTaskCardComponent);
+
 /**
  * Selectable Journal Entry Card
  */
@@ -181,7 +190,7 @@ interface SelectableJournalEntryProps {
   disabled?: boolean;
 }
 
-export const SelectableJournalEntry: React.FC<SelectableJournalEntryProps> = ({
+const SelectableJournalEntryComponent: React.FC<SelectableJournalEntryProps> = ({
   entry,
   children,
   className = '',
@@ -199,6 +208,8 @@ export const SelectableJournalEntry: React.FC<SelectableJournalEntryProps> = ({
   );
 };
 
+export const SelectableJournalEntry = React.memo(SelectableJournalEntryComponent);
+
 /**
  * Selectable Project Card
  */
@@ -209,7 +220,7 @@ interface SelectableProjectCardProps {
   disabled?: boolean;
 }
 
-export const SelectableProjectCard: React.FC<SelectableProjectCardProps> = ({
+const SelectableProjectCardComponent: React.FC<SelectableProjectCardProps> = ({
   project,
   children,
   className = '',
@@ -226,3 +237,5 @@ export const SelectableProjectCard: React.FC<SelectableProjectCardProps> = ({
     </SelectableItem>
   );
 };
+
+export const SelectableProjectCard = React.memo(SelectableProjectCardComponent);

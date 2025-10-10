@@ -78,8 +78,8 @@ export function registerAuthHandlers(): void {
         'SELECT value FROM secure_settings WHERE key = ?',
         ['master_password_hash']
       );
-      
-      const hash = result && result.length > 0 ? result[0].value : null;
+
+      const hash = result && result.length > 0 ? (result[0].value as string | null) : null;
       
       return { success: true, data: { hash }, error: null };
     } catch (error) {
@@ -101,8 +101,8 @@ export function registerAuthHandlers(): void {
         'SELECT COUNT(*) as count FROM secure_settings WHERE key = ?',
         ['master_password_hash']
       );
-      
-      const hasPassword = result && result.length > 0 && result[0].count > 0;
+
+      const hasPassword = result && result.length > 0 && (result[0].count as number) > 0;
       
       return { success: true, data: { hasMasterPassword: hasPassword }, error: null };
     } catch (error) {
@@ -167,8 +167,8 @@ export function registerAuthHandlers(): void {
         'SELECT value FROM secure_settings WHERE key = ?',
         [key]
       );
-      
-      const value = result && result.length > 0 ? result[0].value : null;
+
+      const value = result && result.length > 0 ? (result[0].value as string | null) : null;
       
       return { success: true, data: { value }, error: null };
     } catch (error) {

@@ -285,7 +285,7 @@ export const ActionHubPage: React.FC = () => {
     }, 100);
   };
 
-  const projectOptions = useMemo(() => 
+  const projectOptions = useMemo(() =>
     projects.map(project => ({
       value: project.id,
       label: project.name,
@@ -732,11 +732,11 @@ export const ActionHubPage: React.FC = () => {
                 <>
                   {paginatedTasksData.tasks.map((task, index) => (
                     <SelectableItem key={task.id} id={task.id} type="tasks">
-                        <DraggableTaskCard
+                      <DraggableTaskCard
                         task={task}
                         onToggle={() => dispatch(toggleTask(task.id))}
-                          onToggleSubtask={(taskId: string, subtaskId: string) => dispatch(toggleSubtask({ taskId, subtaskId }))}
-                          onEdit={handleEditTask}
+                        onToggleSubtask={(taskId: string, subtaskId: string) => dispatch(toggleSubtask({ taskId, subtaskId }))}
+                        onEdit={handleEditTask}
                         onDelete={() => dispatch(deleteTask(task.id))}
                         index={index}
                         containerName="actionhub-tasks"
@@ -744,7 +744,7 @@ export const ActionHubPage: React.FC = () => {
                       />
                     </SelectableItem>
                   ))}
-                  
+
                   {/* Load More Button */}
                   {paginatedTasksData.hasMore && (
                     <div className="flex justify-center py-6">
@@ -757,7 +757,7 @@ export const ActionHubPage: React.FC = () => {
                       </Button>
                     </div>
                   )}
-                  
+
                   {/* Pagination Info */}
                   {paginatedTasksData.totalTasks > 0 && (
                     <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">

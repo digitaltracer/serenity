@@ -169,19 +169,19 @@ export class SQLiteService {
 
   // ===== AI INSIGHTS/RECAPS =====
 
-  async addAIInsights(insights: Array<{ provider: string; type: string; title: string; description: string; confidence: number; category: string; actionable?: boolean; metadata?: any }>): Promise<void> {
+  async addAIInsights(insights: Array<{ provider: string; type: string; title: string; description: string; confidence: number; category: string; actionable?: boolean; metadata?: Record<string, unknown> }>): Promise<void> {
     this.ensureInitialized();
     const rows = insights.map(i => ({
-      provider: (i.provider as any) || 'local',
-      type: i.type as any,
+      provider: (i.provider || 'local') as 'openai' | 'gemini' | 'anthropic' | 'local',
+      type: i.type as 'productivity' | 'behavior' | 'recommendation' | 'warning',
       title: i.title,
       description: i.description,
       confidence: i.confidence ?? 0.5,
-      category: i.category as any,
-      actionable: !!i.actionable,
+      category: i.category as 'tasks' | 'journal' | 'habits' | 'goals',
+      actionable: i.actionable ? 1 : 0,
       metadata: JSON.stringify(i.metadata || {}),
     }));
-    await this.ai!.addInsights(rows as any);
+    await this.ai!.addInsights(rows);
   }
 
   async listAIInsights(limit = 200) {
@@ -189,10 +189,10 @@ export class SQLiteService {
     return this.ai!.listInsights(limit);
   }
 
-  async addAIRecap(recap: { provider: string; type: 'weekly' | 'monthly'; title: string; summary: string; highlights?: any[]; challenges?: any[]; recommendations?: any[]; period: { start: string; end: string }; metadata?: any }) {
+  async addAIRecap(recap: { provider: string; type: 'weekly' | 'monthly'; title: string; summary: string; highlights?: unknown[]; challenges?: unknown[]; recommendations?: unknown[]; period: { start: string; end: string }; metadata?: Record<string, unknown> }) {
     this.ensureInitialized();
     await this.ai!.addRecap({
-      provider: (recap.provider as any) || 'local',
+      provider: (recap.provider || 'local') as 'openai' | 'gemini' | 'anthropic' | 'local',
       type: recap.type,
       title: recap.title,
       summary: recap.summary,
@@ -201,7 +201,7 @@ export class SQLiteService {
       recommendations: JSON.stringify(recap.recommendations || []),
       period: JSON.stringify(recap.period),
       metadata: JSON.stringify(recap.metadata || {}),
-    } as any);
+    });
   }
 
   async listAIRecaps(limit = 50) {
@@ -228,7 +228,7 @@ export class SQLiteService {
 
   async createGoal(goal: Omit<Goal, 'id'>): Promise<Goal> {
     this.ensureInitialized();
-    return this.goals!.createGoal(goal as any);
+    return this.goals!.createGoal(goal);
   }
 
   async createGoalWithId(goal: Goal): Promise<Goal> {
@@ -502,7 +502,7 @@ export class SQLiteService {
         if (data.goals) {
           for (const goal of data.goals) {
             try {
-              this.goals!.createGoalWithId(goal as any);
+              this.goals!.createGoalWithId(goal);
               imported++;
             } catch (error) {
               errors.push(`Failed to import goal "${goal.title}": ${error}`);
@@ -541,7 +541,7 @@ export class SQLiteService {
   /**
    * Execute a raw SQL query
    */
-  async executeRawQuery(query: string, params?: any[]): Promise<any> {
+  async executeRawQuery(query: string, params?: unknown[]): Promise<Record<string, unknown>[]> {
     this.ensureInitialized();
     return this.adapter.executeRawQuery(query, params);
   }

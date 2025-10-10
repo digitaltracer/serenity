@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import {
@@ -27,16 +27,39 @@ import { AuthenticatedApp, ToastProvider, useToast, LoadingScreen, WelcomeScreen
 import { Layout } from './components/Layout';
 import { ThemeProvider } from './components/ThemeProvider';
 import { KeyboardShortcutsProvider } from './components/KeyboardShortcutsProvider';
-import { HomePage } from './pages/HomePage';
-import { ActionHubPage } from './pages/ActionHubPage';
-import { TodayPage } from './pages/TodayPage';
-import { JournalPage } from './pages/JournalPage';
-import { GoalsPage } from './pages/GoalsPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { DatabasePage } from './pages/DatabasePage';
-import { IntegrationsPage } from './pages/IntegrationsPage';
-import { AIAssistantPage } from './pages/AIAssistantPage';
+
+// Lazy load all page components for better performance and code splitting
+const HomePage = lazy(() => import('./pages/HomePage').then(module => ({ default: module.HomePage })));
+const ActionHubPage = lazy(() => import('./pages/ActionHubPage').then(module => ({ default: module.ActionHubPage })));
+const TodayPage = lazy(() => import('./pages/TodayPage').then(module => ({ default: module.TodayPage })));
+const JournalPage = lazy(() => import('./pages/JournalPage').then(module => ({ default: module.JournalPage })));
+const GoalsPage = lazy(() => import('./pages/GoalsPage').then(module => ({ default: module.GoalsPage })));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(module => ({ default: module.AnalyticsPage })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
+const DatabasePage = lazy(() => import('./pages/DatabasePage').then(module => ({ default: module.DatabasePage })));
+const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage').then(module => ({ default: module.IntegrationsPage })));
+const AIAssistantPage = lazy(() => import('./pages/AIAssistantPage').then(module => ({ default: module.AIAssistantPage })));
+
+// Loading fallback component for route transitions
+function RouteLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center h-full bg-background">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+// Preload critical routes for better perceived performance
+function preloadCriticalRoutes() {
+  // Preload ActionHub and Today pages as they're most frequently accessed
+  setTimeout(() => {
+    import('./pages/ActionHubPage');
+    import('./pages/TodayPage');
+  }, 1000);
+}
 
 // Component for handling menu events - must be inside ToastProvider
 function MenuEventHandler() {
@@ -94,6 +117,9 @@ function AppContent() {
     async function initializeApp() {
       try {
         setInitializationStatus('Initializing...');
+
+        // Preload critical routes in the background
+        preloadCriticalRoutes();
 
         // Clear any localStorage that might be interfering with shortcuts
         logger.debug('Clearing localStorage shortcuts data', { component: 'App', operation: 'initializeApp' });
@@ -346,18 +372,20 @@ function AppContent() {
           <KeyboardShortcutsProvider>
             <div className="h-screen bg-background text-foreground">
               <Layout>
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/actionhub" element={<ActionHubPage />} />
-                  <Route path="/today" element={<TodayPage />} />
-                  <Route path="/journal" element={<JournalPage />} />
-                  <Route path="/goals" element={<GoalsPage />} />
-                  <Route path="/analytics" element={<AnalyticsPage />} />
-                  <Route path="/ai-assistant" element={<AIAssistantPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/database" element={<DatabasePage />} />
-                  <Route path="/integrations" element={<IntegrationsPage />} />
-                </Routes>
+                <Suspense fallback={<RouteLoadingFallback />}>
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/actionhub" element={<ActionHubPage />} />
+                    <Route path="/today" element={<TodayPage />} />
+                    <Route path="/journal" element={<JournalPage />} />
+                    <Route path="/goals" element={<GoalsPage />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/ai-assistant" element={<AIAssistantPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/database" element={<DatabasePage />} />
+                    <Route path="/integrations" element={<IntegrationsPage />} />
+                  </Routes>
+                </Suspense>
               </Layout>
             </div>
           </KeyboardShortcutsProvider>

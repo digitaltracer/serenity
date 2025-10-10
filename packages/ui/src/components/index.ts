@@ -61,5 +61,6 @@ export * from './GoalCard';
 export * from './GoalsPage';
 export * from './TagsManager';
 export * from './ProjectIcon';
+export * from './VirtualizedList';
 // Error handling components
 export * from './ErrorBoundary';

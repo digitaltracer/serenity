@@ -714,10 +714,9 @@ export const AIAssistantPage: React.FC = () => {
                                 showSuccess('API Key Removed', `${provider.name} API key has been removed`);
                                 dispatch(updateProvidersWithApiKeys({ [provider.id]: false }));
                                 if (activeProvider === provider.id) {
-                                  // Clear persisted active provider
+                                  // Clear persisted active provider (don't send activeProvider to let it be filtered out)
                                   if ((window as any).electronAPI?.aiAssistant?.saveSettings) {
                                     await (window as any).electronAPI.aiAssistant.saveSettings({
-                                      activeProvider: undefined,
                                       autoAnalyze: configuration.autoAnalyze,
                                       analysisFrequency: configuration.analysisFrequency,
                                       dataTypes: configuration.dataTypes,

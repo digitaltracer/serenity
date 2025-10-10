@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Goal, getGoalTypeLabel } from '@serenity/core';
 import { Card, CardHeader, CardTitle, CardContent } from './Card';
 import { Calendar, Flag, Edit2, Trash2, Bell } from 'lucide-react';
@@ -13,7 +13,7 @@ interface GoalCardProps {
   showActions?: boolean;
 }
 
-export const GoalCard: React.FC<GoalCardProps> = ({
+const GoalCardComponent: React.FC<GoalCardProps> = ({
   goal,
   onEdit,
   onDelete,
@@ -22,57 +22,76 @@ export const GoalCard: React.FC<GoalCardProps> = ({
   className = '',
   showActions = true,
 }) => {
-  const progress = goal.progress?.percentage ?? 0;
-  const isCompleted = goal.status === 'completed' || goal.progress?.isCompleted || false;
-  const isOverdue = goal.progress?.periodEnd && new Date(goal.progress.periodEnd) < new Date() && !isCompleted;
+  // Memoize expensive calculations
+  const { progress, isCompleted, isOverdue } = useMemo(() => {
+    const prog = goal.progress?.percentage ?? 0;
+    const completed = goal.status === 'completed' || goal.progress?.isCompleted || false;
+    const overdue = goal.progress?.periodEnd && new Date(goal.progress.periodEnd) < new Date() && !completed;
+    return { progress: prog, isCompleted: completed, isOverdue: overdue };
+  }, [goal.progress?.percentage, goal.progress?.isCompleted, goal.progress?.periodEnd, goal.status]);
 
   
 
-  const getTypeLabel = (type: Goal['type']) => {
-    return getGoalTypeLabel(type);
-  };
+  // Memoize formatted dates and days remaining to avoid recalculation
+  const { daysRemaining, formattedStartDate, formattedEndDate } = useMemo(() => {
+    const formatDate = (date: Date) => {
+      return new Date(date).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    };
 
-  const getProgressColor = (pct: number) => {
+    let days: number | null = null;
+    if (goal.progress?.periodEnd) {
+      const today = new Date();
+      const endDate = new Date(goal.progress.periodEnd);
+      const diffTime = endDate.getTime() - today.getTime();
+      days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    return {
+      daysRemaining: days,
+      formattedStartDate: goal.progress?.periodStart ? formatDate(goal.progress.periodStart) : 'No start',
+      formattedEndDate: goal.progress?.periodEnd ? formatDate(goal.progress.periodEnd) : 'No end'
+    };
+  }, [goal.progress?.periodStart, goal.progress?.periodEnd]);
+
+  // Memoize progress color
+  const ringColor = useMemo(() => {
     if (isCompleted) return 'rgb(34 197 94)'; // green-500
-    if (pct >= 75) return 'rgb(59 130 246)'; // blue-500
-    if (pct >= 50) return 'rgb(234 179 8)'; // yellow-500
+    if (progress >= 75) return 'rgb(59 130 246)'; // blue-500
+    if (progress >= 50) return 'rgb(234 179 8)'; // yellow-500
     return 'rgb(156 163 175)'; // gray-400
-  };
+  }, [isCompleted, progress]);
 
-  const handleProgressIncrement = () => {
-    if (goal.progress?.current !== undefined && goal.progress?.target !== undefined && 
+  const ringTrack = 'rgba(107,114,128,0.25)';
+
+  // Memoize event handlers
+  const handleProgressIncrement = useCallback(() => {
+    if (goal.progress?.current !== undefined && goal.progress?.target !== undefined &&
         goal.progress.current < goal.progress.target && onUpdateProgress) {
       onUpdateProgress(goal.id, goal.progress.current + 1);
     }
-  };
+  }, [goal.id, goal.progress?.current, goal.progress?.target, onUpdateProgress]);
 
-  const handleProgressDecrement = () => {
+  const handleProgressDecrement = useCallback(() => {
     if (goal.progress?.current !== undefined && goal.progress.current > 0 && onUpdateProgress) {
       onUpdateProgress(goal.id, goal.progress.current - 1);
     }
-  };
+  }, [goal.id, goal.progress?.current, onUpdateProgress]);
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
+  const handleEdit = useCallback(() => {
+    if (onEdit) onEdit(goal);
+  }, [goal, onEdit]);
 
-  const getDaysRemaining = () => {
-    if (!goal.progress?.periodEnd) return null;
-    const today = new Date();
-    const endDate = new Date(goal.progress.periodEnd);
-    const diffTime = endDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
+  const handleDelete = useCallback(() => {
+    if (onDelete) onDelete(goal.id);
+  }, [goal.id, onDelete]);
 
-  const daysRemaining = getDaysRemaining();
-
-  const ringColor = getProgressColor(progress);
-  const ringTrack = 'rgba(107,114,128,0.25)';
+  const handleAddReminder = useCallback(() => {
+    if (onAddReminder) onAddReminder(goal);
+  }, [goal, onAddReminder]);
 
   return (
     <Card
@@ -107,7 +126,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({
                 <Flag className="w-3 h-3" />
                 <span className="capitalize">{goal.priority}</span>
               </span>
-              <span className="inline-flex items-center gap-1">{getTypeLabel(goal.type)}</span>
+              <span className="inline-flex items-center gap-1">{getGoalTypeLabel(goal.type)}</span>
               {goal.reminders && goal.reminders.length > 0 && (
                 <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400">
                   <Bell className="w-3 h-3" />
@@ -120,7 +139,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({
               <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 flex items-center gap-2">
                 {onAddReminder && (
                   <button
-                    onClick={() => onAddReminder(goal)}
+                    onClick={handleAddReminder}
                     className="p-1 hover:text-gray-600 dark:hover:text-gray-300"
                     title="Add Reminder"
                   >
@@ -129,7 +148,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({
                 )}
                 {onEdit && (
                   <button
-                    onClick={() => onEdit(goal)}
+                    onClick={handleEdit}
                     className="p-1 hover:text-gray-600 dark:hover:text-gray-300"
                     title="Edit Goal"
                   >
@@ -138,7 +157,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({
                 )}
                 {onDelete && (
                   <button
-                    onClick={() => onDelete(goal.id)}
+                    onClick={handleDelete}
                     className="p-1 hover:text-red-600 dark:hover:text-red-400"
                     title="Delete Goal"
                   >
@@ -177,9 +196,9 @@ export const GoalCard: React.FC<GoalCardProps> = ({
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
             <span>
-              {goal.progress?.periodStart ? formatDate(goal.progress.periodStart) : 'No start'}
+              {formattedStartDate}
               {' '}–{' '}
-              {goal.progress?.periodEnd ? formatDate(goal.progress.periodEnd) : 'No end'}
+              {formattedEndDate}
             </span>
           </div>
           {daysRemaining !== null && (
@@ -200,3 +219,6 @@ export const GoalCard: React.FC<GoalCardProps> = ({
     </Card>
   );
 };
+
+// Export memoized version to prevent unnecessary re-renders
+export const GoalCard = React.memo(GoalCardComponent);

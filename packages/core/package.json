@@ -13,7 +13,8 @@
     }
   },
   "scripts": {
-    "build": "npm run clean && tsc",
+    "build": "npm run clean && tsc && npm run copy-types",
+    "copy-types": "cp src/types/electron.d.ts dist/types/electron.d.ts",
     "dev": "tsc --watch",
     "lint": "eslint src/**/*.ts",
     "test": "jest",

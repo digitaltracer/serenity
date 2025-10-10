@@ -119,12 +119,12 @@ export async function migrateToSQLite(): Promise<boolean> {
     
     // Migrate data to SQLite
     const migrationResult = await window.electronAPI!.sqlite!.importFromLocalStorage(data);
-    
-    if (!migrationResult.success) {
-      throw new Error(migrationResult.error);
+
+    if (!migrationResult.success || !migrationResult.data) {
+      throw new Error(migrationResult.error || 'Migration failed');
     }
-    
-    const { imported, errors } = migrationResult.result;
+
+    const { imported, errors } = migrationResult.data;
     
     logger.info(`✅ Migration completed successfully!
       - Items imported: ${imported}

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { 
-  selectAllEntries, 
+import {
+  selectAllEntries,
   selectPinnedEntries,
   selectCompactMode,
-  addEntry, 
+  addEntry,
   updateEntry,
   deleteEntry,
   togglePin,
@@ -12,14 +12,14 @@ import {
   updateGoalsProgress,
   selectAllTasks,
   selectAllProjects,
-  JournalEntry 
+  JournalEntry
 } from '@serenity/core';
-import { 
-  Card, 
-  CardHeader, 
-  CardTitle, 
-  CardContent, 
-  Button, 
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
   Input,
   JournalEntryCard,
   SelectableItem,

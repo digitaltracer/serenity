@@ -3,7 +3,7 @@
  * Task card with built-in drag and drop functionality
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useDraggable, useTaskDragDrop } from '@serenity/core';
 import { TaskCard } from './TaskCard';
 import { Task } from '@serenity/core';
@@ -24,7 +24,7 @@ interface DraggableTaskCardProps {
   projects?: Array<{ id: string; name: string; color?: string; archived?: boolean }>;
 }
 
-export const DraggableTaskCard: React.FC<DraggableTaskCardProps> = ({
+const DraggableTaskCardComponent: React.FC<DraggableTaskCardProps> = ({
   task,
   onToggle,
   onToggleSubtask,
@@ -39,8 +39,13 @@ export const DraggableTaskCard: React.FC<DraggableTaskCardProps> = ({
   projects,
 }) => {
   const { createTaskDragItem } = useTaskDragDrop();
-  
-  const dragItem = createTaskDragItem(task, index, containerName);
+
+  // Memoize drag item to prevent recreation on every render
+  const dragItem = useMemo(() =>
+    createTaskDragItem(task, index, containerName),
+    [createTaskDragItem, task, index, containerName]
+  );
+
   const { dragRef, isDragging, dragProps } = useDraggable(dragItem, !disabled);
 
   return (
@@ -87,6 +92,9 @@ export const DraggableTaskCard: React.FC<DraggableTaskCardProps> = ({
   );
 };
 
+// Export memoized version to prevent unnecessary re-renders
+export const DraggableTaskCard = React.memo(DraggableTaskCardComponent);
+
 /**
  * Draggable Subtask Component
  */
@@ -99,7 +107,7 @@ interface DraggableSubtaskProps {
   className?: string;
 }
 
-export const DraggableSubtask: React.FC<DraggableSubtaskProps> = ({
+const DraggableSubtaskComponent: React.FC<DraggableSubtaskProps> = ({
   subtask,
   parentTaskId,
   onToggle,
@@ -108,8 +116,13 @@ export const DraggableSubtask: React.FC<DraggableSubtaskProps> = ({
   className = '',
 }) => {
   const { createSubtaskDragItem } = useTaskDragDrop();
-  
-  const dragItem = createSubtaskDragItem(subtask, parentTaskId, index);
+
+  // Memoize drag item to prevent recreation on every render
+  const dragItem = useMemo(() =>
+    createSubtaskDragItem(subtask, parentTaskId, index),
+    [createSubtaskDragItem, subtask, parentTaskId, index]
+  );
+
   const { dragRef, isDragging, dragProps } = useDraggable(dragItem, !disabled);
 
   return (
@@ -157,3 +170,6 @@ export const DraggableSubtask: React.FC<DraggableSubtaskProps> = ({
     </div>
   );
 };
+
+// Export memoized version to prevent unnecessary re-renders
+export const DraggableSubtask = React.memo(DraggableSubtaskComponent);

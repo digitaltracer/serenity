@@ -285,10 +285,10 @@ async function loadAISettingsFromDatabase(): Promise<AISettings | null> {
     const row = Array.isArray(result) ? result[0] : (result && (result as any)[0]);
     logger.info('🔍 [loadAISettingsFromDatabase] Extracted row:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: row } });
 
-    if (row && (row.value || row["value"])) {
-      const value = row.value ?? row["value"];
+    if (row && ((row as any).value || (row as any)["value"])) {
+      const value = (row as any).value ?? (row as any)["value"];
       logger.info('🔍 [loadAISettingsFromDatabase] Raw value from DB:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: value } });
-      const parsed = JSON.parse(value);
+      const parsed = JSON.parse(value as string);
       logger.info('💾 [loadAISettingsFromDatabase] Parsed AI settings:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: parsed } });
       logger.info(`💾 [loadAISettingsFromDatabase] Parsed activeProvider: ${parsed?.activeProvider}`, { component: 'Aiassistanthandlers', operation: 'execute' });
       return parsed;
@@ -1582,9 +1582,23 @@ export function registerAIAssistantHandlers(): void {
       logger.info('⚙️ Saving AI Assistant settings...', { component: 'Aiassistanthandlers', operation: 'save' });
       // Merge with currently persisted settings to avoid wiping fields (e.g., activeProvider)
       const current = await getCurrentAISettings();
+
+      // Filter out undefined values from incoming settings to avoid overwriting with undefined
+      // Note: null is allowed and will clear the value explicitly
+      const filteredSettings: Partial<AISettings> = {};
+      for (const key in settings) {
+        if (settings.hasOwnProperty(key)) {
+          const value = (settings as any)[key];
+          // Include the value if it's not undefined (null is OK for explicit clearing)
+          if (value !== undefined) {
+            (filteredSettings as any)[key] = value;
+          }
+        }
+      }
+
       const merged: AISettings = {
         ...current,
-        ...settings,
+        ...filteredSettings,
       };
       // Loop guard: skip if content unchanged in last 5s
       const signature = JSON.stringify(merged);

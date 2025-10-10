@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, useToast } from '@serenity/ui';
 import { useDispatch, useSelector } from 'react-redux';
-import { addTask, addEntry, parseQuickInput, selectActiveProjects, logger } from '@serenity/core';
+import { addTask, addEntry, parseQuickInput, selectActiveProjects, selectAllEntries, logger } from '@serenity/core';
+import { RootState } from '@serenity/core';
 import { CheckSquare, BookOpen, FolderOpen, BarChart3, Loader2 } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
@@ -13,6 +14,11 @@ export const HomePage: React.FC = () => {
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const activeProjects = useSelector(selectActiveProjects);
+  const journalEntries = useSelector(selectAllEntries);
+  const tasks = useSelector((state: RootState) => state.tasks.tasks);
+
+  // Check if user has any existing data
+  const hasExistingData = tasks.length > 0 || journalEntries.length > 0 || activeProjects.length > 0;
 
   useEffect(() => {
     logger.debug('useEffect triggered - starting AI settings load', { component: 'HomePage', operation: 'loadAISettings' });
@@ -308,27 +314,29 @@ export const HomePage: React.FC = () => {
         })}
       </div>
 
-      {/* Get Started */}
-      <div className="text-center">
-        <Card className="inline-block">
-          <CardContent className="pt-6">
-            <h2 className="text-2xl font-semibold text-foreground mb-4">
-              Ready to get started?
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              Choose your workflow and begin your journey to enhanced productivity.
-            </p>
-            <div className="flex gap-4 justify-center">
-              <Button onClick={() => navigate('/actionhub')}>
-                Start with Tasks
-              </Button>
-              <Button variant="secondary" onClick={() => navigate('/journal')}>
-                Begin Journaling
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Get Started - Only show for new users */}
+      {!hasExistingData && (
+        <div className="text-center">
+          <Card className="inline-block">
+            <CardContent className="pt-6">
+              <h2 className="text-2xl font-semibold text-foreground mb-4">
+                Ready to get started?
+              </h2>
+              <p className="text-muted-foreground mb-6">
+                Choose your workflow and begin your journey to enhanced productivity.
+              </p>
+              <div className="flex gap-4 justify-center">
+                <Button onClick={() => navigate('/actionhub')}>
+                  Start with Tasks
+                </Button>
+                <Button variant="secondary" onClick={() => navigate('/journal')}>
+                  Begin Journaling
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
         </div>
       </div>
     </div>

@@ -25,7 +25,7 @@ export interface AIInsight {
   source: 'openai' | 'gemini' | 'anthropic';
   category: 'tasks' | 'journal' | 'habits' | 'goals';
   actionable?: boolean;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AIRecap {
@@ -42,7 +42,7 @@ export interface AIRecap {
   };
   createdAt: string;
   source: 'openai' | 'gemini' | 'anthropic';
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AnalysisTracker {

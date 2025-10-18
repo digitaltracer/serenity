@@ -30,9 +30,12 @@ const DatePicker: React.FC<DatePickerProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(value || new Date());
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const [dropdownDirection, setDropdownDirection] = useState<'above' | 'below'>('below');
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
+  const DROPDOWN_WIDTH = 256; // matches w-64
+  const HORIZONTAL_MARGIN = 12;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -49,6 +52,21 @@ const DatePicker: React.FC<DatePickerProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleScroll = () => {
+      setIsOpen(false);
+    };
+
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [isOpen]);
 
   const formatDate = (date: Date | null) => {
     if (!date) return '';
@@ -142,9 +160,49 @@ const DatePicker: React.FC<DatePickerProps> = ({
             if (!disabled) {
               if (!isOpen && buttonRef.current) {
                 const rect = buttonRef.current.getBoundingClientRect();
+                const viewportLeft = window.scrollX;
+                const viewportRight = viewportLeft + window.innerWidth;
+                const viewportTop = window.scrollY;
+                const viewportBottom = viewportTop + window.innerHeight;
+
+                let left = rect.left + window.scrollX;
+                const rightEdge = left + DROPDOWN_WIDTH;
+
+                if (rightEdge > viewportRight - HORIZONTAL_MARGIN) {
+                  left = rect.right + window.scrollX - DROPDOWN_WIDTH;
+                }
+
+                if (left < viewportLeft + HORIZONTAL_MARGIN) {
+                  left = viewportLeft + HORIZONTAL_MARGIN;
+                }
+
+                const spaceBelow = viewportBottom - rect.bottom;
+                const spaceAbove = rect.top - viewportTop;
+                const dropdownHeight = 320; // approximate height of calendar panel
+                const verticalMargin = 8;
+
+                const hasRoomBelow = spaceBelow >= dropdownHeight;
+                const hasRoomAbove = spaceAbove >= dropdownHeight;
+
+                let direction: 'above' | 'below' = 'below';
+                let top = rect.bottom + window.scrollY + verticalMargin;
+
+                if (!hasRoomBelow && hasRoomAbove) {
+                  direction = 'above';
+                  top = rect.top + window.scrollY - dropdownHeight - verticalMargin;
+                } else {
+                  direction = 'below';
+                  top = rect.bottom + window.scrollY + verticalMargin;
+                }
+
+                if (direction === 'above') {
+                  top = Math.max(viewportTop + verticalMargin, top);
+                }
+
+                setDropdownDirection(direction);
                 setDropdownPosition({
-                  top: rect.bottom + window.scrollY + 8,
-                  left: rect.left + window.scrollX
+                  top,
+                  left,
                 });
               }
               setIsOpen(!isOpen);
@@ -182,7 +240,8 @@ const DatePicker: React.FC<DatePickerProps> = ({
               className="absolute z-50 w-64 bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-800/90 dark:to-gray-900/60 backdrop-blur-xl border border-gray-200/60 dark:border-gray-700/40 rounded-lg shadow-xl shadow-gray-300/50 dark:shadow-black/40 ring-1 ring-gray-100/80 dark:ring-gray-800/60" 
               style={{
                 top: dropdownPosition.top,
-                left: dropdownPosition.left
+                left: dropdownPosition.left,
+                transformOrigin: dropdownDirection === 'above' ? 'bottom center' : 'top center',
               }}
             >
             {/* Header */}

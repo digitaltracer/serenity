@@ -1,9 +1,8 @@
 import React from 'react';
 import { CustomSelect } from './CustomSelect';
 import { DatePicker } from './DatePicker';
-import { Input } from './Input';
 import { Button } from './Button';
-import { Repeat, X } from 'lucide-react';
+import { Repeat, Plus, Minus } from 'lucide-react';
 import { cn } from '../utils/cn';
 
 export interface RecurringPattern {
@@ -53,6 +52,12 @@ const RecurringTaskSettings: React.FC<RecurringTaskSettingsProps> = ({
         ...value,
         interval: Math.max(1, interval),
       });
+    }
+  };
+
+  const adjustInterval = (delta: number) => {
+    if (value) {
+      handleIntervalChange((value.interval || 1) + delta);
     }
   };
 
@@ -121,13 +126,32 @@ const RecurringTaskSettings: React.FC<RecurringTaskSettingsProps> = ({
               Repeat Every
             </label>
             <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                min="1"
-                value={value.interval}
-                onChange={(e) => handleIntervalChange(parseInt(e.target.value) || 1)}
-                className="w-20 text-sm"
-              />
+              <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => adjustInterval(-1)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border/50 bg-card/60 text-muted-foreground transition-colors hover:bg-card hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Decrease interval"
+                  disabled={value.interval <= 1}
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <input
+                  type="number"
+                  min="1"
+                  value={value.interval}
+                  onChange={(e) => handleIntervalChange(parseInt(e.target.value, 10) || 1)}
+                  className="w-16 bg-transparent text-center text-sm font-medium text-foreground outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => adjustInterval(1)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border/50 bg-card/60 text-muted-foreground transition-colors hover:bg-card hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Increase interval"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
               <span className="text-sm text-gray-600 dark:text-gray-400">
                 {getIntervalLabel()}
               </span>

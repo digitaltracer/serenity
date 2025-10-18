@@ -5,10 +5,33 @@ import { cn } from '../utils/cn';
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
+  hoverable?: boolean;
 }
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ className, children, ...props }, ref) => {
+  ({ className, children, hoverable = false, ...props }, ref) => {
+    if (hoverable) {
+      return (
+        <div
+          ref={ref}
+          className={cn(
+            'group relative rounded-2xl border bg-card text-card-foreground shadow-sm transition-all duration-300',
+            'border-border/50 hover:border-primary/30',
+            'hover:shadow-[0_0_40px_hsl(var(--primary)/0.15)]',
+            className
+          )}
+          {...props}
+        >
+          {/* Gradient overlay on hover */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl pointer-events-none" />
+
+          <div className="relative">
+            {children}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div
         ref={ref}

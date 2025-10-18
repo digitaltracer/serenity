@@ -19,6 +19,7 @@ export * from './JournalTemplateSelector';
 export * from './MediaUploader';
 export * from './TaskCalendar';
 export * from './RecurringTaskSettings';
+export * from './EnhancedTextInput';
 export * from './ThemeToggle';
 export * from './SubtaskModal';
 export * from './TagInput';

@@ -17,21 +17,15 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         )}
         <textarea
           className={cn(
-            // Premium textarea styling with elegant gradients and shadows
-            'flex min-h-[120px] w-full rounded-lg border border-gray-200/60 bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm px-4 py-3 text-base',
-            'text-gray-900 placeholder:text-gray-500 transition-all duration-200 ease-out',
-            'shadow-sm shadow-gray-200/30 ring-1 ring-gray-100/50',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400/60',
-            'focus:shadow-md focus:shadow-blue-200/40',
+            // Elegant textarea styling with focus ring effect
+            'flex min-h-[120px] w-full rounded-lg border px-4 py-3 text-base',
+            'bg-background text-foreground placeholder:text-muted-foreground border-border',
+            'ring-offset-background',
+            'transition-all duration-300 ease-in-out',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:cursor-not-allowed disabled:opacity-50 resize-vertical',
-            'scrollbar-thin scrollbar-track-gray-200 scrollbar-thumb-gray-400',
-            'dark:border-gray-600/60 dark:from-gray-800 dark:to-gray-900 dark:text-gray-100 dark:placeholder:text-gray-400',
-            'dark:shadow-black/20 dark:ring-gray-800/40',
-            'dark:focus:ring-gray-400/40 dark:focus:border-gray-400/60',
-            'dark:focus:shadow-black/40',
-            'dark:scrollbar-track-gray-800 dark:scrollbar-thumb-gray-600',
             {
-              'border-red-500/60 focus:ring-red-500/40 focus:border-red-500/60': error,
+              'border-destructive focus-visible:ring-destructive': error,
             },
             className
           )}

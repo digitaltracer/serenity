@@ -37,15 +37,16 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <div className="relative">
           <input
             className={cn(
-              // Tokenized, minimal input styling
+              // Elegant input styling with focus ring effect
               'flex h-12 w-full rounded-lg border px-4 py-3 text-base',
               'bg-background text-foreground border-border',
-              'transition-colors duration-200 ease-out',
-              'focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring',
+              'ring-offset-background',
+              'transition-all duration-300 ease-in-out',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
               'disabled:cursor-not-allowed disabled:opacity-50',
               'placeholder:text-transparent',
               {
-                'border-destructive focus:ring-destructive focus:border-destructive': error,
+                'border-destructive focus-visible:ring-destructive': error,
               },
               className
             )}
@@ -91,14 +92,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         )}
         <input
           className={cn(
-            // Tokenized, minimal input styling
+            // Elegant input styling with focus ring effect
             'flex h-12 w-full rounded-lg border px-4 py-3 text-base',
             'bg-background text-foreground placeholder:text-muted-foreground border-border',
-            'transition-colors duration-200 ease-out',
-            'focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring',
+            'ring-offset-background',
+            'transition-all duration-300 ease-in-out',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:cursor-not-allowed disabled:opacity-50',
             {
-              'border-destructive focus:ring-destructive focus:border-destructive': error,
+              'border-destructive focus-visible:ring-destructive': error,
             },
             className
           )}

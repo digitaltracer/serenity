@@ -90,11 +90,11 @@ const RecurringTaskSettings: React.FC<RecurringTaskSettingsProps> = ({
 
   return (
     <div className={cn('space-y-3', className)}>
-      <div className="flex items-center justify-between">
-        <label className="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+      <div className="inline-flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-secondary/20 px-4 py-3">
+        <span className="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
           <Repeat className="w-4 h-4" />
           Recurring Task
-        </label>
+        </span>
         <Button
           type="button"
           variant={isEnabled ? 'primary' : 'secondary'}
@@ -152,4 +152,3 @@ const RecurringTaskSettings: React.FC<RecurringTaskSettingsProps> = ({
 };
 
 export { RecurringTaskSettings };
-

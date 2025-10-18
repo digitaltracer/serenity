@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState, selectCompactMode, RecurringPattern } from '@serenity/core';
 import { addTask, toggleTask, deleteTask, updateTask, addProject, deleteProject, updateGoalsProgress, selectAllEntries, selectAllProjects, addUsedTags, generateId, addSubtask, toggleSubtask, selectPaginatedTasks, selectTasksPagination, loadMoreTasks, resetPagination, setPaginationHasMore } from '@serenity/core';
 import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, ProjectComboBox, TagInput, DatePicker, Textarea, cn, DraggableTaskCard, SelectableItem, BulkOperationsToolbar, BulkActionsButton, TaskCalendar, RecurringTaskSettings } from '@serenity/ui';
-import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List, Trash2, CalendarDays } from 'lucide-react';
+import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, Flag, Folder, CheckCircle, Target, List, Trash2, CalendarDays } from 'lucide-react';
 import { logger } from '@serenity/core';
 
 export const ActionHubPage: React.FC = () => {
@@ -752,10 +752,6 @@ export const ActionHubPage: React.FC = () => {
                     {filter.label}
                   </Button>
                 ))}
-                
-                <Button variant="secondary" className="h-12 w-12 p-0 rounded-xl">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
               </div>
             </div>
             

@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { RootState, selectCompactMode } from '@serenity/core';
+import { RootState, selectCompactMode, RecurringPattern } from '@serenity/core';
 import { addTask, toggleTask, deleteTask, updateTask, addProject, deleteProject, updateGoalsProgress, selectAllEntries, selectAllProjects, addUsedTags, generateId, addSubtask, toggleSubtask, selectPaginatedTasks, selectTasksPagination, loadMoreTasks, resetPagination, setPaginationHasMore } from '@serenity/core';
-import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, ProjectComboBox, TagInput, DatePicker, Textarea, cn, DraggableTaskCard, SelectableItem, BulkOperationsToolbar, BulkActionsButton, TaskCalendar } from '@serenity/ui';
+import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, ProjectComboBox, TagInput, DatePicker, Textarea, cn, DraggableTaskCard, SelectableItem, BulkOperationsToolbar, BulkActionsButton, TaskCalendar, RecurringTaskSettings } from '@serenity/ui';
 import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List, Trash2, CalendarDays } from 'lucide-react';
 import { logger } from '@serenity/core';
 
@@ -33,6 +33,7 @@ export const ActionHubPage: React.FC = () => {
   const [newTaskDueDate, setNewTaskDueDate] = useState<Date | null>(null);
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskParentId, setNewTaskParentId] = useState('');
+  const [newTaskRecurring, setNewTaskRecurring] = useState<RecurringPattern | null>(null);
   const [editingTask, setEditingTask] = useState<string | null>(null);
   const [showCreateProjectForm, setShowCreateProjectForm] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -202,6 +203,7 @@ export const ActionHubPage: React.FC = () => {
         priority: newTaskPriority,
         tags: newTaskTags,
         dueDate: newTaskDueDate || undefined,
+        recurring: newTaskRecurring || undefined,
         completed: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -226,6 +228,7 @@ export const ActionHubPage: React.FC = () => {
       setNewTaskTags([]);
       setNewTaskDueDate(null);
       setNewTaskParentId('');
+      setNewTaskRecurring(null);
       setShowCreateForm(false);
       setEditingTask(null);
     }
@@ -273,6 +276,7 @@ export const ActionHubPage: React.FC = () => {
     setNewTaskPriority(task.priority);
     setNewTaskTags(task.tags || []);
     setNewTaskDueDate(task.dueDate ? new Date(task.dueDate) : null);
+    setNewTaskRecurring(task.recurring || null);
     setEditingTask(task.id);
     setShowCreateForm(true);
 
@@ -635,6 +639,13 @@ export const ActionHubPage: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* Recurring Task Settings */}
+                    <RecurringTaskSettings
+                      value={newTaskRecurring}
+                      onChange={setNewTaskRecurring}
+                      className="mt-4"
+                    />
+
                     {/* Subtasks Section - shown when editing, outside the options grid */}
                     {editingTask && (
                       <div className="mt-4 space-y-2">
@@ -695,6 +706,7 @@ export const ActionHubPage: React.FC = () => {
                         setNewTaskTags([]);
                         setNewTaskDueDate(null);
                         setNewTaskParentId('');
+                        setNewTaskRecurring(null);
                       }}>
                         Cancel
                       </Button>

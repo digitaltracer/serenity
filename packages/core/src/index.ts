@@ -16,6 +16,11 @@ export * from './services/integrationSyncService';
 export { EncryptedIntegrationService } from './services/encryptedIntegrationService';
 // biometricAuthService is only used dynamically to avoid bundle conflicts
 export * from './services/aiAssistantService';
+// Re-export preprocessing service but avoid duplicate exports
+export { AIPreprocessingService, PreprocessingConfig } from './services/aiPreprocessingService';
+export * from './services/promptEngineeringService';
+export * from './services/insightQualityService';
+export * from './services/userProfileService';
 // Export secure storage functions
 export { 
   savePostgreSQLConfigSecure,
@@ -32,5 +37,10 @@ export { store, initializeStoreData, getDatabaseStats, checkSQLiteAvailability }
 export type { RootState, AppDispatch } from './store/enhancedStore';
 // Export all store functionality
 export * from './store';
+// Persistence DI for server-centric web apps
+export * from './persistence/PersistenceClient';
+export { WebApiPersistenceClient } from './persistence/WebApiPersistenceClient';
 // Explicit selector re-exports used by UI package
 export { selectCompactMode } from './store/slices/uiSlice';
+// Export journal templates
+export * from './journal/templates';

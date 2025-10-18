@@ -26,9 +26,11 @@ import {
   BulkOperationsToolbar,
   BulkActionsButton,
   JournalEntryModal,
+  JournalTemplateSelector,
   cn
 } from '@serenity/ui';
-import { Plus, BookOpen, Search, Pin } from 'lucide-react';
+import { JournalTemplate } from '@serenity/core';
+import { Plus, BookOpen, Search, Pin, FileText } from 'lucide-react';
 
 export const JournalPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -41,6 +43,8 @@ export const JournalPage: React.FC = () => {
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
   const [activeView, setActiveView] = useState<'all' | 'pinned'>('all');
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<{ content: string; tags: string[] } | null>(null);
 
   // Auto-update goal progress when journal entries change
   useEffect(() => {
@@ -76,6 +80,16 @@ export const JournalPage: React.FC = () => {
 
   const handleCreateEntry = () => {
     setEditingEntry(null);
+    setSelectedTemplate(null);
+    setShowEntryModal(true);
+  };
+
+  const handleTemplateSelect = (template: JournalTemplate) => {
+    setEditingEntry(null);
+    setSelectedTemplate({
+      content: template.content,
+      tags: template.tags,
+    });
     setShowEntryModal(true);
   };
 
@@ -128,6 +142,14 @@ export const JournalPage: React.FC = () => {
           </div>
           <div className="flex items-center space-x-2">
             <BulkActionsButton variant="icon" />
+            <Button 
+              variant="secondary" 
+              onClick={() => setShowTemplateSelector(true)} 
+              className="rounded-xl gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              Templates
+            </Button>
             <Button onClick={handleCreateEntry} className="rounded-xl gap-2">
               <Plus className="w-4 h-4" />
               New Entry
@@ -223,15 +245,25 @@ export const JournalPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Template Selector Modal */}
+      <JournalTemplateSelector
+        isOpen={showTemplateSelector}
+        onClose={() => setShowTemplateSelector(false)}
+        onSelect={handleTemplateSelect}
+      />
+
       {/* Journal Entry Modal */}
       <JournalEntryModal
         isOpen={showEntryModal}
         onClose={() => {
           setShowEntryModal(false);
           setEditingEntry(null);
+          setSelectedTemplate(null);
         }}
         onSave={handleSaveEntry}
         entry={editingEntry}
+        templateContent={selectedTemplate?.content}
+        templateTags={selectedTemplate?.tags}
       />
 
       {/* Entries List */}

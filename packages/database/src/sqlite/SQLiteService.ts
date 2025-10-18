@@ -189,6 +189,11 @@ export class SQLiteService {
     return this.ai!.listInsights(limit);
   }
 
+  async getRecentAIInsights(limit = 20) {
+    this.ensureInitialized();
+    return this.ai!.getRecentInsights(limit);
+  }
+
   async addAIRecap(recap: { provider: string; type: 'weekly' | 'monthly'; title: string; summary: string; highlights?: unknown[]; challenges?: unknown[]; recommendations?: unknown[]; period: { start: string; end: string }; metadata?: Record<string, unknown> }) {
     this.ensureInitialized();
     await this.ai!.addRecap({

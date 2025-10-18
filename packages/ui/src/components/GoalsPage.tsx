@@ -27,10 +27,12 @@ import {
 } from '@serenity/core';
 import { GoalCard } from './GoalCard';
 import { GoalModal } from './GoalModal';
+import { GoalSuggestions } from './GoalSuggestions';
 import { Card, CardHeader, CardTitle, CardContent } from './Card';
 import { Button } from './Button';
 import { Badge } from './Badge';
 import { CustomSelect } from './CustomSelect';
+import { AIAssistantService, GoalSuggestion as AIGoalSuggestion } from '@serenity/core';
 import { 
   Target, 
   Plus, 
@@ -61,6 +63,8 @@ export const GoalsPage: React.FC = () => {
   
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [goalSuggestions, setGoalSuggestions] = useState<AIGoalSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Auto-update goal progress when data changes
   useEffect(() => {
@@ -68,6 +72,18 @@ export const GoalsPage: React.FC = () => {
       dispatch(updateGoalsProgress({ tasks, journalEntries, projects }));
     }
   }, [dispatch, tasks, journalEntries, projects, goals.length]);
+
+  // Generate goal suggestions
+  useEffect(() => {
+    if (tasks.length > 0 || journalEntries.length > 0) {
+      const suggestions = AIAssistantService.generateGoalSuggestions({
+        tasks,
+        journalEntries,
+        existingGoals: goals,
+      });
+      setGoalSuggestions(suggestions);
+    }
+  }, [tasks, journalEntries, goals]);
 
   // Calculate stats with null checks
   const safeGoals = goals || [];
@@ -96,6 +112,45 @@ export const GoalsPage: React.FC = () => {
     if (confirm('Are you sure you want to delete this goal? This action cannot be undone.')) {
       dispatch(deleteGoal(goalId));
     }
+  };
+
+  const handleAcceptSuggestion = (suggestion: AIGoalSuggestion) => {
+    const now = new Date();
+    const periodStart = now;
+    const periodEnd = new Date(now);
+    
+    // Set period based on timeframe
+    switch (suggestion.timeframe) {
+      case 'weekly':
+        periodEnd.setDate(periodEnd.getDate() + 7);
+        break;
+      case 'monthly':
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+        break;
+      case 'daily':
+        periodEnd.setDate(periodEnd.getDate() + 1);
+        break;
+    }
+
+    dispatch(addGoal({
+      title: suggestion.title,
+      description: suggestion.description,
+      type: suggestion.type as Goal['type'],
+      config: {
+        targetCount: suggestion.targetCount,
+        timeframe: suggestion.timeframe as Goal['config']['timeframe'],
+      },
+      status: 'active',
+      priority: suggestion.priority,
+      reminders: [],
+    }));
+
+    // Remove the suggestion after accepting
+    setGoalSuggestions(prev => prev.filter(s => s.title !== suggestion.title));
+  };
+
+  const handleDismissSuggestion = (index: number) => {
+    setGoalSuggestions(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSaveGoal = (goalData: Partial<Goal>) => {

@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, selectCompactMode } from '@serenity/core';
 import { addTask, toggleTask, deleteTask, updateTask, addProject, deleteProject, updateGoalsProgress, selectAllEntries, selectAllProjects, addUsedTags, generateId, addSubtask, toggleSubtask, selectPaginatedTasks, selectTasksPagination, loadMoreTasks, resetPagination, setPaginationHasMore } from '@serenity/core';
-import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, ProjectComboBox, TagInput, DatePicker, Textarea, cn, DraggableTaskCard, SelectableItem, BulkOperationsToolbar, BulkActionsButton } from '@serenity/ui';
-import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List, Trash2 } from 'lucide-react';
+import { Button, Input, TaskCard, Card, CardHeader, CardTitle, CardContent, Select, CustomSelect, ProjectComboBox, TagInput, DatePicker, Textarea, cn, DraggableTaskCard, SelectableItem, BulkOperationsToolbar, BulkActionsButton, TaskCalendar } from '@serenity/ui';
+import { Plus, Search, Filter, BarChart3, Calendar, CheckCircle2, Clock, AlertCircle, FolderOpen, MoreHorizontal, Info, MoreVertical, Flag, Folder, CheckCircle, Target, List, Trash2, CalendarDays } from 'lucide-react';
 import { logger } from '@serenity/core';
 
 export const ActionHubPage: React.FC = () => {
@@ -24,7 +24,7 @@ export const ActionHubPage: React.FC = () => {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'completed'>('all');
-  const [activeTab, setActiveTab] = useState<'tasks' | 'projects'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'projects' | 'calendar'>('tasks');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskProject, setNewTaskProject] = useState('');
@@ -345,6 +345,17 @@ export const ActionHubPage: React.FC = () => {
             }`}
           >
             Projects
+          </button>
+          <button
+            onClick={() => setActiveTab('calendar')}
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 flex items-center gap-2 ${
+              activeTab === 'calendar'
+                ? 'bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-700 dark:to-gray-800 text-gray-900 dark:text-white shadow-md shadow-gray-200/40 dark:shadow-black/40 ring-1 ring-gray-100/50 dark:ring-gray-600/30'
+                : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50/50 dark:hover:bg-gray-700/30'
+            }`}
+          >
+            <CalendarDays className="w-4 h-4" />
+            Calendar
           </button>
         </div>
         {activeTab === 'tasks' ? (
@@ -771,7 +782,7 @@ export const ActionHubPage: React.FC = () => {
               )}
             </div>
           </div>
-        ) : (
+        ) : activeTab === 'projects' ? (
           /* Projects View */
           <div>
             {/* Projects Progress and Add Project - Side by Side */}
@@ -993,7 +1004,28 @@ export const ActionHubPage: React.FC = () => {
             </div>
             </div>
           </div>
-        )}
+        ) : activeTab === 'calendar' ? (
+          <div>
+            {/* Calendar View */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Task Calendar</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  View and manage your tasks by due date. Drag and drop to reschedule.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <TaskCalendar
+                  tasks={tasks}
+                  onTaskClick={handleEditTask}
+                  onDateChange={(taskId, newDate) => {
+                    dispatch(updateTask({ id: taskId, dueDate: newDate }));
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
       </div>
       
       {/* Bulk Operations Toolbar */}

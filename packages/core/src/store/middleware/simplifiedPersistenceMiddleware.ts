@@ -6,6 +6,7 @@
 import { Middleware, AnyAction } from '@reduxjs/toolkit';
 import { logger } from '../../utils/logger';
 import type { RootState } from '../enhancedStore';
+import { getPersistenceClient } from '../../persistence/PersistenceClient';
 import type { Task, Project, JournalEntry, Goal } from '../../types';
 
 type ElectronAPIType = typeof window.electronAPI;
@@ -271,13 +272,18 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
       } catch {}
     }
 
-    // For data operations, use SQLite if available, otherwise localStorage as temporary fallback
-    if (sqliteInitialized && window.electronAPI?.sqlite) {
-      await persistToSQLite(action, state);
-    } else {
-      // Temporary fallback to localStorage (should be rare after initialization)
-      logger.warn('SQLite not available, using localStorage fallback', { component: 'SimplifiedPersistenceMiddleware', operation: 'middleware', metadata: { actionType: action.type } });
-      persistToLocalStorage(action, state);
+    // For data operations, prefer injected persistence client when available
+    try {
+      const client = getPersistenceClient();
+      await persistViaClient(action, state, client);
+    } catch {
+      // Fallback for desktop IPC path
+      if (sqliteInitialized && window.electronAPI?.sqlite) {
+        await persistToSQLite(action, state);
+      } else {
+        logger.warn('No persistence client; falling back to localStorage', { component: 'SimplifiedPersistenceMiddleware', operation: 'middleware', metadata: { actionType: action.type } });
+        persistToLocalStorage(action, state);
+      }
     }
   } catch (error) {
     logger.error('Persistence error for action', { component: 'SimplifiedPersistenceMiddleware', operation: 'middleware', metadata: { actionType: action.type } }, error as Error);
@@ -287,6 +293,80 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
   
   return result;
 };
+
+async function persistViaClient(action: AnyAction, state: RootState, client: ReturnType<typeof getPersistenceClient>): Promise<void> {
+  const { type, payload } = action;
+  if (type.startsWith('tasks/')) {
+    switch (type) {
+      case 'tasks/addTask':
+        await client.tasks.create(payload as any);
+        break;
+      case 'tasks/updateTask': {
+        const { id, ...updates } = payload as any;
+        await client.tasks.update(id, updates);
+        break;
+      }
+      case 'tasks/toggleTask': {
+        const task = (state as any).tasks.tasks.find((t: any) => t.id === payload);
+        if (task) await client.tasks.update(task.id, { completed: task.completed, completedAt: task.completedAt });
+        break;
+      }
+      case 'tasks/deleteTask':
+        await client.tasks.remove(payload as string);
+        break;
+      case 'tasks/addSubtask':
+      case 'tasks/removeSubtask':
+      case 'tasks/toggleSubtask': {
+        const task = (state as any).tasks.tasks.find((t: any) => t.id === (payload as any).taskId);
+        if (task) await client.tasks.update(task.id, { subtasks: task.subtasks } as any);
+        break;
+      }
+    }
+  } else if (type.startsWith('projects/')) {
+    switch (type) {
+      case 'projects/addProject':
+        await client.projects.create(payload as any);
+        break;
+      case 'projects/updateProject': {
+        const { id, ...updates } = payload as any;
+        await client.projects.update(id, updates);
+        break;
+      }
+      case 'projects/deleteProject':
+        await client.projects.remove(payload as string);
+        break;
+    }
+  } else if (type.startsWith('journal/')) {
+    switch (type) {
+      case 'journal/addEntry':
+        await client.journal.create(payload as any);
+        break;
+      case 'journal/updateEntry':
+      case 'journal/togglePin': {
+        const { id, ...updates } = payload as any;
+        await client.journal.update(id, updates);
+        break;
+      }
+      case 'journal/deleteEntry':
+        await client.journal.remove(payload as string);
+        break;
+    }
+  } else if (type.startsWith('goals/')) {
+    switch (type) {
+      case 'goals/addGoal':
+        await client.goals.create(payload as any);
+        break;
+      case 'goals/updateGoal': {
+        const { id, ...updates } = payload as any;
+        await client.goals.update(id, updates);
+        break;
+      }
+      case 'goals/deleteGoal':
+        await client.goals.remove(payload as string);
+        break;
+    }
+  }
+}
 
 /**
  * Persist to SQLite using the new business logic API

@@ -8,6 +8,7 @@ import { CustomSelect } from './CustomSelect';
 import { ProjectComboBox } from './ProjectComboBox';
 import { TagInput } from './TagInput';
 import { DatePicker } from './DatePicker';
+import { RecurringTaskSettings } from './RecurringTaskSettings';
 import { Calendar, Flag, Folder, Trash2, Archive, Plus, Pencil, X, CheckSquare } from 'lucide-react';
 
 export interface TaskModalProps {
@@ -119,6 +120,13 @@ const TaskModal: React.FC<TaskModalProps> = ({
     setFormData(prev => ({
       ...prev,
       tags,
+    }));
+  };
+
+  const handleRecurringChange = (recurring: Task['recurring'] | null) => {
+    setFormData(prev => ({
+      ...prev,
+      recurring: recurring || undefined,
     }));
   };
 
@@ -280,6 +288,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
           onChange={handleTagsChange}
           placeholder="Add a tag..."
           maxTags={8}
+        />
+
+        {/* Recurring Task Settings */}
+        <RecurringTaskSettings
+          value={formData.recurring || null}
+          onChange={handleRecurringChange}
         />
 
         {/* Subtasks editor - show only when editing existing task */}

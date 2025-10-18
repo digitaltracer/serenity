@@ -59,6 +59,13 @@ export class SQLiteAIQueries {
     return rows;
   }
 
+  async getRecentInsights(limit = 20): Promise<AIInsightRow[]> {
+    const sql = `SELECT * FROM ai_insights ORDER BY created_at DESC LIMIT ?`;
+    const stmt = this.db.prepare(sql);
+    const rows = stmt.all(limit) as AIInsightRow[];
+    return rows;
+  }
+
   async addRecap(recap: Omit<AIRecapRow, 'id' | 'created_at'>): Promise<void> {
     const sql = `INSERT INTO ai_recaps (provider, type, title, summary, highlights, challenges, recommendations, period, metadata)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;

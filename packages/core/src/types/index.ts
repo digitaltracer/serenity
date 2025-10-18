@@ -40,6 +40,17 @@ export interface Project {
   userId?: string;
 }
 
+export interface MediaAttachment {
+  id: string;
+  type: 'image' | 'video' | 'audio' | 'file';
+  filename: string;
+  originalName: string;
+  path: string;
+  size: number;
+  mimeType: string;
+  createdAt: Date;
+}
+
 export interface JournalEntry {
   id: string;
   title?: string;
@@ -50,6 +61,7 @@ export interface JournalEntry {
   updatedAt: Date;
   pinned: boolean;
   mood?: 'happy' | 'neutral' | 'sad' | 'excited' | 'stressed';
+  attachments?: MediaAttachment[];
   userId?: string;
 }
 

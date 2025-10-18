@@ -1275,60 +1275,388 @@ export function registerAIAssistantHandlers(): void {
         };
       }
 
-      // Apply intelligent data limiting to prevent token overflow and ensure quality analysis
-      const { limitedTasks, limitedJournalEntries } = applyDataLimitsForAnalysis(analyzeTasks, analyzeJournalEntries);
-      logger.info(`📊 Data limiting: ${analyzeTasks.length} → ${limitedTasks.length} tasks, ${analyzeJournalEntries.length} → ${limitedJournalEntries.length} journal entries`, { component: 'Aiassistanthandlers', operation: 'execute' });
+      // ===== ENHANCED AI ANALYSIS PIPELINE =====
+      logger.info('🚀 Starting enhanced AI analysis pipeline', { component: 'Aiassistanthandlers', operation: 'pipeline' });
 
-      // Preprocess the limited data for AI analysis
-      const preprocessedTasks = AIAssistantService.preprocessTasks(limitedTasks);
-      const preprocessedJournalEntries = AIAssistantService.preprocessJournalEntries(limitedJournalEntries);
-      
-      // Generate prompts
-      const prompts = AIAssistantService.generateInsightPrompts({
+      // Import enhanced services with detailed logging
+      logger.info('📦 Importing enhanced services from @serenity/core...', { component: 'Aiassistanthandlers', operation: 'import' });
+      const coreModule = await import('@serenity/core');
+      logger.info('✅ Core module imported successfully', {
+        component: 'Aiassistanthandlers',
+        operation: 'import',
+        metadata: {
+          availableExports: Object.keys(coreModule).filter(key => key.includes('Service')).join(', ')
+        }
+      });
+
+      const {
+        AIPreprocessingService,
+        PromptEngineeringService,
+        InsightQualityService,
+        UserProfileService
+      } = coreModule;
+
+      logger.info('🔍 Service availability check:', {
+        component: 'Aiassistanthandlers',
+        operation: 'serviceCheck',
+        metadata: {
+          AIPreprocessingService: typeof AIPreprocessingService,
+          PromptEngineeringService: typeof PromptEngineeringService,
+          InsightQualityService: typeof InsightQualityService,
+          UserProfileService: typeof UserProfileService
+        }
+      });
+
+      // Step 1: Build user profile for context
+      logger.info('👤 Step 1: Building user profile for personalized context...', { component: 'Aiassistanthandlers', operation: 'profile-start' });
+      let userProfile = null;
+      try {
+        // Fetch goals for profile building
+        let goals: any[] = [];
+        logger.info('📊 Fetching user goals for profile building...', { component: 'Aiassistanthandlers', operation: 'goals-fetch' });
+        try {
+          const { queryGoalsIPC } = await import('./goalsHandlers');
+          const goalsResult = await queryGoalsIPC();
+          if (goalsResult.success) {
+            goals = goalsResult.data || [];
+            logger.info(`✅ Fetched ${goals.length} goals`, { component: 'Aiassistanthandlers', operation: 'goals-success' });
+          } else {
+            logger.warn('⚠️ No goals found or goals query failed', { component: 'Aiassistanthandlers', operation: 'goals-warning' });
+          }
+        } catch (goalsError) {
+          logger.error('❌ Error fetching goals:', { component: 'Aiassistanthandlers', operation: 'goals-error' }, goalsError as Error);
+        }
+
+        logger.info('🔨 Building user profile...', {
+          component: 'Aiassistanthandlers',
+          operation: 'profile-build',
+          metadata: {
+            inputTasksCount: tasks.length,
+            inputJournalEntriesCount: journalEntries.length,
+            inputGoalsCount: goals.length
+          }
+        });
+
+        userProfile = UserProfileService.buildProfile({
+          tasks: tasks,
+          journalEntries: journalEntries,
+          goals: goals,
+        });
+
+        logger.info('✅ User profile built successfully', {
+          component: 'Aiassistanthandlers',
+          operation: 'profile-success',
+          metadata: {
+            workStyle: userProfile.workStyle,
+            focusAreas: userProfile.focusAreas.slice(0, 3).join(', '),
+            activeGoals: userProfile.activeGoals.length,
+            commonTags: userProfile.commonTags.slice(0, 5).map(t => `${t.tag} (${t.frequency})`).join(', '),
+            communicationPreference: userProfile.communicationPreference
+          }
+        });
+      } catch (profileError) {
+        logger.error('❌ Failed to build user profile, continuing without context:', {
+          component: 'Aiassistanthandlers',
+          operation: 'profile-error'
+        }, profileError as Error);
+      }
+
+      // Step 2: Apply intelligent data limiting
+      const { limitedTasks, limitedJournalEntries } = applyDataLimitsForAnalysis(analyzeTasks, analyzeJournalEntries);
+      logger.info(`📊 Data limiting: ${analyzeTasks.length} → ${limitedTasks.length} tasks, ${analyzeJournalEntries.length} → ${limitedJournalEntries.length} journal entries`, { 
+        component: 'Aiassistanthandlers', 
+        operation: 'limiting' 
+      });
+
+      // Step 3: Smart preprocessing with quality scoring
+      logger.info('🔄 Step 3: Smart preprocessing with quality scoring...', {
+        component: 'Aiassistanthandlers',
+        operation: 'preprocess-start',
+        metadata: {
+          inputTasks: limitedTasks.length,
+          inputJournalEntries: limitedJournalEntries.length
+        }
+      });
+
+      logger.info('📝 Preprocessing tasks...', { component: 'Aiassistanthandlers', operation: 'preprocess-tasks' });
+      const preprocessedTasks = AIPreprocessingService.preprocessTasks(limitedTasks);
+      logger.info(`✅ Tasks preprocessed: ${preprocessedTasks.length} tasks`, {
+        component: 'Aiassistanthandlers',
+        operation: 'preprocess-tasks-success',
+        metadata: {
+          sampleTask: preprocessedTasks.length > 0 ? {
+            id: preprocessedTasks[0].id,
+            title: preprocessedTasks[0].title,
+            hasDescription: !!preprocessedTasks[0].description,
+            tagsCount: preprocessedTasks[0].tags?.length || 0
+          } : null
+        }
+      });
+
+      logger.info('📖 Preprocessing journal entries...', { component: 'Aiassistanthandlers', operation: 'preprocess-journal' });
+      const preprocessedJournalEntries = AIPreprocessingService.preprocessJournalEntries(limitedJournalEntries);
+      logger.info(`✅ Journal entries preprocessed: ${preprocessedJournalEntries.length} entries`, {
+        component: 'Aiassistanthandlers',
+        operation: 'preprocess-journal-success',
+        metadata: {
+          sampleEntry: preprocessedJournalEntries.length > 0 ? {
+            id: preprocessedJournalEntries[0].id,
+            hasContent: !!preprocessedJournalEntries[0].content,
+            tagsCount: preprocessedJournalEntries[0].tags?.length || 0,
+            mood: preprocessedJournalEntries[0].mood
+          } : null
+        }
+      });
+
+      logger.info('📊 Preparing data summary...', { component: 'Aiassistanthandlers', operation: 'data-summary' });
+      const dataSummary = AIPreprocessingService.prepareDataSummary(preprocessedTasks, preprocessedJournalEntries);
+      logger.info('✅ Data summary prepared', {
+        component: 'Aiassistanthandlers',
+        operation: 'data-summary-success',
+        metadata: {
+          summary: dataSummary
+        }
+      });
+
+      // Step 4: Generate enhanced prompts with context
+      logger.info('🎯 Step 4: Generating enhanced prompts with context...', { component: 'Aiassistanthandlers', operation: 'prompt-start' });
+
+      const promptContext = userProfile ? {
+        userGoals: userProfile.activeGoals,
+        focusAreas: userProfile.focusAreas,
+        workStyle: userProfile.workStyle,
+        currentPriorities: userProfile.commonTags.slice(0, 3).map(t => t.tag),
+        userPreferences: {
+          communicationStyle: userProfile.communicationPreference,
+          preferredCategories: userProfile.insightPreferences.preferredCategories,
+        }
+      } : undefined;
+
+      logger.info('📋 Prompt context prepared', {
+        component: 'Aiassistanthandlers',
+        operation: 'prompt-context',
+        metadata: {
+          hasUserProfile: !!userProfile,
+          userGoalsCount: userProfile?.activeGoals.length || 0,
+          focusAreasCount: userProfile?.focusAreas.length || 0,
+          workStyle: userProfile?.workStyle || 'unknown'
+        }
+      });
+
+      // Fetch previous insights for novelty scoring
+      let previousInsights: Array<{ type: string; title: string; description: string }> = [];
+      logger.info('🔍 Fetching previous insights for novelty scoring...', { component: 'Aiassistanthandlers', operation: 'previous-insights' });
+      try {
+        const { sqliteService } = await import('@serenity/database');
+        await sqliteService.initialize();
+        const recentInsightsData = await sqliteService.getRecentAIInsights(20);
+        previousInsights = recentInsightsData.map((i: any) => ({
+          type: i.type,
+          title: i.title,
+          description: i.description,
+        }));
+        logger.info(`✅ Fetched ${previousInsights.length} previous insights`, {
+          component: 'Aiassistanthandlers',
+          operation: 'previous-insights-success'
+        });
+      } catch (insightsError) {
+        logger.warn('⚠️ Could not fetch previous insights', {
+          component: 'Aiassistanthandlers',
+          operation: 'previous-insights-warning'
+        });
+      }
+
+      if (previousInsights.length > 0 && promptContext) {
+        (promptContext as any).previousInsights = previousInsights;
+      }
+
+      logger.info('🔨 Generating enhanced prompt...', { component: 'Aiassistanthandlers', operation: 'prompt-generate' });
+      const enhancedPrompt = PromptEngineeringService.generateInsightPrompt({
         tasks: preprocessedTasks,
         journalEntries: preprocessedJournalEntries,
         dataTypes: options.dataTypes,
+        context: promptContext,
+        dataSummary: dataSummary,
       });
-      // Instruct providers explicitly to return ONLY JSON to avoid code fences/prose
-      Object.keys(prompts).forEach((k) => {
-        prompts[k] = `${prompts[k]}\n\nRespond with ONLY valid JSON. Do not include code fences, markdown, or any explanatory text.`;
-      });
-      
-      // Analyze with AI provider
-      const allInsights = [];
-      let usageTotals = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-      
-      for (const [promptType, prompt] of Object.entries(prompts)) {
-        logger.info(`🤖 Running ${promptType} analysis...`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        const result = await makeAIApiCall(options.provider, prompt);
-        
-        if (result.success && result.content) {
-          // Debug: log raw provider content to aid parsing issues (remove later)
-          try { console.error(`[AI][${options.provider}] Raw ${String(promptType)} content:`, result.content); } catch {}
-          const insights = AIAssistantService.parseInsightsResponse(result.content);
-          // Set correct source provider
-          insights.forEach(insight => {
-            insight.source = options.provider;
-          });
-          allInsights.push(...insights);
-          logger.info(`✅ Generated ${insights.length} insights from ${promptType}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          const u = normalizeUsage(result.usage);
-          usageTotals.promptTokens += u.promptTokens;
-          usageTotals.completionTokens += u.completionTokens;
-          usageTotals.totalTokens += u.totalTokens;
-        } else {
-          try { console.error(`[AI][${options.provider}] ${String(promptType)} call failed. Raw result:`, result); } catch {}
-          logger.warn(`⚠️ ${promptType} analysis failed: ${result.error}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+
+      logger.info(`✅ Enhanced prompt generated`, {
+        component: 'Aiassistanthandlers',
+        operation: 'prompt-success',
+        metadata: {
+          promptLength: enhancedPrompt.length,
+          promptPreview: enhancedPrompt.substring(0, 200) + '...',
+          estimatedTokens: Math.ceil(enhancedPrompt.length / 4)
         }
-      }
+      });
+
+      // Step 5: Make AI API call (single batched call instead of multiple)
+      logger.info(`🤖 Step 5: Calling ${options.provider} API...`, {
+        component: 'Aiassistanthandlers',
+        operation: 'api-call-start',
+        metadata: {
+          provider: options.provider,
+          promptLength: enhancedPrompt.length,
+          estimatedTokens: Math.ceil(enhancedPrompt.length / 4)
+        }
+      });
+
+      const result = await makeAIApiCall(options.provider, enhancedPrompt);
+
+      logger.info(`✅ ${options.provider} API call completed`, {
+        component: 'Aiassistanthandlers',
+        operation: 'api-call-complete',
+        metadata: {
+          success: result.success,
+          hasContent: !!result.content,
+          contentLength: result.content?.length || 0
+        }
+      });
       
+      let rawInsights = [];
+      let usageTotals = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+
+      if (result.success && result.content) {
+        logger.info('📥 Processing AI response...', { component: 'Aiassistanthandlers', operation: 'response-process' });
+
+        // Log the raw response for debugging
+        logger.info('📄 Raw AI response:', {
+          component: 'Aiassistanthandlers',
+          operation: 'response-raw',
+          metadata: {
+            provider: options.provider,
+            responseLength: result.content.length,
+            responsePreview: result.content.substring(0, 500) + (result.content.length > 500 ? '...' : ''),
+            fullResponse: result.content
+          }
+        });
+
+        logger.info('🔍 Parsing insights from AI response...', { component: 'Aiassistanthandlers', operation: 'parse-insights' });
+        rawInsights = AIAssistantService.parseInsightsResponse(result.content);
+
+        logger.info(`✅ Parsed ${rawInsights.length} insights from response`, {
+          component: 'Aiassistanthandlers',
+          operation: 'parse-success',
+          metadata: {
+            insightsCount: rawInsights.length,
+            insightTypes: rawInsights.map(i => i.type).join(', '),
+            sampleInsights: rawInsights.slice(0, 3).map(i => ({
+              type: i.type,
+              title: i.title,
+              confidence: i.confidence
+            }))
+          }
+        });
+
+        // Set correct source provider
+        rawInsights.forEach(insight => {
+          insight.source = options.provider;
+        });
+
+        const u = normalizeUsage(result.usage);
+        usageTotals = u;
+
+        logger.info('📊 Token usage statistics:', {
+          component: 'Aiassistanthandlers',
+          operation: 'usage',
+          metadata: {
+            promptTokens: usageTotals.promptTokens,
+            completionTokens: usageTotals.completionTokens,
+            totalTokens: usageTotals.totalTokens
+          }
+        });
+      } else {
+        logger.error(`❌ AI API call failed`, {
+          component: 'Aiassistanthandlers',
+          operation: 'api-error',
+          metadata: {
+            provider: options.provider,
+            error: result.error,
+            hasContent: !!result.content,
+            fullResult: result
+          }
+        });
+        throw new Error(result.error || 'AI API call failed');
+      }
+
+      // Step 6: Quality processing - score, filter, deduplicate, rank
+      logger.info('✨ Step 6: Quality processing - scoring, filtering, deduplicating...', { component: 'Aiassistanthandlers', operation: 'quality-start' });
+
+      const qualityProcessingContext = {
+        previousInsights: previousInsights as any, // Type cast for now - full AIInsight structure not needed for quality check
+        focusAreas: userProfile?.focusAreas,
+        recentCategories: userProfile?.insightPreferences.preferredCategories,
+        minimumQuality: 0.5, // Adjust based on needs
+      };
+
+      logger.info('🔍 Quality processing context:', {
+        component: 'Aiassistanthandlers',
+        operation: 'quality-context',
+        metadata: {
+          previousInsightsCount: previousInsights.length,
+          focusAreasCount: userProfile?.focusAreas.length || 0,
+          minimumQuality: 0.5
+        }
+      });
+
+      const allInsights = InsightQualityService.processInsights(
+        rawInsights,
+        qualityProcessingContext
+      );
+
+      const filteredCount = rawInsights.length - allInsights.length;
+      logger.info(`✅ Quality pipeline complete`, {
+        component: 'Aiassistanthandlers',
+        operation: 'quality-complete',
+        metadata: {
+          originalInsights: rawInsights.length,
+          qualityInsights: allInsights.length,
+          filteredOut: filteredCount,
+          filterRate: rawInsights.length > 0 ? `${((filteredCount / rawInsights.length) * 100).toFixed(1)}%` : '0%',
+          finalInsightTypes: allInsights.map(i => i.type).join(', ')
+        }
+      });
+
       // Create analysis summary for tracking
+      logger.info('📊 Creating analysis summary for tracking...', { component: 'Aiassistanthandlers', operation: 'summary' });
       const analysisSummary = AIAssistantService.createAnalysisSummary(
         analyzeTasks,
         analyzeJournalEntries
       );
-      
-      logger.info(`✅ Analysis complete: ${allInsights.length} insights generated`, { component: 'Aiassistanthandlers', operation: 'execute' });
+
+      logger.info('✅ Analysis summary created', {
+        component: 'Aiassistanthandlers',
+        operation: 'summary-complete',
+        metadata: {
+          processedTasksCount: analysisSummary.processedTaskIds.length,
+          processedJournalEntriesCount: analysisSummary.processedJournalIds.length
+        }
+      });
+
+      // Final comprehensive summary
+      logger.info('🎉 ===== DATA ANALYSIS COMPLETE =====', {
+        component: 'Aiassistanthandlers',
+        operation: 'analysis-complete',
+        metadata: {
+          provider: options.provider,
+          inputTasks: tasks.length,
+          inputJournalEntries: journalEntries.length,
+          analyzedTasks: analyzeTasks.length,
+          analyzedJournalEntries: analyzeJournalEntries.length,
+          limitedTasks: limitedTasks.length,
+          limitedJournalEntries: limitedJournalEntries.length,
+          promptLength: enhancedPrompt.length,
+          estimatedPromptTokens: Math.ceil(enhancedPrompt.length / 4),
+          responseLength: result.content?.length || 0,
+          rawInsightsCount: rawInsights.length,
+          qualityInsightsCount: allInsights.length,
+          filteredInsightsCount: filteredCount,
+          promptTokens: usageTotals.promptTokens,
+          completionTokens: usageTotals.completionTokens,
+          totalTokens: usageTotals.totalTokens,
+          hasUserProfile: !!userProfile,
+          previousInsightsUsed: previousInsights.length
+        }
+      });
       // Persist insights and usage to SQLite for durability
       try {
         const { sqliteService } = await import('@serenity/database');

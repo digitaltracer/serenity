@@ -68,7 +68,114 @@ export interface PreprocessedJournalEntry {
   hourOfDay: number;
 }
 
+export interface GoalSuggestion {
+  title: string;
+  description: string;
+  type: 'weekly_tasks' | 'project_tasks' | 'priority_tasks' | 'daily_streak' | 'journal_weekly' | 'completion_rate';
+  priority: 'low' | 'medium' | 'high';
+  targetCount?: number;
+  timeframe: 'daily' | 'weekly' | 'monthly';
+  reasoning: string;
+  confidence: number;
+}
+
 export class AIAssistantService {
+  /**
+   * Generate goal suggestions based on user activity patterns
+   */
+  static generateGoalSuggestions(data: {
+    tasks: Task[];
+    journalEntries: JournalEntry[];
+    existingGoals?: any[];
+  }): GoalSuggestion[] {
+    const suggestions: GoalSuggestion[] = [];
+    const completedTasks = data.tasks.filter(t => t.completed);
+    const weeklyAvgTasks = Math.floor(completedTasks.length / 4); // Assuming ~4 weeks of data
+
+    // Suggest weekly tasks goal if user completes tasks regularly
+    if (completedTasks.length > 10) {
+      const targetTasks = Math.max(5, Math.floor(weeklyAvgTasks * 1.2)); // 20% increase
+      suggestions.push({
+        title: `Complete ${targetTasks} tasks per week`,
+        description: `Based on your current pace, aim to complete ${targetTasks} tasks weekly to improve productivity.`,
+        type: 'weekly_tasks',
+        priority: 'medium',
+        targetCount: targetTasks,
+        timeframe: 'weekly',
+        reasoning: `You've been completing an average of ${weeklyAvgTasks} tasks per week. A 20% increase is achievable and will boost your productivity.`,
+        confidence: 0.85,
+      });
+    }
+
+    // Suggest high-priority task goal if user has many pending high-priority tasks
+    const highPriorityPending = data.tasks.filter(t => !t.completed && t.priority === 'high');
+    if (highPriorityPending.length >= 3) {
+      suggestions.push({
+        title: 'Focus on high-priority tasks',
+        description: 'Complete all high-priority tasks this week to stay on top of important work.',
+        type: 'priority_tasks',
+        priority: 'high',
+        timeframe: 'weekly',
+        reasoning: `You currently have ${highPriorityPending.length} pending high-priority tasks. Focusing on these will help you manage critical work better.`,
+        confidence: 0.9,
+      });
+    }
+
+    // Suggest daily streak goal based on task completion patterns
+    const recentCompletions = completedTasks.filter(t => {
+      const daysSince = (Date.now() - new Date(t.completedAt || t.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
+      return daysSince <= 7;
+    });
+
+    if (recentCompletions.length >= 5) {
+      suggestions.push({
+        title: 'Build a 7-day completion streak',
+        description: 'Complete at least one task every day for 7 consecutive days.',
+        type: 'daily_streak',
+        priority: 'medium',
+        timeframe: 'weekly',
+        reasoning: 'You\'ve been active recently. Building a streak will help establish consistent productivity habits.',
+        confidence: 0.8,
+      });
+    }
+
+    // Suggest journal goal if user journals occasionally but not regularly
+    if (data.journalEntries.length > 3 && data.journalEntries.length < 20) {
+      const weeklyJournalTarget = 3;
+      suggestions.push({
+        title: `Write ${weeklyJournalTarget} journal entries per week`,
+        description: 'Regular journaling helps with self-reflection and mental clarity.',
+        type: 'journal_weekly',
+        priority: 'low',
+        targetCount: weeklyJournalTarget,
+        timeframe: 'weekly',
+        reasoning: 'You\'ve started journaling but haven\'t made it a consistent habit yet. Regular entries can improve well-being.',
+        confidence: 0.75,
+      });
+    }
+
+    // Suggest completion rate goal if current rate is low
+    const completionRate = data.tasks.length > 0 
+      ? (completedTasks.length / data.tasks.length) * 100 
+      : 0;
+
+    if (completionRate < 60 && data.tasks.length > 10) {
+      suggestions.push({
+        title: 'Improve task completion rate to 75%',
+        description: 'Focus on completing tasks rather than just creating them.',
+        type: 'completion_rate',
+        priority: 'high',
+        timeframe: 'monthly',
+        reasoning: `Your current completion rate is ${completionRate.toFixed(0)}%. Improving this will help you accomplish more.`,
+        confidence: 0.85,
+      });
+    }
+
+    // Filter out suggestions for goals that already exist
+    const existingGoalTypes = new Set(data.existingGoals?.map(g => g.type) || []);
+    return suggestions.filter(s => !existingGoalTypes.has(s.type));
+  }
+
   /**
    * Preprocess tasks for AI analysis
    * Removes sensitive information and structures data

@@ -82,9 +82,50 @@ const tasksSlice = createSlice({
     toggleTask: (state, action: PayloadAction<string>) => {
       const task = state.tasks.find(task => task.id === action.payload);
       if (task) {
+        const wasCompleted = task.completed;
         task.completed = !task.completed;
         task.completedAt = task.completed ? new Date() : undefined;
         task.updatedAt = new Date();
+
+        // If task is being marked as completed and has a recurring pattern, create a new instance
+        if (task.completed && !wasCompleted && task.recurring) {
+          const { type, interval, endDate } = task.recurring;
+          
+          // Check if the recurrence should continue (not past endDate)
+          const now = new Date();
+          if (!endDate || new Date(endDate) > now) {
+            // Calculate next due date
+            let nextDueDate = task.dueDate ? new Date(task.dueDate) : now;
+            
+            switch (type) {
+              case 'daily':
+                nextDueDate.setDate(nextDueDate.getDate() + interval);
+                break;
+              case 'weekly':
+                nextDueDate.setDate(nextDueDate.getDate() + (interval * 7));
+                break;
+              case 'monthly':
+                nextDueDate.setMonth(nextDueDate.getMonth() + interval);
+                break;
+              case 'custom':
+                nextDueDate.setDate(nextDueDate.getDate() + interval);
+                break;
+            }
+
+            // Create new recurring task instance
+            const newTask: Task = {
+              ...task,
+              id: generateId(),
+              completed: false,
+              completedAt: undefined,
+              dueDate: nextDueDate,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+
+            state.tasks.push(newTask);
+          }
+        }
       }
     },
     toggleSubtask: (state, action: PayloadAction<{ taskId: string; subtaskId: string }>) => {

@@ -4,16 +4,19 @@ import { Modal } from './Modal';
 import { Button } from './Button';
 import { Input } from './Input';
 import { CustomSelect } from './CustomSelect';
-import { RichTextEditor } from './RichTextEditor';
+import { QuillEditor } from './QuillEditor';
 import { TagInput } from './TagInput';
 import { DatePicker } from './DatePicker';
-import { Pin, Calendar } from 'lucide-react';
+import { MediaUploader, MediaFile } from './MediaUploader';
+import { Pin, Calendar, Paperclip } from 'lucide-react';
 
 export interface JournalEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (entry: Partial<JournalEntry>) => void;
   entry?: JournalEntry | null;
+  templateContent?: string;
+  templateTags?: string[];
 }
 
 const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
@@ -21,6 +24,8 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
   onClose,
   onSave,
   entry,
+  templateContent,
+  templateTags,
 }) => {
   const [formData, setFormData] = useState({
     title: '',
@@ -30,6 +35,8 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
     pinned: false,
     mood: '' as JournalEntry['mood'] | '',
   });
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const [showMediaUploader, setShowMediaUploader] = useState(false);
 
 
   useEffect(() => {
@@ -42,17 +49,21 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
         pinned: entry.pinned,
         mood: entry.mood || '',
       });
+      // TODO: Load existing attachments
+      setMediaFiles([]);
     } else {
       setFormData({
         title: '',
-        content: '',
+        content: templateContent || '',
         date: new Date(),
-        tags: [],
+        tags: templateTags || [],
         pinned: false,
         mood: '',
       });
+      setMediaFiles([]);
     }
-  }, [entry, isOpen]);
+    setShowMediaUploader(false);
+  }, [entry, isOpen, templateContent, templateTags]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +132,7 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
           <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
             Content
           </label>
-          <RichTextEditor
+          <QuillEditor
             value={formData.content}
             onChange={(content) => setFormData(prev => ({ ...prev, content }))}
             placeholder="Write your thoughts..."
@@ -167,6 +178,38 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
           maxTags={8}
           className="text-sm"
         />
+
+        {/* Media Attachments */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+              Attachments
+            </label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowMediaUploader(!showMediaUploader)}
+              className="text-xs h-7 rounded-lg"
+            >
+              <Paperclip className="w-3 h-3 mr-1" />
+              {showMediaUploader ? 'Hide' : 'Add Files'}
+            </Button>
+          </div>
+          {showMediaUploader && (
+            <MediaUploader
+              value={mediaFiles}
+              onChange={setMediaFiles}
+              maxFiles={5}
+              maxFileSize={25}
+            />
+          )}
+          {!showMediaUploader && mediaFiles.length > 0 && (
+            <div className="text-xs text-muted-foreground">
+              {mediaFiles.length} file(s) attached
+            </div>
+          )}
+        </div>
 
         {/* Actions */}
         <div className="flex gap-2 pt-3 border-t border-gray-200/30 dark:border-gray-700/20">

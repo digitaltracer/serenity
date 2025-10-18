@@ -1,4 +1,4 @@
-import { Pool, PoolClient, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 
 export interface PostgresConfig {
   connectionString?: string;
@@ -27,7 +27,7 @@ export class PostgresAdapter {
     });
   }
 
-  async query<T = unknown>(text: string, params?: unknown[]): Promise<QueryResult<T>> {
+  async query<T extends QueryResultRow = QueryResultRow>(text: string, params?: unknown[]): Promise<QueryResult<T>> {
     return this.pool.query<T>(text, params as any);
   }
 

@@ -1,4 +1,4 @@
-import type { PersistenceClient, DatabaseStats } from './PersistenceClient';
+import type { PersistenceClient, PersistenceStats } from './PersistenceClient';
 import type { Task, Project, JournalEntry, Goal } from '../types';
 
 interface WebApiClientOptions {
@@ -87,7 +87,7 @@ export class WebApiPersistenceClient implements PersistenceClient {
   };
 
   stats = {
-    get: async (): Promise<DatabaseStats> => this.request<DatabaseStats>('/stats'),
+    get: async (): Promise<PersistenceStats> => this.request<PersistenceStats>('/stats'),
   };
 }
 

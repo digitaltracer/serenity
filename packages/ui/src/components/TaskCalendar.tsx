@@ -43,22 +43,29 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
   const renderEventContent = (eventInfo: any) => {
     const t = eventInfo.event.extendedProps?.task as Task | undefined;
     const completed = t?.completed;
-    
-    const priorityIcon = t?.priority === 'high' ? '🔥' : 
-                        t?.priority === 'medium' ? '⚡' : 
-                        t?.priority === 'low' ? '📌' : '';
-    
+
+    const priorityClass = completed ? 'is-completed' : t?.priority ? `priority-${t.priority}` : 'priority-low';
+
+    // Get text color class for light theme visibility
+    const getTextColorClass = () => {
+      if (completed) return 'line-through text-emerald-700 dark:text-gray-400';
+      switch (t?.priority) {
+        case 'high': return 'text-red-700 dark:text-red-300';
+        case 'medium': return 'text-amber-800 dark:text-amber-300';
+        case 'low': return 'text-slate-700 dark:text-slate-300';
+        default: return 'text-slate-700 dark:text-slate-300';
+      }
+    };
+
     return (
-      <div className="flex items-center gap-2 px-2 py-1.5 w-full">
-        {completed ? (
-          <span className="text-xs">✓</span>
-        ) : priorityIcon ? (
-          <span className="text-xs">{priorityIcon}</span>
-        ) : null}
-        <span className={cn(
-          'truncate flex-1 text-xs font-medium',
-          completed && 'line-through opacity-75'
-        )}>
+      <div className="serenity-event-content flex items-center gap-2 px-2 py-1 w-full">
+        <span className={cn('event-dot', priorityClass)} />
+        <span
+          className={cn(
+            'truncate flex-1 text-[11px] font-medium',
+            getTextColorClass()
+          )}
+        >
           {eventInfo.event.title}
         </span>
       </div>
@@ -129,36 +136,41 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
         }
 
         .task-calendar .fc .fc-button {
-          background: linear-gradient(to bottom, rgb(59 130 246), rgb(37 99 235));
-          border: none;
-          color: white;
-          padding: 0.625rem 1.25rem;
-          font-size: 0.875rem;
+          background: rgb(255 255 255);
+          color: rgb(51 65 85);
+          border: 1px solid rgb(226 232 240);
+          padding: 0.375rem 0.75rem;
+          font-size: 0.8125rem;
           font-weight: 600;
-          border-radius: 0.625rem;
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2), 0 1px 2px rgba(0,0,0,0.1);
-          text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+          border-radius: 9999px;
+          box-shadow: none;
+          text-shadow: none;
         }
         
         /* Navigation buttons with proper arrows */
+        .task-calendar .fc .fc-prev-button,
+        .task-calendar .fc .fc-next-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
         .task-calendar .fc .fc-prev-button .fc-icon,
         .task-calendar .fc .fc-next-button .fc-icon {
           font-family: Arial, sans-serif;
-          font-size: 1.125rem;
+          font-size: 1rem;
           line-height: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
-        
+
         .task-calendar .fc .fc-prev-button .fc-icon::before {
-          content: '‹';
-          font-size: 1.5rem;
-          font-weight: bold;
+          content: '\u2039';
         }
-        
+
         .task-calendar .fc .fc-next-button .fc-icon::before {
-          content: '›';
-          font-size: 1.5rem;
-          font-weight: bold;
+          content: '\u203a';
         }
         
         .task-calendar .fc .fc-button:hover:not(:disabled) {
@@ -461,6 +473,82 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
         .dark .task-calendar .fc-scroller::-webkit-scrollbar-thumb:hover {
           background: rgb(100 116 139);
         }
+
+        /* ===== Enterprise overrides (minimalist, neutral) ===== */
+        .task-calendar {
+          border-radius: 0.75rem;
+          border: 1px solid rgb(226 232 240);
+          box-shadow: none;
+        }
+        .dark .task-calendar { border-color: rgb(51 65 85); }
+
+        .task-calendar .fc-toolbar {
+          padding: 0.875rem 1rem;
+          background: transparent;
+          border-bottom: 1px solid var(--fc-border-color);
+        }
+        .task-calendar .fc-toolbar-title {
+          font-size: 1.25rem;
+          font-weight: 600;
+          letter-spacing: -0.01em;
+        }
+
+        .task-calendar .fc .fc-button {
+          background: rgb(255 255 255);
+          color: rgb(51 65 85);
+          border: 1px solid rgb(226 232 240);
+          padding: 0.375rem 0.75rem;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          border-radius: 0.5rem;
+          box-shadow: none;
+          text-shadow: none;
+        }
+        .task-calendar .fc .fc-button:hover:not(:disabled) {
+          background: rgb(248 250 252);
+          border-color: rgb(203 213 225);
+        }
+        .task-calendar .fc .fc-button-primary:not(:disabled).fc-button-active {
+          background: rgb(248 250 252);
+          border-color: rgb(203 213 225);
+          color: rgb(30 41 59);
+        }
+        .dark .task-calendar .fc .fc-button {
+          background: rgb(51 65 85);
+          color: rgb(226 232 240);
+          border: 1px solid rgb(71 85 105);
+        }
+        .dark .task-calendar .fc .fc-button:hover:not(:disabled) {
+          background: rgb(71 85 105);
+          border-color: rgb(100 116 139);
+        }
+
+        .task-calendar .fc-col-header {
+          background: transparent;
+          border-bottom: 1px solid var(--fc-border-color) !important;
+        }
+
+        .task-calendar .fc-daygrid-day.fc-day-today { background: var(--fc-today-bg-color) !important; }
+        .task-calendar .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+          background: rgba(59, 130, 246, 0.12);
+          color: rgb(30 64 175);
+          border-radius: 0.375rem;
+        }
+        .dark .task-calendar .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+          background: rgba(59, 130, 246, 0.2);
+          color: rgb(147 197 253);
+        }
+
+        .task-calendar .fc-event { box-shadow: none; }
+        .task-calendar .fc .serenity-event.priority-high { background: rgba(239, 68, 68, 0.08); border-left: 3px solid rgb(239 68 68); }
+        .task-calendar .fc .serenity-event.priority-medium { background: rgba(245, 158, 11, 0.08); border-left: 3px solid rgb(245 158 11); }
+        .task-calendar .fc .serenity-event.priority-low { background: rgba(100, 116, 139, 0.08); border-left: 3px solid rgb(100 116 139); }
+        .task-calendar .fc .serenity-event.is-completed { background: rgba(16, 185, 129, 0.08); border-left: 3px solid rgb(16 185 129); }
+        .task-calendar .serenity-event .event-dot { width: 8px; height: 8px; border-radius: 9999px; display: inline-block; }
+        .task-calendar .serenity-event.priority-high .event-dot { background: rgb(239 68 68); }
+        .task-calendar .serenity-event.priority-medium .event-dot { background: rgb(245 158 11); }
+        .task-calendar .serenity-event.priority-low .event-dot { background: rgb(100 116 139); }
+        .task-calendar .serenity-event.is-completed .event-dot { background: rgb(16 185 129); }
       `}</style>
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}

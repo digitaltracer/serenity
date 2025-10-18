@@ -1,6 +1,6 @@
 import type { Task, Project, JournalEntry, Goal } from '../types';
 
-export interface DatabaseStats {
+export interface PersistenceStats {
   totalTasks: number;
   totalProjects: number;
   totalJournalEntries: number;
@@ -34,7 +34,7 @@ export interface PersistenceClient {
     remove(id: string): Promise<void>;
   };
   stats: {
-    get(): Promise<DatabaseStats>;
+    get(): Promise<PersistenceStats>;
   };
 }
 

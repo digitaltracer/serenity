@@ -275,7 +275,7 @@ export const ActionHubPage: React.FC = () => {
     setNewTaskDueDate(task.dueDate ? new Date(task.dueDate) : null);
     setEditingTask(task.id);
     setShowCreateForm(true);
-    
+
     // Scroll to the form after a short delay to ensure it's rendered
     setTimeout(() => {
       createFormRef.current?.scrollIntoView({
@@ -283,6 +283,31 @@ export const ActionHubPage: React.FC = () => {
         block: 'start'
       });
     }, 100);
+  };
+
+  const handleTaskClickFromCalendar = (task: any) => {
+    // Switch to tasks tab
+    setActiveTab('tasks');
+
+    // Wait for the tab to render, then scroll to the task
+    setTimeout(() => {
+      const taskElement = document.getElementById(`task-${task.id}`);
+      if (taskElement) {
+        taskElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+
+        // Add a temporary highlight effect
+        taskElement.style.transition = 'background-color 0.3s ease';
+        const originalBg = taskElement.style.backgroundColor;
+        taskElement.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+
+        setTimeout(() => {
+          taskElement.style.backgroundColor = originalBg;
+        }, 1500);
+      }
+    }, 150);
   };
 
   const projectOptions = useMemo(() =>
@@ -742,18 +767,20 @@ export const ActionHubPage: React.FC = () => {
               ) : (
                 <>
                   {paginatedTasksData.tasks.map((task, index) => (
-                    <SelectableItem key={task.id} id={task.id} type="tasks">
-                      <DraggableTaskCard
-                        task={task}
-                        onToggle={() => dispatch(toggleTask(task.id))}
-                        onToggleSubtask={(taskId: string, subtaskId: string) => dispatch(toggleSubtask({ taskId, subtaskId }))}
-                        onEdit={handleEditTask}
-                        onDelete={() => dispatch(deleteTask(task.id))}
-                        index={index}
-                        containerName="actionhub-tasks"
-                        projects={projects}
-                      />
-                    </SelectableItem>
+                    <div key={task.id} id={`task-${task.id}`} data-task-id={task.id}>
+                      <SelectableItem id={task.id} type="tasks">
+                        <DraggableTaskCard
+                          task={task}
+                          onToggle={() => dispatch(toggleTask(task.id))}
+                          onToggleSubtask={(taskId: string, subtaskId: string) => dispatch(toggleSubtask({ taskId, subtaskId }))}
+                          onEdit={handleEditTask}
+                          onDelete={() => dispatch(deleteTask(task.id))}
+                          index={index}
+                          containerName="actionhub-tasks"
+                          projects={projects}
+                        />
+                      </SelectableItem>
+                    </div>
                   ))}
 
                   {/* Load More Button */}
@@ -1017,7 +1044,7 @@ export const ActionHubPage: React.FC = () => {
               <CardContent>
                 <TaskCalendar
                   tasks={tasks}
-                  onTaskClick={handleEditTask}
+                  onTaskClick={handleTaskClickFromCalendar}
                   onDateChange={(taskId, newDate) => {
                     dispatch(updateTask({ id: taskId, dueDate: newDate }));
                   }}

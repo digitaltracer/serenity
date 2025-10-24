@@ -11,7 +11,8 @@
     "clean": "turbo run clean --no-daemon",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "type-check": "tsc --noEmit",
-    "prepare:logos": "bash scripts/prepare-logos.sh"
+    "prepare:logos": "bash scripts/prepare-logos.sh",
+    "postinstall": "npm run build"
   },
   "devDependencies": {
     "@turbo/gen": "^1.10.7",

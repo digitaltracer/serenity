@@ -66,4 +66,3 @@ export declare const selectPinnedEntries: ((state: {
 };
 declare const _default: import("redux").Reducer<JournalState>;
 export default _default;
-//# sourceMappingURL=journalSlice.d.ts.map

@@ -20,6 +20,7 @@ export declare function createEnhancedStore(): import("@reduxjs/toolkit/dist/con
     goals: import("./slices/goalsSlice").GoalsState;
     integrations: import("./slices/integrationsSlice").IntegrationsState;
     aiAssistant: import("./slices/aiAssistantSlice").AIAssistantState;
+    insights: import("./slices/insightsSlice").InsightsState;
 }, import("redux").AnyAction, import("@reduxjs/toolkit").MiddlewareArray<[import("@reduxjs/toolkit").ThunkMiddleware<{
     tasks: import("./slices/tasksSlice").TasksState;
     projects: import("./slices/projectsSlice").ProjectsState;
@@ -35,6 +36,7 @@ export declare function createEnhancedStore(): import("@reduxjs/toolkit/dist/con
     goals: import("./slices/goalsSlice").GoalsState;
     integrations: import("./slices/integrationsSlice").IntegrationsState;
     aiAssistant: import("./slices/aiAssistantSlice").AIAssistantState;
+    insights: import("./slices/insightsSlice").InsightsState;
 }, import("redux").AnyAction>, import("redux").Middleware<{}, any, import("redux").Dispatch<import("redux").AnyAction>>]>>;
 export declare const store: import("@reduxjs/toolkit/dist/configureStore").ToolkitStore<{
     tasks: import("./slices/tasksSlice").TasksState;
@@ -51,6 +53,7 @@ export declare const store: import("@reduxjs/toolkit/dist/configureStore").Toolk
     goals: import("./slices/goalsSlice").GoalsState;
     integrations: import("./slices/integrationsSlice").IntegrationsState;
     aiAssistant: import("./slices/aiAssistantSlice").AIAssistantState;
+    insights: import("./slices/insightsSlice").InsightsState;
 }, import("redux").AnyAction, import("@reduxjs/toolkit").MiddlewareArray<[import("@reduxjs/toolkit").ThunkMiddleware<{
     tasks: import("./slices/tasksSlice").TasksState;
     projects: import("./slices/projectsSlice").ProjectsState;
@@ -66,6 +69,7 @@ export declare const store: import("@reduxjs/toolkit/dist/configureStore").Toolk
     goals: import("./slices/goalsSlice").GoalsState;
     integrations: import("./slices/integrationsSlice").IntegrationsState;
     aiAssistant: import("./slices/aiAssistantSlice").AIAssistantState;
+    insights: import("./slices/insightsSlice").InsightsState;
 }, import("redux").AnyAction>, import("redux").Middleware<{}, any, import("redux").Dispatch<import("redux").AnyAction>>]>>;
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
@@ -80,5 +84,4 @@ export declare function checkSQLiteAvailability(): Promise<boolean>;
 /**
  * Get database statistics for monitoring
  */
-export declare function getDatabaseStats(): Promise<any>;
-//# sourceMappingURL=enhancedStore.d.ts.map
+export declare function getDatabaseStats(): Promise<import("..").DatabaseStats | null | undefined>;

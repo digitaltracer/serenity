@@ -277,4 +277,3 @@ export declare function getUserMessage(error: unknown): string;
  */
 export declare function isRetryableError(error: unknown): boolean;
 export { ErrorHandler, type SerenityError };
-//# sourceMappingURL=errorHandler.d.ts.map

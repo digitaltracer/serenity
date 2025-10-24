@@ -4,6 +4,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.selectLastSyncError = exports.selectIsSyncing = exports.selectGitHubIntegration = exports.selectGoogleCalendarIntegration = exports.restoreState = exports.clearSyncError = exports.setSyncError = exports.setSyncing = exports.updateGitHubLastSync = exports.updateGitHubTotalRepositories = exports.setGitHubSyncEnabled = exports.disconnectGitHub = exports.toggleGitHubTokenActive = exports.updateGitHubToken = exports.removeGitHubToken = exports.addGitHubToken = exports.connectGitHub = exports.saveGoogleCalendarCredentials = exports.updateGoogleCalendarLastSync = exports.setGoogleCalendarSyncEnabled = exports.updateGoogleCalendarTokens = exports.disconnectGoogleCalendar = exports.connectGoogleCalendar = exports.persistIntegrationsState = exports.updateGitHubSyncEnabled = exports.updateGoogleCalendarSyncEnabled = exports.initializeIntegrations = void 0;
 const toolkit_1 = require("@reduxjs/toolkit");
 const encryptedIntegrationService_1 = require("../../services/encryptedIntegrationService");
+const logger_1 = require("../../utils/logger");
 const initialState = {
     googleCalendar: {
         connected: false,
@@ -19,28 +20,28 @@ const initialState = {
 // Async thunks
 exports.initializeIntegrations = (0, toolkit_1.createAsyncThunk)('integrations/initialize', async (masterPassword, { rejectWithValue }) => {
     try {
-        console.log('🔄 Initializing integrations...');
+        logger_1.logger.info('🔄 Initializing integrations...', { component: 'integrationsSlice', operation: 'initializingIntegrations...' });
         // Check if we have encrypted integrations data
         const hasEncrypted = await encryptedIntegrationService_1.EncryptedIntegrationService.hasEncryptedIntegrations();
         if (!hasEncrypted) {
-            console.log('📝 No encrypted integrations found');
+            logger_1.logger.info('📝 No encrypted integrations found', { component: 'integrationsSlice', operation: 'encryptedIntegrationsFound' });
             return initialState;
         }
         if (!masterPassword) {
-            console.log('🔐 Encrypted integrations found, but no master password provided');
+            logger_1.logger.info('🔐 Encrypted integrations found, but no master password provided', { component: 'integrationsSlice', operation: 'operation' });
             // Return initial state - integrations will be loaded when user authenticates
             return initialState;
         }
-        console.log('🔓 Loading encrypted integrations with master password...');
+        logger_1.logger.info('🔓 Loading encrypted integrations with master password...', { component: 'integrationsSlice', operation: 'loadingEncryptedIntegrations' });
         let integrationsState = await encryptedIntegrationService_1.EncryptedIntegrationService.loadEncryptedIntegrations(masterPassword);
         // Check if loading was successful
         if (!integrationsState) {
-            console.log('❌ Failed to load encrypted integrations');
+            logger_1.logger.info('❌ Failed to load encrypted integrations', { component: 'integrationsSlice', operation: 'failedLoadEncrypted' });
             return initialState;
         }
         // Migration: Convert legacy single-token GitHub integration to multi-token format
         if (integrationsState.github && 'accessToken' in integrationsState.github) {
-            console.log('🔄 Migrating legacy single-token GitHub integration to multi-token format...');
+            logger_1.logger.info('🔄 Migrating legacy single-token GitHub integration to multi-token format...', { component: 'integrationsSlice', operation: 'migratingLegacySingle-token' });
             const legacyIntegration = integrationsState.github;
             // Create a token from the legacy accessToken
             if (legacyIntegration.accessToken && legacyIntegration.username) {
@@ -63,29 +64,29 @@ exports.initializeIntegrations = (0, toolkit_1.createAsyncThunk)('integrations/i
                     lastSync: legacyIntegration.lastSync,
                     totalRepositories: legacyIntegration.repositories?.length || 0
                 };
-                console.log('✅ Successfully migrated legacy GitHub integration');
+                logger_1.logger.info('✅ Successfully migrated legacy GitHub integration', { component: 'integrationsSlice', operation: 'successfullyMigratedLegacy' });
                 // Save the migrated state back to storage
                 try {
                     await encryptedIntegrationService_1.EncryptedIntegrationService.saveEncryptedIntegrations(integrationsState, masterPassword);
-                    console.log('💾 Migrated integration state saved to storage');
+                    logger_1.logger.info('💾 Migrated integration state saved to storage', { component: 'integrationsSlice', operation: 'migratedIntegrationState' });
                 }
                 catch (error) {
-                    console.error('⚠️ Failed to save migrated integration state:', error);
+                    logger_1.logger.error('⚠️ Failed to save migrated integration state:', { component: 'integrationsSlice', operation: 'failedSaveMigrated' }, error);
                 }
             }
         }
-        console.log('✅ Successfully loaded encrypted integrations');
+        logger_1.logger.info('✅ Successfully loaded encrypted integrations', { component: 'integrationsSlice', operation: 'successfullyLoadedEncrypted' });
         return integrationsState;
     }
     catch (error) {
-        console.error('❌ Failed to initialize integrations:', error);
+        logger_1.logger.error('❌ Failed to initialize integrations:', { component: 'integrationsSlice', operation: 'failedInitializeIntegrations:' }, error);
         return rejectWithValue(error instanceof Error ? error.message : 'Failed to load integrations');
     }
 });
 // Async thunk to update and persist Google Calendar sync enabled state
 exports.updateGoogleCalendarSyncEnabled = (0, toolkit_1.createAsyncThunk)('integrations/updateGoogleCalendarSyncEnabled', async (enabled, { getState, rejectWithValue }) => {
     try {
-        console.log('🔄 Updating Google Calendar sync enabled state:', enabled);
+        logger_1.logger.info('🔄 Updating Google Calendar sync enabled state', { component: 'integrationsSlice', operation: 'updatingGoogleCalendar', metadata: { enabled } });
         // Get current state to check if we have encrypted integrations
         const state = getState();
         const integrations = state.integrations;
@@ -95,18 +96,18 @@ exports.updateGoogleCalendarSyncEnabled = (0, toolkit_1.createAsyncThunk)('integ
         }
         // Try to get the master password from authentication state or prompt user
         // For now, we'll return success and let the user know they need to re-connect to persist
-        console.log('⚠️ Cannot persist sync state change without master password. State updated locally only.');
+        logger_1.logger.info('⚠️ Cannot persist sync state change without master password. State updated locally only.', { component: 'integrationsSlice', operation: 'cannotPersistSync' });
         return { enabled, persisted: false };
     }
     catch (error) {
-        console.error('❌ Failed to update Google Calendar sync enabled state:', error);
+        logger_1.logger.error('❌ Failed to update Google Calendar sync enabled state:', { component: 'integrationsSlice', operation: 'failedUpdateGoogle' }, error);
         return rejectWithValue(error instanceof Error ? error.message : 'Failed to update sync state');
     }
 });
 // Async thunk to update and persist GitHub sync enabled state  
 exports.updateGitHubSyncEnabled = (0, toolkit_1.createAsyncThunk)('integrations/updateGitHubSyncEnabled', async (enabled, { getState, rejectWithValue }) => {
     try {
-        console.log('🔄 Updating GitHub sync enabled state:', enabled);
+        logger_1.logger.info('🔄 Updating GitHub sync enabled state', { component: 'integrationsSlice', operation: 'updatingGithubSync', metadata: { enabled } });
         // Get current state to check if we have encrypted integrations
         const state = getState();
         const integrations = state.integrations;
@@ -116,26 +117,26 @@ exports.updateGitHubSyncEnabled = (0, toolkit_1.createAsyncThunk)('integrations/
         }
         // Try to get the master password from authentication state or prompt user
         // For now, we'll return success and let the user know they need to re-connect to persist
-        console.log('⚠️ Cannot persist sync state change without master password. State updated locally only.');
+        logger_1.logger.info('⚠️ Cannot persist sync state change without master password. State updated locally only.', { component: 'integrationsSlice', operation: 'cannotPersistSync' });
         return { enabled, persisted: false };
     }
     catch (error) {
-        console.error('❌ Failed to update GitHub sync enabled state:', error);
+        logger_1.logger.error('❌ Failed to update GitHub sync enabled state:', { component: 'integrationsSlice', operation: 'failedUpdateGithub' }, error);
         return rejectWithValue(error instanceof Error ? error.message : 'Failed to update sync state');
     }
 });
 // Async thunk to persist current integrations state with master password
 exports.persistIntegrationsState = (0, toolkit_1.createAsyncThunk)('integrations/persistState', async (masterPassword, { getState, rejectWithValue }) => {
     try {
-        console.log('💾 Persisting integrations state to database...');
+        logger_1.logger.info('💾 Persisting integrations state to database...', { component: 'integrationsSlice', operation: 'persistingIntegrationsState' });
         const state = getState();
         const integrationsState = state.integrations;
         await encryptedIntegrationService_1.EncryptedIntegrationService.saveEncryptedIntegrations(integrationsState, masterPassword);
-        console.log('✅ Integrations state persisted successfully');
+        logger_1.logger.info('✅ Integrations state persisted successfully', { component: 'integrationsSlice', operation: 'integrationsStatePersisted' });
         return true;
     }
     catch (error) {
-        console.error('❌ Failed to persist integrations state:', error);
+        logger_1.logger.error('❌ Failed to persist integrations state:', { component: 'integrationsSlice', operation: 'failedPersistIntegrations' }, error);
         return rejectWithValue(error instanceof Error ? error.message : 'Failed to persist integrations');
     }
 });

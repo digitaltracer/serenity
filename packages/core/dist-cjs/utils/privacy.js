@@ -39,6 +39,7 @@ exports.migratePasswordHash = exports.needsPasswordMigration = exports.removeMas
  */
 const bcrypt = __importStar(require("bcryptjs"));
 const encryption_1 = require("./encryption");
+const logger_1 = require("./logger");
 const STORAGE_KEY = 'serenity_privacy_settings';
 const DEFAULT_SETTINGS = {
     masterPasswordEnabled: false,
@@ -71,7 +72,7 @@ const savePrivacySettings = (settings) => {
         localStorage.setItem(STORAGE_KEY, obfuscatedData);
     }
     catch (error) {
-        console.error('Failed to save privacy settings:', error);
+        logger_1.logger.error('Failed to save privacy settings:', { component: 'privacy', operation: 'failedSavePrivacy' }, error);
         throw new Error('Failed to save privacy settings');
     }
 };
@@ -92,7 +93,7 @@ const getPrivacySettings = () => {
         return { ...DEFAULT_SETTINGS, ...settings };
     }
     catch (error) {
-        console.error('Failed to retrieve privacy settings:', error);
+        logger_1.logger.error('Failed to retrieve privacy settings:', { component: 'privacy', operation: 'failedRetrievePrivacy' }, error);
         return DEFAULT_SETTINGS;
     }
 };
@@ -105,7 +106,7 @@ const resetPrivacySettings = () => {
         localStorage.removeItem(STORAGE_KEY);
     }
     catch (error) {
-        console.error('Failed to reset privacy settings:', error);
+        logger_1.logger.error('Failed to reset privacy settings:', { component: 'privacy', operation: 'failedResetPrivacy' }, error);
     }
 };
 exports.resetPrivacySettings = resetPrivacySettings;
@@ -155,7 +156,7 @@ const saveMasterPasswordHash = async (password) => {
         localStorage.setItem(MASTER_PASSWORD_KEY, obfuscatedHash);
     }
     catch (error) {
-        console.error('Failed to save master password:', error);
+        logger_1.logger.error('Failed to save master password:', { component: 'privacy', operation: 'failedSaveMaster' }, error);
         throw new Error('Failed to save master password');
     }
 };
@@ -171,7 +172,7 @@ const validateMasterPassword = async (password) => {
         return await verifyPassword(password, hash);
     }
     catch (error) {
-        console.error('Failed to validate master password:', error);
+        logger_1.logger.error('Failed to validate master password:', { component: 'privacy', operation: 'failedValidateMaster' }, error);
         return false;
     }
 };
@@ -185,7 +186,7 @@ const removeMasterPassword = () => {
         localStorage.removeItem(MASTER_PASSWORD_KEY);
     }
     catch (error) {
-        console.error('Failed to remove master password:', error);
+        logger_1.logger.error('Failed to remove master password:', { component: 'privacy', operation: 'failedRemoveMaster' }, error);
     }
 };
 exports.removeMasterPassword = removeMasterPassword;
@@ -205,7 +206,7 @@ const needsPasswordMigration = () => {
         return !hash.startsWith('$2') && /^[a-f0-9]{64}$/i.test(hash);
     }
     catch (error) {
-        console.error('Failed to check password migration status:', error);
+        logger_1.logger.error('Failed to check password migration status:', { component: 'privacy', operation: 'failedCheckPassword' }, error);
         return false;
     }
 };
@@ -223,11 +224,11 @@ const migratePasswordHash = async (password) => {
         }
         // Hash with new secure method
         await (0, exports.saveMasterPasswordHash)(password);
-        console.log('✅ Password successfully migrated to bcrypt');
+        logger_1.logger.info('✅ Password successfully migrated to bcrypt', { component: 'privacy', operation: 'passwordSuccessfullyMigrated' });
         return true;
     }
     catch (error) {
-        console.error('Password migration failed:', error);
+        logger_1.logger.error('Password migration failed:', { component: 'privacy', operation: 'passwordMigrationFailed:' }, error);
         return false;
     }
 };
@@ -252,7 +253,7 @@ async function validateMasterPasswordLegacy(password) {
         return passwordHash === hash;
     }
     catch (error) {
-        console.error('Legacy password validation failed:', error);
+        logger_1.logger.error('Legacy password validation failed:', { component: 'privacy', operation: 'legacyPasswordValidation' }, error);
         return false;
     }
 }
@@ -271,7 +272,7 @@ async function hashPassword(password) {
         return hash;
     }
     catch (error) {
-        console.error('Password hashing failed:', error);
+        logger_1.logger.error('Password hashing failed:', { component: 'privacy', operation: 'passwordHashingFailed:' }, error);
         // Still clear password even on error
         encryption_1.EncryptionService.secureDeletePassword(password);
         throw new Error('Failed to hash password');
@@ -286,7 +287,7 @@ async function verifyPassword(password, hash) {
         return isValid;
     }
     catch (error) {
-        console.error('Password verification failed:', error);
+        logger_1.logger.error('Password verification failed:', { component: 'privacy', operation: 'passwordVerificationFailed:' }, error);
         // Still clear password even on error
         encryption_1.EncryptionService.secureDeletePassword(password);
         return false; // Fail securely

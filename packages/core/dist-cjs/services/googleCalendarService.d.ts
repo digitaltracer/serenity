@@ -69,4 +69,3 @@ export declare class GoogleCalendarService {
      */
     static isTokenExpired(expiresAt: number): boolean;
 }
-//# sourceMappingURL=googleCalendarService.d.ts.map

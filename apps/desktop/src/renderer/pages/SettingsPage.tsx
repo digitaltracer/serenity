@@ -1,15 +1,23 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { 
-  selectTheme, 
-  selectCompactMode, 
+import {
+  selectTheme,
+  selectCompactMode,
   selectAllTasks,
   selectAllEntries,
   selectAllProjects,
-  setTheme, 
+  setTheme,
   setCompactMode,
   lockApp,
-  selectHasMasterPassword 
+  selectHasMasterPassword,
+  // AI Assistant selectors and actions
+  selectAIProviders,
+  selectActiveProvider,
+  selectAIConfiguration,
+  setActiveProvider,
+  setAutoAnalyze,
+  setAnalysisFrequency,
+  type AIProvider,
 } from '@serenity/core';
 import { 
   saveDatabaseConnection, 
@@ -40,7 +48,10 @@ import {
   Monitor,
   Download,
   Lock,
-  Tag
+  Tag,
+  Sparkles,
+  Brain,
+  Zap
 } from 'lucide-react';
 
 
@@ -53,7 +64,10 @@ export const SettingsPage: React.FC = () => {
   const journalEntries = useSelector(selectAllEntries);
   const projects = useSelector(selectAllProjects);
   const hasMasterPassword = useSelector(selectHasMasterPassword);
-  
+  const aiProviders = useSelector(selectAIProviders);
+  const activeProvider = useSelector(selectActiveProvider);
+  const aiConfiguration = useSelector(selectAIConfiguration);
+
   // Local state for features not yet in Redux
   const [notifications, setNotifications] = React.useState(true);
   const [sounds, setSounds] = React.useState(true);
@@ -405,6 +419,157 @@ export const SettingsPage: React.FC = () => {
                 checked={sounds} 
                 onChange={setSounds}
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* AI Configuration */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="w-5 h-5" />
+              AI Configuration
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Active Provider Selection */}
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                  <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 dark:text-gray-100">Active AI Provider</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Select which AI provider to use for analysis
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {aiProviders.map((provider) => (
+                  <button
+                    key={provider.id}
+                    onClick={() => provider.hasApiKey && dispatch(setActiveProvider(provider.id))}
+                    disabled={!provider.hasApiKey}
+                    className={`
+                      p-3 rounded-lg border transition-all text-center
+                      ${activeProvider === provider.id
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                        : provider.hasApiKey
+                          ? 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                          : 'border-gray-100 dark:border-gray-800 opacity-50 cursor-not-allowed'
+                      }
+                    `}
+                  >
+                    <div className="font-medium text-sm">{provider.name}</div>
+                    {provider.hasApiKey ? (
+                      <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                        {activeProvider === provider.id ? 'Active' : 'Ready'}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-400 mt-1">No API key</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+              {!activeProvider && (
+                <div className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded">
+                  Please set up an API key for at least one provider to enable AI features
+                </div>
+              )}
+            </div>
+
+            {/* Auto-Analyze Setting */}
+            <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                  <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 dark:text-gray-100">Auto-Analyze</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Automatically analyze new data as it's created
+                  </p>
+                </div>
+              </div>
+              <Toggle
+                checked={aiConfiguration.autoAnalyze}
+                onChange={(checked) => dispatch(setAutoAnalyze(checked))}
+              />
+            </div>
+
+            {/* Analysis Frequency */}
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                  <Bell className="w-4 h-4 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 dark:text-gray-100">Analysis Frequency</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    How often to generate new insights
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {(['daily', 'weekly', 'manual'] as const).map((freq) => (
+                  <button
+                    key={freq}
+                    onClick={() => dispatch(setAnalysisFrequency(freq))}
+                    className={`
+                      flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors capitalize
+                      ${aiConfiguration.analysisFrequency === freq
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }
+                    `}
+                  >
+                    {freq}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Data Types to Analyze */}
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+                  <Database className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 dark:text-gray-100">Data Sources</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Select what data to include in AI analysis
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-700 dark:text-gray-300">Tasks</span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {aiConfiguration.dataTypes.includeTasks ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-700 dark:text-gray-300">Journal Entries</span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {aiConfiguration.dataTypes.includeJournal ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-700 dark:text-gray-300">Projects</span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {aiConfiguration.dataTypes.includeProjects ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Privacy Notice */}
+            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                <strong>Privacy:</strong> Your data is sent to the selected AI provider for analysis. API keys are stored securely using system encryption.
+              </p>
             </div>
           </CardContent>
         </Card>

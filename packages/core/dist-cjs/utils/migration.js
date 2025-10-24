@@ -10,6 +10,7 @@ exports.isMigrationComplete = isMigrationComplete;
 exports.migrateToSQLite = migrateToSQLite;
 exports.loadInitialDataFromSQLite = loadInitialDataFromSQLite;
 exports.createMigrationBackup = createMigrationBackup;
+const logger_1 = require("./logger");
 /**
  * Check if there's existing localStorage data that needs migration
  */
@@ -59,7 +60,7 @@ function clearLocalStorageData() {
     localStorage.removeItem('serenity_journal_entries');
     // Mark migration as complete
     localStorage.setItem('serenity_migration_complete', 'true');
-    console.log('🧹 LocalStorage data cleared after migration');
+    logger_1.logger.info('🧹 LocalStorage data cleared after migration', { component: 'migration', operation: 'localstorageDataCleared' });
 }
 /**
  * Check if migration has already been completed
@@ -73,21 +74,21 @@ function isMigrationComplete() {
 async function migrateToSQLite() {
     // Check if we're in Electron environment
     if (typeof window === 'undefined' || !window.electronAPI?.sqlite) {
-        console.warn('⚠️ SQLite not available - skipping migration');
+        logger_1.logger.warn('⚠️ SQLite not available - skipping migration', { component: 'migration', operation: 'sqliteNotAvailable' });
         return false;
     }
     // Check if migration is already complete
     if (isMigrationComplete()) {
-        console.log('✅ Migration already completed');
+        logger_1.logger.info('✅ Migration already completed', { component: 'migration', operation: 'migrationAlreadyCompleted' });
         return true;
     }
     // Check if there's data to migrate
     if (!hasLocalStorageData()) {
-        console.log('📭 No localStorage data to migrate');
+        logger_1.logger.info('📭 No localStorage data to migrate', { component: 'migration', operation: 'localstorageDataMigrate' });
         localStorage.setItem('serenity_migration_complete', 'true');
         return true;
     }
-    console.log('🚀 Starting data migration from localStorage to SQLite...');
+    logger_1.logger.info('🚀 Starting data migration from localStorage to SQLite...', { component: 'migration', operation: 'startingDataMigration' });
     try {
         // Initialize SQLite database
         const initResult = await window.electronAPI.sqlite.initialize();
@@ -96,28 +97,28 @@ async function migrateToSQLite() {
         }
         // Get data from localStorage
         const data = getLocalStorageData();
-        console.log(`📊 Migration data summary:
+        logger_1.logger.info(`📊 Migration data summary:
       - Tasks: ${data.tasks.length}
       - Projects: ${data.projects.length}
-      - Journal Entries: ${data.journalEntries.length}`);
+      - Journal Entries: ${data.journalEntries.length}`, { component: 'migration', operation: 'operation' });
         // Migrate data to SQLite
         const migrationResult = await window.electronAPI.sqlite.importFromLocalStorage(data);
-        if (!migrationResult.success) {
-            throw new Error(migrationResult.error);
+        if (!migrationResult.success || !migrationResult.data) {
+            throw new Error(migrationResult.error || 'Migration failed');
         }
-        const { imported, errors } = migrationResult.result;
-        console.log(`✅ Migration completed successfully!
+        const { imported, errors } = migrationResult.data;
+        logger_1.logger.info(`✅ Migration completed successfully!
       - Items imported: ${imported}
-      - Errors: ${errors.length}`);
+      - Errors: ${errors.length}`, { component: 'migration', operation: 'operation' });
         if (errors.length > 0) {
-            console.warn('⚠️ Migration warnings:', errors);
+            logger_1.logger.warn('⚠️ Migration warnings', { component: 'migration', operation: 'migrationWarnings', metadata: { errors } });
         }
         // Clear localStorage data
         clearLocalStorageData();
         return true;
     }
     catch (error) {
-        console.error('❌ Migration failed:', error);
+        logger_1.logger.error('❌ Migration failed:', { component: 'migration', operation: 'migrationFailed:' }, error);
         return false;
     }
 }
@@ -126,11 +127,11 @@ async function migrateToSQLite() {
  */
 async function loadInitialDataFromSQLite() {
     if (typeof window === 'undefined' || !window.electronAPI?.sqlite) {
-        console.warn('⚠️ SQLite not available - using empty data');
+        logger_1.logger.warn('⚠️ SQLite not available - using empty data', { component: 'migration', operation: 'sqliteNotAvailable' });
         return null;
     }
     try {
-        console.log('📂 Loading initial data from SQLite...');
+        logger_1.logger.info('📂 Loading initial data from SQLite...', { component: 'migration', operation: 'loadingInitialData' });
         const [tasksResult, projectsResult, journalResult] = await Promise.all([
             window.electronAPI.sqlite.getTasks(),
             window.electronAPI.sqlite.getProjects(),
@@ -144,14 +145,14 @@ async function loadInitialDataFromSQLite() {
             projects: projectsResult.data || [],
             journalEntries: journalResult.data || [],
         };
-        console.log(`📊 Loaded initial data:
+        logger_1.logger.info(`📊 Loaded initial data:
       - Tasks: ${data.tasks.length}
       - Projects: ${data.projects.length}
-      - Journal Entries: ${data.journalEntries.length}`);
+      - Journal Entries: ${data.journalEntries.length}`, { component: 'migration', operation: 'operation' });
         return data;
     }
     catch (error) {
-        console.error('❌ Failed to load initial data from SQLite:', error);
+        logger_1.logger.error('❌ Failed to load initial data from SQLite:', { component: 'migration', operation: 'failedLoadInitial' }, error);
         return null;
     }
 }
@@ -171,11 +172,11 @@ async function createMigrationBackup() {
         };
         // Save backup to localStorage with a special key
         localStorage.setItem('serenity_migration_backup', JSON.stringify(backup));
-        console.log('💾 Migration backup created');
+        logger_1.logger.info('💾 Migration backup created', { component: 'migration', operation: 'migrationBackupCreated' });
         return true;
     }
     catch (error) {
-        console.error('❌ Failed to create migration backup:', error);
+        logger_1.logger.error('❌ Failed to create migration backup:', { component: 'migration', operation: 'failedCreateMigration' }, error);
         return false;
     }
 }

@@ -6,6 +6,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateCryptoSupport = exports.secureClear = exports.constantTimeCompare = exports.generateSecureToken = exports.generateIV = exports.generateSalt = exports.validateSecurityPolicy = exports.getEnvironmentConfig = exports.CRYPTO_CONFIG = void 0;
 // Production-ready cryptographic settings
+const logger_1 = require("./logger");
 exports.CRYPTO_CONFIG = {
     // PBKDF2 iterations - balanced for security and performance
     PBKDF2_ITERATIONS: 100000, // OWASP recommended minimum
@@ -64,13 +65,13 @@ const validateSecurityPolicy = (config) => {
         errors.push(`Salt length (${config.SALT_LENGTH}) insufficient - minimum 16 bytes required`);
     }
     if (warnings.length > 0) {
-        console.warn('🔒 Security warnings:', warnings);
+        logger_1.logger.warn('🔒 Security warnings', { component: 'securityConfig', operation: 'securityWarnings', metadata: { warnings } });
     }
     if (errors.length > 0) {
-        console.error('🚨 Security policy violations:', errors);
+        logger_1.logger.error('🚨 Security policy violations', { component: 'securityConfig', operation: 'securityPolicyViolations', metadata: { errors } }, new Error(`Security policy violations: ${errors.join(', ')}`));
         return false;
     }
-    console.log('✅ Security policy validation passed');
+    logger_1.logger.info('✅ Security policy validation passed', { component: 'securityConfig', operation: 'securityPolicyValidation' });
     return true;
 };
 exports.validateSecurityPolicy = validateSecurityPolicy;

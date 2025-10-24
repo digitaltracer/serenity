@@ -119,4 +119,3 @@ export declare const selectSessionActive: (state: {
 export declare const getSessionMasterPassword: () => string | null;
 declare const _default: import("redux").Reducer<AuthState>;
 export default _default;
-//# sourceMappingURL=authSlice.d.ts.map

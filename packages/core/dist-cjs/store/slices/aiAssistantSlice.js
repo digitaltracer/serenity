@@ -1,8 +1,10 @@
 "use strict";
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.selectAIUsage = exports.selectLastAIError = exports.selectAIErrors = exports.selectAIConfiguration = exports.selectAnalysisTracker = exports.selectAIRecaps = exports.selectAIInsights = exports.selectAnalysisStatus = exports.selectAnalysisProgress = exports.selectIsAnalyzing = exports.selectActiveProvider = exports.selectAIProviders = exports.clearUsage = exports.recordUsage = exports.clearProviderModelInfo = exports.updateProvidersWithApiKeys = exports.updateProvidersWithModelInfo = exports.clearAllErrors = exports.clearAIError = exports.updateAnalysisTracker = exports.removeRecap = exports.addRecap = exports.clearInsights = exports.removeInsight = exports.addInsight = exports.setDataTypes = exports.setAnalysisFrequency = exports.setAutoAnalyze = exports.clearActiveProvider = exports.setActiveProvider = exports.generateRecap = exports.analyzeUserData = exports.testApiKey = exports.setApiKey = void 0;
+exports.selectAIUsage = exports.selectLastAIError = exports.selectAIErrors = exports.selectAIConfiguration = exports.selectAnalysisTracker = exports.selectAIRecaps = exports.selectAIInsights = exports.selectLastAnalysis = exports.selectAnalysisStatus = exports.selectAnalysisProgress = exports.selectIsAnalyzing = exports.selectActiveProvider = exports.selectAIProviders = exports.restoreUsage = exports.clearUsage = exports.recordUsage = exports.clearProviderModelInfo = exports.updateProvidersWithApiKeys = exports.updateProvidersWithModelInfo = exports.clearAllErrors = exports.clearAIError = exports.updateAnalysisTracker = exports.restoreRecaps = exports.removeRecap = exports.addRecap = exports.restoreInsights = exports.clearInsights = exports.removeInsight = exports.addInsight = exports.setDataTypes = exports.setAnalysisFrequency = exports.setAutoAnalyze = exports.clearActiveProvider = exports.setActiveProvider = exports.generateRecap = exports.analyzeUserData = exports.testApiKey = exports.setApiKey = void 0;
 const toolkit_1 = require("@reduxjs/toolkit");
+const aiAssistantService_1 = require("../../services/aiAssistantService");
+const logger_1 = require("../../utils/logger");
 const loadStoredUsage = () => {
     try {
         if (typeof localStorage !== 'undefined') {
@@ -45,12 +47,12 @@ const initialState = {
 exports.setApiKey = (0, toolkit_1.createAsyncThunk)('aiAssistant/setApiKey', async ({ provider, apiKey }) => {
     // This will be handled by the main process for security
     if (typeof globalThis !== 'undefined' && globalThis.window?.electronAPI?.aiAssistant?.setApiKey) {
-        console.log('[aiAssistant/setApiKey] Calling main process setApiKey for', provider);
+        logger_1.logger.info(`[aiAssistant/setApiKey] Calling main process setApiKey for ${provider}`, { component: 'aiAssistantSlice', operation: '[aiassistant/setapikey]CallingMain' });
         const result = await globalThis.window.electronAPI.aiAssistant.setApiKey(provider, apiKey);
-        console.log('[aiAssistant/setApiKey] Main returned:', result);
+        logger_1.logger.info('[aiAssistant/setApiKey] Main returned', { component: 'aiAssistantSlice', operation: '[aiassistant/setapikey]MainReturned', metadata: { result } });
         if (result.success) {
             const payload = { provider, hasKey: true, modelInfo: result.modelInfo, usage: result.usage };
-            console.log('[aiAssistant/setApiKey] Fulfilled payload:', payload);
+            logger_1.logger.info('[aiAssistant/setApiKey] Fulfilled payload', { component: 'aiAssistantSlice', operation: '[aiassistant/setapikey]FulfilledPayload', metadata: { payload } });
             return payload;
         }
         else {
@@ -71,31 +73,74 @@ exports.testApiKey = (0, toolkit_1.createAsyncThunk)('aiAssistant/testApiKey', a
     }
     throw new Error('AI Assistant API not available');
 });
-exports.analyzeUserData = (0, toolkit_1.createAsyncThunk)('aiAssistant/analyzeUserData', async ({ provider, dataTypes, forceReAnalyze = false, tasks, journalEntries, }, { getState }) => {
-    if (typeof globalThis !== 'undefined' && globalThis.window?.electronAPI?.aiAssistant?.analyzeData) {
-        const state = getState();
-        const result = await globalThis.window.electronAPI.aiAssistant.analyzeData({
-            provider,
-            dataTypes,
-            forceReAnalyze,
-            tasks,
-            journalEntries,
-            analysisTracker: state.aiAssistant.analysisTracker,
-        });
-        if (result.success) {
-            return {
-                insights: result.insights || [],
-                processedData: result.processedData || {},
-                usage: result.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+exports.analyzeUserData = (0, toolkit_1.createAsyncThunk)('aiAssistant/analyzeUserData', async ({ provider, dataTypes, forceReAnalyze = false, tasks, journalEntries, forceLocal = false, }, { getState }) => {
+    const state = getState();
+    // Try Electron-backed analysis first if available
+    if (!forceLocal && typeof globalThis !== 'undefined' && globalThis.window?.electronAPI?.aiAssistant?.analyzeData) {
+        try {
+            const result = await globalThis.window.electronAPI.aiAssistant.analyzeData({
                 provider,
-                operation: 'analyze',
-            };
+                dataTypes,
+                forceReAnalyze,
+                tasks,
+                journalEntries,
+                analysisTracker: state.aiAssistant.analysisTracker,
+            });
+            if (result.success && Array.isArray(result.insights) && result.insights.length > 0) {
+                // Apply quality scoring to AI-generated insights as well
+                const qualityInsights = aiAssistantService_1.AIAssistantService.applyQualityScoring(result.insights, {
+                    previousInsights: state.aiAssistant.insights,
+                    minimumQuality: 0.4,
+                });
+                return {
+                    insights: qualityInsights,
+                    processedData: result.processedData || {},
+                    usage: result.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+                    provider,
+                    operation: 'analyze',
+                };
+            }
         }
-        else {
-            throw new Error(result.error || 'Data analysis failed');
+        catch (e) {
+            // Fall back to local analysis below
         }
     }
-    throw new Error('AI Assistant API not available');
+    // Fallback: generate local insights so the user sees value without an API
+    const safeTasks = tasks || [];
+    const safeJournal = journalEntries || [];
+    const local = aiAssistantService_1.AIAssistantService.generateLocalInsights(safeTasks, safeJournal);
+    const nowIso = new Date().toISOString();
+    const rawInsights = local.map((i, idx) => ({
+        id: `local_${Date.now()}_${idx}`,
+        type: i.type,
+        title: i.title,
+        description: i.description,
+        confidence: i.confidence,
+        createdAt: nowIso,
+        source: provider,
+        category: i.category,
+        actionable: i.actionable,
+        metadata: { ...(i.metadata || {}), fallback: true },
+    }));
+    // Apply quality scoring, filtering, deduplication, and ranking
+    const insights = aiAssistantService_1.AIAssistantService.applyQualityScoring(rawInsights, {
+        previousInsights: state.aiAssistant.insights,
+        minimumQuality: 0.4,
+    });
+    return {
+        insights,
+        processedData: {
+            processedTaskIds: safeTasks.map(t => t.id),
+            processedJournalIds: safeJournal.map(j => j.id),
+            lastTaskAnalysis: safeTasks.length > 0 ? nowIso : undefined,
+            lastJournalAnalysis: safeJournal.length > 0 ? nowIso : undefined,
+            totalTasksAnalyzed: safeTasks.length,
+            totalJournalEntriesAnalyzed: safeJournal.length,
+        },
+        usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        provider,
+        operation: 'analyze',
+    };
 });
 exports.generateRecap = (0, toolkit_1.createAsyncThunk)('aiAssistant/generateRecap', async ({ provider, type, period, tasks, journalEntries, }) => {
     if (typeof globalThis !== 'undefined' && globalThis.window?.electronAPI?.aiAssistant?.generateRecap) {
@@ -166,6 +211,9 @@ const aiAssistantSlice = (0, toolkit_1.createSlice)({
         clearInsights: (state) => {
             state.insights = [];
         },
+        restoreInsights: (state, action) => {
+            state.insights = action.payload || [];
+        },
         addRecap: (state, action) => {
             state.recaps.unshift(action.payload);
             // Keep only last 20 recaps
@@ -175,6 +223,9 @@ const aiAssistantSlice = (0, toolkit_1.createSlice)({
         },
         removeRecap: (state, action) => {
             state.recaps = state.recaps.filter(recap => recap.id !== action.payload);
+        },
+        restoreRecaps: (state, action) => {
+            state.recaps = action.payload || [];
         },
         updateAnalysisTracker: (state, action) => {
             state.analysisTracker = { ...state.analysisTracker, ...action.payload };
@@ -210,6 +261,9 @@ const aiAssistantSlice = (0, toolkit_1.createSlice)({
         },
         clearUsage: (state) => {
             state.usage = [];
+        },
+        restoreUsage: (state, action) => {
+            state.usage = action.payload || [];
         },
     },
     extraReducers: (builder) => {
@@ -347,7 +401,7 @@ const aiAssistantSlice = (0, toolkit_1.createSlice)({
         });
     },
 });
-_a = aiAssistantSlice.actions, exports.setActiveProvider = _a.setActiveProvider, exports.clearActiveProvider = _a.clearActiveProvider, exports.setAutoAnalyze = _a.setAutoAnalyze, exports.setAnalysisFrequency = _a.setAnalysisFrequency, exports.setDataTypes = _a.setDataTypes, exports.addInsight = _a.addInsight, exports.removeInsight = _a.removeInsight, exports.clearInsights = _a.clearInsights, exports.addRecap = _a.addRecap, exports.removeRecap = _a.removeRecap, exports.updateAnalysisTracker = _a.updateAnalysisTracker, exports.clearAIError = _a.clearAIError, exports.clearAllErrors = _a.clearAllErrors, exports.updateProvidersWithModelInfo = _a.updateProvidersWithModelInfo, exports.updateProvidersWithApiKeys = _a.updateProvidersWithApiKeys, exports.clearProviderModelInfo = _a.clearProviderModelInfo, exports.recordUsage = _a.recordUsage, exports.clearUsage = _a.clearUsage;
+_a = aiAssistantSlice.actions, exports.setActiveProvider = _a.setActiveProvider, exports.clearActiveProvider = _a.clearActiveProvider, exports.setAutoAnalyze = _a.setAutoAnalyze, exports.setAnalysisFrequency = _a.setAnalysisFrequency, exports.setDataTypes = _a.setDataTypes, exports.addInsight = _a.addInsight, exports.removeInsight = _a.removeInsight, exports.clearInsights = _a.clearInsights, exports.restoreInsights = _a.restoreInsights, exports.addRecap = _a.addRecap, exports.removeRecap = _a.removeRecap, exports.restoreRecaps = _a.restoreRecaps, exports.updateAnalysisTracker = _a.updateAnalysisTracker, exports.clearAIError = _a.clearAIError, exports.clearAllErrors = _a.clearAllErrors, exports.updateProvidersWithModelInfo = _a.updateProvidersWithModelInfo, exports.updateProvidersWithApiKeys = _a.updateProvidersWithApiKeys, exports.clearProviderModelInfo = _a.clearProviderModelInfo, exports.recordUsage = _a.recordUsage, exports.clearUsage = _a.clearUsage, exports.restoreUsage = _a.restoreUsage;
 // Selectors
 const selectAIProviders = (state) => state.aiAssistant.providers;
 exports.selectAIProviders = selectAIProviders;
@@ -359,6 +413,8 @@ const selectAnalysisProgress = (state) => state.aiAssistant.analysisProgress;
 exports.selectAnalysisProgress = selectAnalysisProgress;
 const selectAnalysisStatus = (state) => state.aiAssistant.analysisStatus;
 exports.selectAnalysisStatus = selectAnalysisStatus;
+const selectLastAnalysis = (state) => state.aiAssistant.lastAnalysis;
+exports.selectLastAnalysis = selectLastAnalysis;
 const selectAIInsights = (state) => state.aiAssistant.insights;
 exports.selectAIInsights = selectAIInsights;
 const selectAIRecaps = (state) => state.aiAssistant.recaps;

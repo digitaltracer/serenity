@@ -133,20 +133,20 @@ export declare const ProjectSchema: z.ZodObject<{
     createdAt: z.ZodEffects<z.ZodUnion<[z.ZodString, z.ZodString, z.ZodDate]>, Date, string | Date>;
     updatedAt: z.ZodEffects<z.ZodUnion<[z.ZodString, z.ZodString, z.ZodDate]>, Date, string | Date>;
 }, "strip", z.ZodTypeAny, {
+    name: string;
     id: string;
     createdAt: Date;
     updatedAt: Date;
-    name: string;
     color: string;
     archived: boolean;
     description?: string | undefined;
     userId?: string | undefined;
     icon?: string | undefined;
 }, {
+    name: string;
     id: string;
     createdAt: string | Date;
     updatedAt: string | Date;
-    name: string;
     color: string;
     archived: boolean;
     description?: string | undefined;
@@ -288,10 +288,10 @@ export declare const UserSchema: z.ZodObject<{
     createdAt: z.ZodEffects<z.ZodUnion<[z.ZodString, z.ZodString, z.ZodDate]>, Date, string | Date>;
     updatedAt: z.ZodEffects<z.ZodUnion<[z.ZodString, z.ZodString, z.ZodDate]>, Date, string | Date>;
 }, "strip", z.ZodTypeAny, {
+    name: string;
     id: string;
     createdAt: Date;
     updatedAt: Date;
-    name: string;
     email: string;
     preferences: {
         theme: "light" | "dark" | "system";
@@ -307,10 +307,10 @@ export declare const UserSchema: z.ZodObject<{
         timeFormat: "12h" | "24h";
     };
 }, {
+    name: string;
     id: string;
     createdAt: string | Date;
     updatedAt: string | Date;
-    name: string;
     email: string;
     preferences: {
         theme: "light" | "dark" | "system";
@@ -425,20 +425,20 @@ export declare const ProjectsArraySchema: z.ZodArray<z.ZodObject<{
     createdAt: z.ZodEffects<z.ZodUnion<[z.ZodString, z.ZodString, z.ZodDate]>, Date, string | Date>;
     updatedAt: z.ZodEffects<z.ZodUnion<[z.ZodString, z.ZodString, z.ZodDate]>, Date, string | Date>;
 }, "strip", z.ZodTypeAny, {
+    name: string;
     id: string;
     createdAt: Date;
     updatedAt: Date;
-    name: string;
     color: string;
     archived: boolean;
     description?: string | undefined;
     userId?: string | undefined;
     icon?: string | undefined;
 }, {
+    name: string;
     id: string;
     createdAt: string | Date;
     updatedAt: string | Date;
-    name: string;
     color: string;
     archived: boolean;
     description?: string | undefined;
@@ -504,10 +504,10 @@ export declare const validateTask: (data: unknown) => {
     userId?: string | undefined;
 };
 export declare const validateProject: (data: unknown) => {
+    name: string;
     id: string;
     createdAt: Date;
     updatedAt: Date;
-    name: string;
     color: string;
     archived: boolean;
     description?: string | undefined;
@@ -527,10 +527,10 @@ export declare const validateJournalEntry: (data: unknown) => {
     mood?: "happy" | "neutral" | "sad" | "excited" | "stressed" | undefined;
 };
 export declare const validateUser: (data: unknown) => {
+    name: string;
     id: string;
     createdAt: Date;
     updatedAt: Date;
-    name: string;
     email: string;
     preferences: {
         theme: "light" | "dark" | "system";
@@ -571,10 +571,10 @@ export declare const validateTasks: (data: unknown) => {
     userId?: string | undefined;
 }[];
 export declare const validateProjects: (data: unknown) => {
+    name: string;
     id: string;
     createdAt: Date;
     updatedAt: Date;
-    name: string;
     color: string;
     archived: boolean;
     description?: string | undefined;
@@ -618,10 +618,10 @@ export declare const safeValidateTask: (data: unknown) => {
     userId?: string | undefined;
 } | null;
 export declare const safeValidateProject: (data: unknown) => {
+    name: string;
     id: string;
     createdAt: Date;
     updatedAt: Date;
-    name: string;
     color: string;
     archived: boolean;
     description?: string | undefined;
@@ -665,10 +665,10 @@ export declare const safeValidateTasks: (data: unknown) => {
     userId?: string | undefined;
 }[];
 export declare const safeValidateProjects: (data: unknown) => {
+    name: string;
     id: string;
     createdAt: Date;
     updatedAt: Date;
-    name: string;
     color: string;
     archived: boolean;
     description?: string | undefined;
@@ -692,4 +692,3 @@ export type ValidatedProject = z.infer<typeof ProjectSchema>;
 export type ValidatedJournalEntry = z.infer<typeof JournalEntrySchema>;
 export type ValidatedUser = z.infer<typeof UserSchema>;
 export type ValidatedUserPreferences = z.infer<typeof UserPreferencesSchema>;
-//# sourceMappingURL=schemas.d.ts.map

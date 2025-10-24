@@ -5,7 +5,92 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AIAssistantService = void 0;
+const logger_1 = require("../utils/logger");
+const insightQualityService_1 = require("./insightQualityService");
 class AIAssistantService {
+    /**
+     * Generate goal suggestions based on user activity patterns
+     */
+    static generateGoalSuggestions(data) {
+        const suggestions = [];
+        const completedTasks = data.tasks.filter(t => t.completed);
+        const weeklyAvgTasks = Math.floor(completedTasks.length / 4); // Assuming ~4 weeks of data
+        // Suggest weekly tasks goal if user completes tasks regularly
+        if (completedTasks.length > 10) {
+            const targetTasks = Math.max(5, Math.floor(weeklyAvgTasks * 1.2)); // 20% increase
+            suggestions.push({
+                title: `Complete ${targetTasks} tasks per week`,
+                description: `Based on your current pace, aim to complete ${targetTasks} tasks weekly to improve productivity.`,
+                type: 'weekly_tasks',
+                priority: 'medium',
+                targetCount: targetTasks,
+                timeframe: 'weekly',
+                reasoning: `You've been completing an average of ${weeklyAvgTasks} tasks per week. A 20% increase is achievable and will boost your productivity.`,
+                confidence: 0.85,
+            });
+        }
+        // Suggest high-priority task goal if user has many pending high-priority tasks
+        const highPriorityPending = data.tasks.filter(t => !t.completed && t.priority === 'high');
+        if (highPriorityPending.length >= 3) {
+            suggestions.push({
+                title: 'Focus on high-priority tasks',
+                description: 'Complete all high-priority tasks this week to stay on top of important work.',
+                type: 'priority_tasks',
+                priority: 'high',
+                timeframe: 'weekly',
+                reasoning: `You currently have ${highPriorityPending.length} pending high-priority tasks. Focusing on these will help you manage critical work better.`,
+                confidence: 0.9,
+            });
+        }
+        // Suggest daily streak goal based on task completion patterns
+        const recentCompletions = completedTasks.filter(t => {
+            const daysSince = (Date.now() - new Date(t.completedAt || t.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
+            return daysSince <= 7;
+        });
+        if (recentCompletions.length >= 5) {
+            suggestions.push({
+                title: 'Build a 7-day completion streak',
+                description: 'Complete at least one task every day for 7 consecutive days.',
+                type: 'daily_streak',
+                priority: 'medium',
+                timeframe: 'weekly',
+                reasoning: 'You\'ve been active recently. Building a streak will help establish consistent productivity habits.',
+                confidence: 0.8,
+            });
+        }
+        // Suggest journal goal if user journals occasionally but not regularly
+        if (data.journalEntries.length > 3 && data.journalEntries.length < 20) {
+            const weeklyJournalTarget = 3;
+            suggestions.push({
+                title: `Write ${weeklyJournalTarget} journal entries per week`,
+                description: 'Regular journaling helps with self-reflection and mental clarity.',
+                type: 'journal_weekly',
+                priority: 'low',
+                targetCount: weeklyJournalTarget,
+                timeframe: 'weekly',
+                reasoning: 'You\'ve started journaling but haven\'t made it a consistent habit yet. Regular entries can improve well-being.',
+                confidence: 0.75,
+            });
+        }
+        // Suggest completion rate goal if current rate is low
+        const completionRate = data.tasks.length > 0
+            ? (completedTasks.length / data.tasks.length) * 100
+            : 0;
+        if (completionRate < 60 && data.tasks.length > 10) {
+            suggestions.push({
+                title: 'Improve task completion rate to 75%',
+                description: 'Focus on completing tasks rather than just creating them.',
+                type: 'completion_rate',
+                priority: 'high',
+                timeframe: 'monthly',
+                reasoning: `Your current completion rate is ${completionRate.toFixed(0)}%. Improving this will help you accomplish more.`,
+                confidence: 0.85,
+            });
+        }
+        // Filter out suggestions for goals that already exist
+        const existingGoalTypes = new Set(data.existingGoals?.map(g => g.type) || []);
+        return suggestions.filter(s => !existingGoalTypes.has(s.type));
+    }
     /**
      * Preprocess tasks for AI analysis
      * Removes sensitive information and structures data
@@ -29,6 +114,98 @@ class AIAssistantService {
                 ? Math.floor((new Date(task.updatedAt).getTime() - new Date(task.createdAt).getTime()) / (1000 * 60 * 60 * 24))
                 : null,
         }));
+    }
+    /**
+     * Generate basic, local insights without calling external providers.
+     * Provides a sensible fallback when no provider is configured.
+     */
+    static generateLocalInsights(tasks, journalEntries) {
+        const insights = [];
+        const totalTasks = tasks.length;
+        const completedTasks = tasks.filter(t => t.completed);
+        const completionRate = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
+        // Insight: completion rate
+        insights.push({
+            type: 'productivity',
+            title: `Completion rate is ${completionRate}%`,
+            description: totalTasks > 0
+                ? `You have completed ${completedTasks.length} of ${totalTasks} tasks. Consider limiting work-in-progress to improve throughput.`
+                : 'No tasks yet. Create a few tasks to kickstart your workflow.',
+            category: 'tasks',
+            actionable: totalTasks > 0,
+            confidence: 0.7,
+            metadata: { totalTasks, completed: completedTasks.length, completionRate }
+        });
+        // Insight: overdue tasks
+        const now = new Date();
+        const overdue = tasks.filter(t => t.dueDate && !t.completed && new Date(t.dueDate) < now);
+        if (overdue.length > 0) {
+            insights.push({
+                type: 'warning',
+                title: `${overdue.length} overdue ${overdue.length === 1 ? 'task' : 'tasks'}`,
+                description: 'Review due dates and reschedule or complete overdue work to reduce stress.',
+                category: 'tasks',
+                actionable: true,
+                confidence: 0.8,
+                metadata: { overdueCount: overdue.length }
+            });
+        }
+        // Insight: weekly activity (created/completed)
+        const startOfWeek = new Date();
+        startOfWeek.setHours(0, 0, 0, 0);
+        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+        const createdThisWeek = tasks.filter(t => new Date(t.createdAt) >= startOfWeek).length;
+        const completedThisWeek = tasks.filter(t => t.completed && new Date(t.completedAt || t.updatedAt || t.createdAt) >= startOfWeek).length;
+        insights.push({
+            type: 'behavior',
+            title: `This week: ${createdThisWeek} created, ${completedThisWeek} completed`,
+            description: 'Balance task intake and completion to maintain steady progress.',
+            category: 'tasks',
+            actionable: false,
+            confidence: 0.6,
+            metadata: { createdThisWeek, completedThisWeek }
+        });
+        // Insight: journaling frequency
+        const entriesThisWeek = journalEntries.filter(j => new Date(j.date) >= startOfWeek);
+        if (entriesThisWeek.length === 0) {
+            insights.push({
+                type: 'recommendation',
+                title: 'No journal entries this week',
+                description: 'Try a short daily reflection to capture insights and reduce mental load.',
+                category: 'journal',
+                actionable: true,
+                confidence: 0.6,
+                metadata: { entriesThisWeek: 0 }
+            });
+        }
+        else if (entriesThisWeek.length >= 3) {
+            insights.push({
+                type: 'behavior',
+                title: `Consistent journaling (${entriesThisWeek.length} this week)`,
+                description: 'Great job building a reflection habit. Keep it up for better clarity and focus.',
+                category: 'journal',
+                actionable: false,
+                confidence: 0.7,
+                metadata: { entriesThisWeek: entriesThisWeek.length }
+            });
+        }
+        // Insight: top tags/themes
+        const tagCounts = new Map();
+        tasks.forEach(t => (t.tags || []).forEach(tag => tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1)));
+        journalEntries.forEach(e => (e.tags || []).forEach(tag => tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1)));
+        const topTags = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([tag]) => tag);
+        if (topTags.length > 0) {
+            insights.push({
+                type: 'productivity',
+                title: `Frequent themes: ${topTags.join(', ')}`,
+                description: 'Consider time-blocking for your top themes to reduce context switching.',
+                category: 'habits',
+                actionable: true,
+                confidence: 0.55,
+                metadata: { topTags }
+            });
+        }
+        return insights;
     }
     /**
      * Preprocess journal entries for AI analysis
@@ -198,14 +375,14 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
         if (process.env.NODE_ENV === 'development') {
             const filteredTasksCount = tasks.length - newTasks.length;
             const filteredJournalCount = journalEntries.length - newJournalEntries.length;
-            console.log(`🔍 AI Analysis Filtering Results:`);
-            console.log(`📊 Tasks: ${newTasks.length} new / ${filteredTasksCount} already processed`);
-            console.log(`📝 Journal: ${newJournalEntries.length} new / ${filteredJournalCount} already processed`);
+            logger_1.logger.info(`🔍 AI Analysis Filtering Results:`, { component: 'aiAssistantService', operation: 'analysisFilteringResults:' });
+            logger_1.logger.info(`📊 Tasks: ${newTasks.length} new / ${filteredTasksCount} already processed`, { component: 'aiAssistantService', operation: 'tasks:${newtasks.length}New' });
+            logger_1.logger.info(`📝 Journal: ${newJournalEntries.length} new / ${filteredJournalCount} already processed`, { component: 'aiAssistantService', operation: 'journal:${newjournalentries.length}New' });
             if (lastTaskAnalysisDate) {
-                console.log(`⏰ Last task analysis: ${lastTaskAnalysisDate.toISOString()}`);
+                logger_1.logger.info(`⏰ Last task analysis: ${lastTaskAnalysisDate.toISOString()}`, { component: 'aiAssistantService', operation: 'lastTaskAnalysis:' });
             }
             if (lastJournalAnalysisDate) {
-                console.log(`⏰ Last journal analysis: ${lastJournalAnalysisDate.toISOString()}`);
+                logger_1.logger.info(`⏰ Last journal analysis: ${lastJournalAnalysisDate.toISOString()}`, { component: 'aiAssistantService', operation: 'lastJournalAnalysis:' });
             }
         }
         return { newTasks, newJournalEntries };
@@ -232,7 +409,7 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
             // Always log raw response to help debug parsing issues
             try {
                 // eslint-disable-next-line no-console
-                console.error('[AIAssistantService] Raw AI response (insights):', response);
+                logger_1.logger.error('[AIAssistantService] Raw AI response (insights):', { component: 'aiAssistantService', operation: '[aiassistantservice]RawResponse' }, new Error(response));
             }
             catch { }
             // Sanitize common wrapping formats (code fences, prose)
@@ -257,38 +434,44 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
             }
             const parsed = JSON.parse(working);
             if (parsed && parsed.insights && Array.isArray(parsed.insights)) {
-                return parsed.insights.map((insight) => ({
-                    id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    type: insight.type || 'recommendation',
-                    title: insight.title || 'AI Recommendation',
-                    description: insight.description || '',
-                    confidence: Math.max(0, Math.min(1, insight.confidence || 0.5)),
-                    createdAt: new Date().toISOString(),
-                    source: 'openai', // This will be set by the calling function
-                    category: insight.category || 'tasks',
-                    actionable: insight.actionable !== false,
-                    metadata: insight.metadata || {},
-                }));
+                return parsed.insights.map((insight) => {
+                    const insightObj = insight;
+                    return {
+                        id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                        type: insightObj.type || 'recommendation',
+                        title: insightObj.title || 'AI Recommendation',
+                        description: insightObj.description || '',
+                        confidence: Math.max(0, Math.min(1, insightObj.confidence || 0.5)),
+                        createdAt: new Date().toISOString(),
+                        source: 'openai', // This will be set by the calling function
+                        category: insightObj.category || 'tasks',
+                        actionable: insightObj.actionable !== false,
+                        metadata: insightObj.metadata || {},
+                    };
+                });
             }
             if (Array.isArray(parsed)) {
-                return parsed.map((insight) => ({
-                    id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    type: insight.type || 'recommendation',
-                    title: insight.title || 'AI Recommendation',
-                    description: insight.description || '',
-                    confidence: Math.max(0, Math.min(1, insight.confidence || 0.5)),
-                    createdAt: new Date().toISOString(),
-                    source: 'openai',
-                    category: insight.category || 'tasks',
-                    actionable: insight.actionable !== false,
-                    metadata: insight.metadata || {},
-                }));
+                return parsed.map((insight) => {
+                    const insightObj = insight;
+                    return {
+                        id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                        type: insightObj.type || 'recommendation',
+                        title: insightObj.title || 'AI Recommendation',
+                        description: insightObj.description || '',
+                        confidence: Math.max(0, Math.min(1, insightObj.confidence || 0.5)),
+                        createdAt: new Date().toISOString(),
+                        source: 'openai',
+                        category: insightObj.category || 'tasks',
+                        actionable: insightObj.actionable !== false,
+                        metadata: insightObj.metadata || {},
+                    };
+                });
             }
         }
         catch (error) {
             try {
                 // eslint-disable-next-line no-console
-                console.error('Failed to parse AI insights response:', error, '\n[AIAssistantService] Raw response for debugging:', response);
+                logger_1.logger.error('Failed to parse AI insights response:', { component: 'aiAssistantService', operation: 'failedParseInsights' }, new Error(response));
             }
             catch { }
         }
@@ -315,7 +498,7 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
             };
         }
         catch (error) {
-            console.error('Failed to parse AI recap response:', error);
+            logger_1.logger.error('Failed to parse AI recap response:', { component: 'aiAssistantService', operation: 'failedParseRecap' }, error);
             return null;
         }
     }
@@ -379,6 +562,52 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
             },
         };
         return configs[provider];
+    }
+    /**
+     * Apply quality scoring, filtering, deduplication, and ranking to insights
+     * This is the integration point for InsightQualityService
+     */
+    static applyQualityScoring(rawInsights, context) {
+        logger_1.logger.info(`📊 Applying quality scoring to ${rawInsights.length} insights`, {
+            component: 'aiAssistantService',
+            operation: 'applyQualityScoring',
+        });
+        // Use InsightQualityService to process insights through the full pipeline:
+        // validate → score → filter → deduplicate → rank
+        const scoredInsights = insightQualityService_1.InsightQualityService.processInsights(rawInsights, context);
+        // Convert ScoredInsight back to AIInsight (strip quality metadata for state storage)
+        const processedInsights = scoredInsights.map((insight) => {
+            // Keep the quality score in metadata for potential UI display
+            const baseInsight = {
+                id: insight.id,
+                type: insight.type,
+                title: insight.title,
+                description: insight.description,
+                confidence: insight.confidence,
+                createdAt: insight.createdAt,
+                source: insight.source,
+                category: insight.category,
+                actionable: insight.actionable,
+                metadata: {
+                    ...(insight.metadata || {}),
+                    qualityScore: insight.qualityScore,
+                    similarTo: insight.similarTo,
+                    supersedes: insight.supersedes,
+                },
+            };
+            return baseInsight;
+        });
+        logger_1.logger.info(`✅ Quality scoring complete: ${rawInsights.length} → ${processedInsights.length} high-quality insights`, {
+            component: 'aiAssistantService',
+            operation: 'applyQualityScoring',
+            metadata: {
+                filtered: rawInsights.length - processedInsights.length,
+                avgQuality: processedInsights.length > 0
+                    ? (processedInsights.reduce((sum, i) => sum + (i.metadata?.qualityScore?.overall || 0), 0) / processedInsights.length).toFixed(2)
+                    : '0.00',
+            },
+        });
+        return processedInsights;
     }
 }
 exports.AIAssistantService = AIAssistantService;

@@ -5,6 +5,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.importDataSecurely = exports.exportDataSecurely = exports.SecureExportManager = void 0;
 const encryption_1 = require("./encryption");
+const logger_1 = require("./logger");
 /**
  * Secure export manager
  */
@@ -52,7 +53,7 @@ class SecureExportManager {
             return JSON.stringify(exportData, null, 2);
         }
         catch (error) {
-            console.error('Export failed:', error);
+            logger_1.logger.error('Export failed:', { component: 'secureExport', operation: 'exportFailed:' }, error);
             throw new Error('Failed to export data securely');
         }
     }
@@ -67,7 +68,7 @@ class SecureExportManager {
             const calculatedChecksum = await this.calculateChecksum(dataString);
             const checksumValid = calculatedChecksum === exportData.metadata.checksumHash;
             if (!checksumValid) {
-                console.warn('Checksum validation failed - data may be corrupted');
+                logger_1.logger.warn('Checksum validation failed - data may be corrupted', { component: 'secureExport', operation: 'checksumValidationFailed' });
             }
             // Decrypt tasks
             const tasks = await this.processTasksFromImport(exportData.data.tasks);
@@ -89,7 +90,7 @@ class SecureExportManager {
             };
         }
         catch (error) {
-            console.error('Import failed:', error);
+            logger_1.logger.error('Import failed:', { component: 'secureExport', operation: 'importFailed:' }, error);
             throw new Error('Failed to import data - invalid format or incorrect password');
         }
     }
@@ -312,7 +313,7 @@ const exportDataSecurely = async (data, password, settings, filename) => {
         URL.revokeObjectURL(url);
     }
     catch (error) {
-        console.error('Secure export failed:', error);
+        logger_1.logger.error('Secure export failed:', { component: 'secureExport', operation: 'secureExportFailed:' }, error);
         throw error;
     }
 };
@@ -327,7 +328,7 @@ const importDataSecurely = async (file, password, settings) => {
         return await exportManager.importData(fileContent);
     }
     catch (error) {
-        console.error('Secure import failed:', error);
+        logger_1.logger.error('Secure import failed:', { component: 'secureExport', operation: 'secureImportFailed:' }, error);
         throw error;
     }
 };

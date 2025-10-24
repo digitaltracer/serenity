@@ -1,17 +1,18 @@
 "use strict";
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.selectTodayTasks = exports.selectFilteredTasks = exports.selectTaskFilters = exports.selectTasksError = exports.selectTasksLoading = exports.selectAllTasks = exports.updateAllTasks = exports.bulkDeleteTasks = exports.bulkUpdateTasks = exports.reorderSubtasks = exports.scheduleTask = exports.changeTaskPriority = exports.moveTaskToProject = exports.reorderTasks = exports.setTasksError = exports.setTasksLoading = exports.setTasks = exports.clearTaskFilters = exports.setTaskFilter = exports.updateSubtaskTitle = exports.removeSubtask = exports.addSubtask = exports.toggleSubtask = exports.toggleTask = exports.deleteTask = exports.updateTask = exports.addTask = void 0;
+exports.selectPaginatedTasks = exports.selectTodayTasks = exports.selectFilteredTasks = exports.selectTasksPagination = exports.selectTaskFilters = exports.selectTasksError = exports.selectTasksLoading = exports.selectAllTasks = exports.setPaginationHasMore = exports.resetPagination = exports.loadMoreTasks = exports.updateAllTasks = exports.bulkDeleteTasks = exports.bulkUpdateTasks = exports.reorderSubtasks = exports.scheduleTask = exports.changeTaskPriority = exports.moveTaskToProject = exports.reorderTasks = exports.setTasksError = exports.setTasksLoading = exports.setTasks = exports.clearTaskFilters = exports.setTaskFilter = exports.updateSubtaskTitle = exports.removeSubtask = exports.addSubtask = exports.toggleSubtask = exports.toggleTask = exports.deleteTask = exports.updateTask = exports.addTask = void 0;
 const toolkit_1 = require("@reduxjs/toolkit");
 const utils_1 = require("../../utils");
 const persistence_1 = require("../../utils/persistence");
+const logger_1 = require("../../utils/logger");
 // Load tasks from localStorage on initialization
 const initialTasks = (() => {
     try {
         return (0, persistence_1.loadTasks)();
     }
     catch (error) {
-        console.error('Failed to load tasks from storage:', error);
+        logger_1.logger.error('Failed to load tasks from storage:', { component: 'tasksSlice', operation: 'failedLoadTasks' }, error);
         return [];
     }
 })();
@@ -24,6 +25,11 @@ const initialState = {
         priority: 'all',
         status: 'all',
         project: null,
+    },
+    pagination: {
+        currentPage: 1,
+        tasksPerPage: 10,
+        hasMore: true,
     },
 };
 const tasksSlice = (0, toolkit_1.createSlice)({
@@ -60,8 +66,45 @@ const tasksSlice = (0, toolkit_1.createSlice)({
         toggleTask: (state, action) => {
             const task = state.tasks.find(task => task.id === action.payload);
             if (task) {
+                const wasCompleted = task.completed;
                 task.completed = !task.completed;
+                task.completedAt = task.completed ? new Date() : undefined;
                 task.updatedAt = new Date();
+                // If task is being marked as completed and has a recurring pattern, create a new instance
+                if (task.completed && !wasCompleted && task.recurring) {
+                    const { type, interval, endDate } = task.recurring;
+                    // Check if the recurrence should continue (not past endDate)
+                    const now = new Date();
+                    if (!endDate || new Date(endDate) > now) {
+                        // Calculate next due date
+                        let nextDueDate = task.dueDate ? new Date(task.dueDate) : now;
+                        switch (type) {
+                            case 'daily':
+                                nextDueDate.setDate(nextDueDate.getDate() + interval);
+                                break;
+                            case 'weekly':
+                                nextDueDate.setDate(nextDueDate.getDate() + (interval * 7));
+                                break;
+                            case 'monthly':
+                                nextDueDate.setMonth(nextDueDate.getMonth() + interval);
+                                break;
+                            case 'custom':
+                                nextDueDate.setDate(nextDueDate.getDate() + interval);
+                                break;
+                        }
+                        // Create new recurring task instance
+                        const newTask = {
+                            ...task,
+                            id: (0, utils_1.generateId)(),
+                            completed: false,
+                            completedAt: undefined,
+                            dueDate: nextDueDate,
+                            createdAt: new Date(),
+                            updatedAt: new Date(),
+                        };
+                        state.tasks.push(newTask);
+                    }
+                }
             }
         },
         toggleSubtask: (state, action) => {
@@ -188,7 +231,12 @@ const tasksSlice = (0, toolkit_1.createSlice)({
             taskIds.forEach(taskId => {
                 const task = state.tasks.find(t => t.id === taskId);
                 if (task) {
-                    Object.assign(task, updates, { updatedAt: new Date() });
+                    const updatedData = { ...updates, updatedAt: new Date() };
+                    // If we're updating completion status, set/clear completedAt timestamp
+                    if (updates.completed !== undefined) {
+                        updatedData.completedAt = updates.completed ? new Date() : undefined;
+                    }
+                    Object.assign(task, updatedData);
                 }
             });
         },
@@ -199,13 +247,26 @@ const tasksSlice = (0, toolkit_1.createSlice)({
         updateAllTasks: (state, action) => {
             state.tasks = action.payload;
         },
+        // Pagination Actions
+        loadMoreTasks: (state) => {
+            state.pagination.currentPage += 1;
+        },
+        resetPagination: (state) => {
+            state.pagination.currentPage = 1;
+            state.pagination.hasMore = true;
+        },
+        setPaginationHasMore: (state, action) => {
+            state.pagination.hasMore = action.payload;
+        },
     },
 });
 _a = tasksSlice.actions, exports.addTask = _a.addTask, exports.updateTask = _a.updateTask, exports.deleteTask = _a.deleteTask, exports.toggleTask = _a.toggleTask, exports.toggleSubtask = _a.toggleSubtask, exports.addSubtask = _a.addSubtask, exports.removeSubtask = _a.removeSubtask, exports.updateSubtaskTitle = _a.updateSubtaskTitle, exports.setTaskFilter = _a.setTaskFilter, exports.clearTaskFilters = _a.clearFilters, exports.setTasks = _a.setTasks, exports.setTasksLoading = _a.setLoading, exports.setTasksError = _a.setError, 
 // Drag and Drop actions
 exports.reorderTasks = _a.reorderTasks, exports.moveTaskToProject = _a.moveTaskToProject, exports.changeTaskPriority = _a.changeTaskPriority, exports.scheduleTask = _a.scheduleTask, exports.reorderSubtasks = _a.reorderSubtasks, 
 // Bulk operations
-exports.bulkUpdateTasks = _a.bulkUpdateTasks, exports.bulkDeleteTasks = _a.bulkDeleteTasks, exports.updateAllTasks = _a.updateAllTasks;
+exports.bulkUpdateTasks = _a.bulkUpdateTasks, exports.bulkDeleteTasks = _a.bulkDeleteTasks, exports.updateAllTasks = _a.updateAllTasks, 
+// Pagination actions
+exports.loadMoreTasks = _a.loadMoreTasks, exports.resetPagination = _a.resetPagination, exports.setPaginationHasMore = _a.setPaginationHasMore;
 // Selectors
 const selectAllTasks = (state) => state.tasks.tasks;
 exports.selectAllTasks = selectAllTasks;
@@ -215,6 +276,8 @@ const selectTasksError = (state) => state.tasks.error;
 exports.selectTasksError = selectTasksError;
 const selectTaskFilters = (state) => state.tasks.filters;
 exports.selectTaskFilters = selectTaskFilters;
+const selectTasksPagination = (state) => state.tasks.pagination;
+exports.selectTasksPagination = selectTasksPagination;
 exports.selectFilteredTasks = (0, toolkit_1.createSelector)([exports.selectAllTasks, exports.selectTaskFilters], (tasks, filters) => {
     return tasks.filter(task => {
         // Search filter
@@ -253,5 +316,53 @@ exports.selectTodayTasks = (0, toolkit_1.createSelector)([exports.selectAllTasks
         const taskDateString = new Date(task.dueDate).toISOString().split('T')[0];
         return taskDateString === todayString;
     });
+});
+exports.selectPaginatedTasks = (0, toolkit_1.createSelector)([exports.selectFilteredTasks, exports.selectTasksPagination], (filteredTasks, pagination) => {
+    // Sort tasks: unfinished tasks first (by due date, then created date), then completed tasks (by completion date)
+    const sortedTasks = [...filteredTasks].sort((a, b) => {
+        // If one is completed and the other isn't, put unfinished first
+        if (a.completed !== b.completed) {
+            return a.completed ? 1 : -1;
+        }
+        // Both are unfinished - sort by due date first, then created date
+        if (!a.completed && !b.completed) {
+            // Tasks with due dates come first
+            if (a.dueDate && !b.dueDate)
+                return -1;
+            if (!a.dueDate && b.dueDate)
+                return 1;
+            // Both have due dates - sort by due date
+            if (a.dueDate && b.dueDate) {
+                const dueDateDiff = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+                if (dueDateDiff !== 0)
+                    return dueDateDiff;
+            }
+            // Sort by created date (newest first for unfinished tasks)
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        }
+        // Both are completed - sort by completion date (newest first)
+        if (a.completed && b.completed) {
+            const aCompletedDate = a.completedAt ? new Date(a.completedAt) :
+                a.updatedAt ? new Date(a.updatedAt) :
+                    new Date(a.createdAt);
+            const bCompletedDate = b.completedAt ? new Date(b.completedAt) :
+                b.updatedAt ? new Date(b.updatedAt) :
+                    new Date(b.createdAt);
+            return bCompletedDate.getTime() - aCompletedDate.getTime();
+        }
+        return 0;
+    });
+    // Calculate pagination
+    const { currentPage, tasksPerPage } = pagination;
+    const startIndex = 0; // Always start from the beginning
+    const endIndex = currentPage * tasksPerPage;
+    const paginatedTasks = sortedTasks.slice(startIndex, endIndex);
+    const hasMore = endIndex < sortedTasks.length;
+    return {
+        tasks: paginatedTasks,
+        hasMore,
+        totalTasks: sortedTasks.length,
+        currentlyShowing: paginatedTasks.length,
+    };
 });
 exports.default = tasksSlice.reducer;

@@ -13,7 +13,7 @@ export interface GoalsState {
     loading: boolean;
     error: string | null;
 }
-export declare const addGoal: import("@reduxjs/toolkit").ActionCreatorWithPayload<Omit<Goal, "id" | "createdAt" | "updatedAt" | "progress">, "goals/addGoal">, updateGoal: import("@reduxjs/toolkit").ActionCreatorWithPayload<{
+export declare const setGoals: import("@reduxjs/toolkit").ActionCreatorWithPayload<Goal[], "goals/setGoals">, addGoal: import("@reduxjs/toolkit").ActionCreatorWithPayload<Omit<Goal, "id" | "createdAt" | "updatedAt" | "progress">, "goals/addGoal">, updateGoal: import("@reduxjs/toolkit").ActionCreatorWithPayload<{
     id: string;
     updates: Partial<Goal>;
 }, "goals/updateGoal">, deleteGoal: import("@reduxjs/toolkit").ActionCreatorWithPayload<string, "goals/deleteGoal">, updateGoalsProgress: import("@reduxjs/toolkit").ActionCreatorWithPayload<{
@@ -82,4 +82,3 @@ export declare const selectGoalsError: (state: {
 }) => string | null;
 declare const _default: import("redux").Reducer<GoalsState>;
 export default _default;
-//# sourceMappingURL=goalsSlice.d.ts.map

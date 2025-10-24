@@ -7,6 +7,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.useListNavigation = exports.useShortcutActions = exports.useContextualKeyboardShortcuts = exports.useGlobalKeyboardShortcuts = exports.useKeyboardShortcuts = void 0;
 const react_1 = require("react");
 const react_redux_1 = require("react-redux");
+const logger_1 = require("../utils/logger");
 const keyboardShortcuts_1 = require("../utils/keyboardShortcuts");
 /**
  * Hook for handling keyboard shortcuts
@@ -43,7 +44,7 @@ const useKeyboardShortcuts = (handler, options) => {
                 await handlerRef.current(matchingShortcut, event);
             }
             catch (error) {
-                console.error('Keyboard shortcut handler error:', error);
+                logger_1.logger.error('Keyboard shortcut handler error:', { component: 'useKeyboardShortcuts', operation: 'keyboardShortcutHandler' }, error);
             }
         }
     }, [enabled, preventDefault, stopPropagation]);
@@ -172,7 +173,7 @@ const useShortcutActions = () => {
                 dispatch({ type: 'ui/openShortcutsHelp' });
                 break;
             default:
-                console.warn(`Unhandled keyboard shortcut action: ${action}`);
+                logger_1.logger.warn(`Unhandled keyboard shortcut action: ${action}`, { component: 'useKeyboardShortcuts', operation: 'unhandledKeyboardShortcut' });
         }
     }, [dispatch]);
 };

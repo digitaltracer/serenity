@@ -33,4 +33,3 @@ export declare const useShortcutActions: () => (shortcut: KeyboardShortcut, even
  * Hook for list navigation with arrow keys
  */
 export declare const useListNavigation: (items: any[], selectedIndex: number, onSelectionChange: (index: number) => void, onActivate?: (index: number, item: any) => void, enabled?: boolean) => void;
-//# sourceMappingURL=useKeyboardShortcuts.d.ts.map

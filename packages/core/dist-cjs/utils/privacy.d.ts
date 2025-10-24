@@ -40,4 +40,3 @@ export declare const needsPasswordMigration: () => boolean;
  * This requires the user to re-enter their password
  */
 export declare const migratePasswordHash: (password: string) => Promise<boolean>;
-//# sourceMappingURL=privacy.d.ts.map

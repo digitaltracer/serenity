@@ -6,6 +6,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.testStoredDatabaseConnection = exports.updateStoredConnectionStatus = exports.isDatabaseConnected = exports.removeDatabaseConnection = exports.getDatabaseConnection = exports.saveDatabaseConnection = void 0;
 /// <reference path="../types/electron.d.ts" />
+const logger_1 = require("./logger");
 const STORAGE_KEYS = {
     DATABASE_CONNECTION: 'serenity_db_connection',
     DATABASE_CONNECTED: 'serenity_db_connected',
@@ -39,7 +40,7 @@ const saveDatabaseConnection = (connectionUrl) => {
         localStorage.setItem(STORAGE_KEYS.DATABASE_CONNECTION, obfuscatedData);
     }
     catch (error) {
-        console.error('Failed to save database connection:', error);
+        logger_1.logger.error('Failed to save database connection:', { component: 'storage', operation: 'failedSaveDatabase' }, error);
         throw new Error('Failed to save connection details');
     }
 };
@@ -58,7 +59,7 @@ const getDatabaseConnection = () => {
         return JSON.parse(decodedData);
     }
     catch (error) {
-        console.error('Failed to retrieve database connection:', error);
+        logger_1.logger.error('Failed to retrieve database connection:', { component: 'storage', operation: 'failedRetrieveDatabase' }, error);
         return null;
     }
 };
@@ -71,7 +72,7 @@ const removeDatabaseConnection = () => {
         localStorage.removeItem(STORAGE_KEYS.DATABASE_CONNECTION);
     }
     catch (error) {
-        console.error('Failed to remove database connection:', error);
+        logger_1.logger.error('Failed to remove database connection:', { component: 'storage', operation: 'failedRemoveDatabase' }, error);
     }
 };
 exports.removeDatabaseConnection = removeDatabaseConnection;
@@ -112,12 +113,12 @@ const testStoredDatabaseConnection = async (connectionUrl) => {
         }
         else {
             // Fallback for non-Electron environments (tests, web, etc.)
-            console.warn('Database connection testing not available outside Electron environment');
+            logger_1.logger.warn('Database connection testing not available outside Electron environment', { component: 'storage', operation: 'databaseConnectionTesting' });
             return false;
         }
     }
     catch (error) {
-        console.error('Database connection test failed:', error);
+        logger_1.logger.error('Database connection test failed:', { component: 'storage', operation: 'databaseConnectionTest' }, error);
         return false;
     }
 };

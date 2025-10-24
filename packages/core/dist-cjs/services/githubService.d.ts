@@ -168,4 +168,3 @@ export declare class GitHubService {
         }>;
     }>;
 }
-//# sourceMappingURL=githubService.d.ts.map

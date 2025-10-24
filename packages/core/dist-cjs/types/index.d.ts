@@ -3,6 +3,7 @@ export interface Task {
     title: string;
     description?: string;
     completed: boolean;
+    completedAt?: Date;
     priority: 'low' | 'medium' | 'high';
     dueDate?: Date;
     projectId?: string;
@@ -35,6 +36,16 @@ export interface Project {
     archived: boolean;
     userId?: string;
 }
+export interface MediaAttachment {
+    id: string;
+    type: 'image' | 'video' | 'audio' | 'file';
+    filename: string;
+    originalName: string;
+    path: string;
+    size: number;
+    mimeType: string;
+    createdAt: Date;
+}
 export interface JournalEntry {
     id: string;
     title?: string;
@@ -45,6 +56,7 @@ export interface JournalEntry {
     updatedAt: Date;
     pinned: boolean;
     mood?: 'happy' | 'neutral' | 'sad' | 'excited' | 'stressed';
+    attachments?: MediaAttachment[];
     userId?: string;
 }
 export interface User {
@@ -131,4 +143,4 @@ export interface Reminder {
     userId?: string;
 }
 export * from './database';
-//# sourceMappingURL=index.d.ts.map
+export * from './ipc';

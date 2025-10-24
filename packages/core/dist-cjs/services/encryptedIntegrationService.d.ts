@@ -41,4 +41,3 @@ export declare class EncryptedIntegrationService {
      */
     static migrateToEncryptedStorage(masterPassword: string): Promise<void>;
 }
-//# sourceMappingURL=encryptedIntegrationService.d.ts.map

@@ -8,6 +8,8 @@ exports.simplifiedPersistenceMiddleware = void 0;
 exports.initializeSQLitePersistence = initializeSQLitePersistence;
 exports.isSQLiteInitialized = isSQLiteInitialized;
 exports.reinitializeSQLite = reinitializeSQLite;
+const logger_1 = require("../../utils/logger");
+const PersistenceClient_1 = require("../../persistence/PersistenceClient");
 // Actions that should trigger persistence
 const PERSISTENT_ACTIONS = [
     // Tasks
@@ -23,6 +25,10 @@ const PERSISTENT_ACTIONS = [
     'journal/updateEntry',
     'journal/deleteEntry',
     'journal/togglePin',
+    // Goals
+    'goals/addGoal',
+    'goals/updateGoal',
+    'goals/deleteGoal',
     // Projects
     'projects/addProject',
     'projects/updateProject',
@@ -71,30 +77,30 @@ async function initializeSQLitePersistence() {
     isInitializing = true;
     try {
         if (typeof window !== 'undefined' && window.electronAPI?.sqlite) {
-            console.log('🔄 Initializing SQLite persistence...');
+            logger_1.logger.info('Initializing SQLite persistence', { component: 'SimplifiedPersistenceMiddleware', operation: 'initializeSQLitePersistence' });
             const initResult = await window.electronAPI.sqlite.initialize();
             if (initResult.success) {
                 sqliteInitialized = true;
-                console.log('✅ SQLite persistence initialized successfully');
+                logger_1.logger.info('SQLite persistence initialized successfully', { component: 'SimplifiedPersistenceMiddleware', operation: 'initializeSQLitePersistence' });
                 // Migrate any existing localStorage data to SQLite
                 await migrateLocalStorageToSQLite();
                 return true;
             }
             else {
-                console.error('❌ SQLite initialization failed:', initResult.error);
+                logger_1.logger.error('SQLite initialization failed', { component: 'SimplifiedPersistenceMiddleware', operation: 'initializeSQLitePersistence', metadata: { error: initResult.error } });
                 sqliteInitialized = false;
                 return false;
             }
         }
     }
     catch (error) {
-        console.error('❌ SQLite initialization error:', error);
+        logger_1.logger.error('SQLite initialization error', { component: 'SimplifiedPersistenceMiddleware', operation: 'initializeSQLitePersistence' }, error);
         sqliteInitialized = false;
     }
     finally {
         isInitializing = false;
     }
-    console.log('💾 SQLite not available, falling back to localStorage');
+    logger_1.logger.info('SQLite not available, falling back to localStorage', { component: 'SimplifiedPersistenceMiddleware', operation: 'initializeSQLitePersistence' });
     return false;
 }
 /**
@@ -104,13 +110,13 @@ async function migrateLocalStorageToSQLite() {
     if (!window.electronAPI?.sqlite)
         return;
     try {
-        console.log('🔄 Checking for localStorage data to migrate...');
+        logger_1.logger.debug('Checking for localStorage data to migrate', { component: 'SimplifiedPersistenceMiddleware', operation: 'migrateLocalStorageToSQLite' });
         // Check for existing data
         const tasks = localStorage.getItem('serenity_tasks');
         const projects = localStorage.getItem('serenity_projects');
         const journal = localStorage.getItem('serenity_journal');
         if (tasks || projects || journal) {
-            console.log('📦 Found localStorage data, migrating to SQLite...');
+            logger_1.logger.info('Found localStorage data, migrating to SQLite', { component: 'SimplifiedPersistenceMiddleware', operation: 'migrateLocalStorageToSQLite' });
             const migrationData = {
                 tasks: tasks ? JSON.parse(tasks) : [],
                 projects: projects ? JSON.parse(projects) : [],
@@ -118,7 +124,7 @@ async function migrateLocalStorageToSQLite() {
             };
             const result = await window.electronAPI.sqlite.importFromLocalStorage(migrationData);
             if (result.success) {
-                console.log('✅ Data migration completed successfully');
+                logger_1.logger.info('Data migration completed successfully', { component: 'SimplifiedPersistenceMiddleware', operation: 'migrateLocalStorageToSQLite' });
                 // Clear migrated data from localStorage
                 localStorage.removeItem('serenity_tasks');
                 localStorage.removeItem('serenity_projects');
@@ -126,15 +132,15 @@ async function migrateLocalStorageToSQLite() {
                 localStorage.setItem('serenity_data_migrated', 'true');
             }
             else {
-                console.error('❌ Data migration failed:', result.error);
+                logger_1.logger.error('Data migration failed', { component: 'SimplifiedPersistenceMiddleware', operation: 'migrateLocalStorageToSQLite', metadata: { error: result.error } });
             }
         }
         else {
-            console.log('📝 No localStorage data found to migrate');
+            logger_1.logger.debug('No localStorage data found to migrate', { component: 'SimplifiedPersistenceMiddleware', operation: 'migrateLocalStorageToSQLite' });
         }
     }
     catch (error) {
-        console.error('❌ Migration error:', error);
+        logger_1.logger.error('Migration error', { component: 'SimplifiedPersistenceMiddleware', operation: 'migrateLocalStorageToSQLite' }, error);
     }
 }
 /**
@@ -173,12 +179,22 @@ const simplifiedPersistenceMiddleware = (store) => (next) => async (action) => {
                         lastAISentSignature = signature;
                         if (aiSettingsTimer)
                             clearTimeout(aiSettingsTimer);
-                        aiSettingsTimer = setTimeout(() => {
+                        // Save activeProvider changes immediately, debounce other settings
+                        const isActiveProviderChange = action.type === 'aiAssistant/setActiveProvider' || action.type === 'aiAssistant/clearActiveProvider';
+                        if (isActiveProviderChange) {
                             try {
                                 window.electronAPI.aiAssistant.saveSettings(aiSettings);
                             }
                             catch { }
-                        }, 300);
+                        }
+                        else {
+                            aiSettingsTimer = setTimeout(() => {
+                                try {
+                                    window.electronAPI.aiAssistant.saveSettings(aiSettings);
+                                }
+                                catch { }
+                            }, 300);
+                        }
                     }
                 }
                 // Persist usage to localStorage for quick access across sessions
@@ -197,27 +213,159 @@ const simplifiedPersistenceMiddleware = (store) => (next) => async (action) => {
                 }
             }
             catch (e) {
-                console.warn('⚠️ Failed to trigger AI settings save:', e);
+                logger_1.logger.error('Failed to trigger AI settings save', { component: 'SimplifiedPersistenceMiddleware', operation: 'middleware' }, e);
             }
         }
-        // For data operations, use SQLite if available, otherwise localStorage as temporary fallback
-        if (sqliteInitialized && window.electronAPI?.sqlite) {
-            await persistToSQLite(action, state);
+        // Persist AI insights/recaps and usage to localStorage when updated
+        if (action.type === 'aiAssistant/analyzeUserData/fulfilled' || action.type === 'aiAssistant/clearInsights' || action.type === 'aiAssistant/removeInsight') {
+            try {
+                localStorage.setItem('serenity_ai_insights', JSON.stringify(state.aiAssistant.insights));
+                localStorage.setItem('serenity_ai_usage', JSON.stringify(state.aiAssistant.usage));
+            }
+            catch { }
+            // Also persist to DB via IPC when available (supports local-analysis fallback)
+            try {
+                if (action.type === 'aiAssistant/analyzeUserData/fulfilled') {
+                    const provider = action.payload?.provider || state.aiAssistant.activeProvider || 'local';
+                    const insights = action.payload?.insights || [];
+                    logger_1.logger.debug('Analyze fulfilled, persisting insights', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights', metadata: { provider, insightCount: insights.length } });
+                    if (Array.isArray(insights) && insights.length > 0) {
+                        // Save insights - TODO: add saveInsights to IPC
+                        logger_1.logger.debug('Would save insights via IPC (not yet implemented)', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights' });
+                    }
+                    const usage = action.payload?.usage;
+                    if (usage) {
+                        logger_1.logger.debug('Saving AI usage via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights', metadata: { usage } });
+                        // Save usage - TODO: add saveUsage to IPC
+                        logger_1.logger.debug('Would save usage via IPC (not yet implemented)', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights' });
+                    }
+                }
+            }
+            catch (e) {
+                logger_1.logger.error('Failed to persist AI insights/usage via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights' }, e);
+            }
         }
-        else {
-            // Temporary fallback to localStorage (should be rare after initialization)
-            console.warn('⚠️ SQLite not available, using localStorage fallback');
-            persistToLocalStorage(action, state);
+        // Handle direct recordUsage actions - persist individual usage entries to database
+        if (action.type === 'aiAssistant/recordUsage') {
+            try {
+                localStorage.setItem('serenity_ai_usage', JSON.stringify(state.aiAssistant.usage));
+                // Persist to database via IPC - TODO: implement saveUsage IPC method
+                const usageEntry = action.payload;
+                logger_1.logger.debug('Would save recordUsage via IPC (not yet implemented)', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecordUsage', metadata: { usageEntry } });
+            }
+            catch (e) {
+                logger_1.logger.error('Failed to persist recordUsage to database via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecordUsage' }, e);
+            }
+        }
+        if (action.type === 'aiAssistant/generateRecap/fulfilled' || action.type === 'aiAssistant/removeRecap') {
+            try {
+                localStorage.setItem('serenity_ai_recaps', JSON.stringify(state.aiAssistant.recaps));
+                localStorage.setItem('serenity_ai_usage', JSON.stringify(state.aiAssistant.usage));
+            }
+            catch { }
+        }
+        // For data operations, prefer injected persistence client when available
+        try {
+            const client = (0, PersistenceClient_1.getPersistenceClient)();
+            await persistViaClient(action, state, client);
+        }
+        catch {
+            // Fallback for desktop IPC path
+            if (sqliteInitialized && window.electronAPI?.sqlite) {
+                await persistToSQLite(action, state);
+            }
+            else {
+                logger_1.logger.warn('No persistence client; falling back to localStorage', { component: 'SimplifiedPersistenceMiddleware', operation: 'middleware', metadata: { actionType: action.type } });
+                persistToLocalStorage(action, state);
+            }
         }
     }
     catch (error) {
-        console.error('❌ Persistence error for action', action.type, ':', error);
+        logger_1.logger.error('Persistence error for action', { component: 'SimplifiedPersistenceMiddleware', operation: 'middleware', metadata: { actionType: action.type } }, error);
         // Fallback to localStorage if SQLite fails
         persistToLocalStorage(action, state);
     }
     return result;
 };
 exports.simplifiedPersistenceMiddleware = simplifiedPersistenceMiddleware;
+async function persistViaClient(action, state, client) {
+    const { type, payload } = action;
+    if (type.startsWith('tasks/')) {
+        switch (type) {
+            case 'tasks/addTask':
+                await client.tasks.create(payload);
+                break;
+            case 'tasks/updateTask': {
+                const { id, ...updates } = payload;
+                await client.tasks.update(id, updates);
+                break;
+            }
+            case 'tasks/toggleTask': {
+                const task = state.tasks.tasks.find((t) => t.id === payload);
+                if (task)
+                    await client.tasks.update(task.id, { completed: task.completed, completedAt: task.completedAt });
+                break;
+            }
+            case 'tasks/deleteTask':
+                await client.tasks.remove(payload);
+                break;
+            case 'tasks/addSubtask':
+            case 'tasks/removeSubtask':
+            case 'tasks/toggleSubtask': {
+                const task = state.tasks.tasks.find((t) => t.id === payload.taskId);
+                if (task)
+                    await client.tasks.update(task.id, { subtasks: task.subtasks });
+                break;
+            }
+        }
+    }
+    else if (type.startsWith('projects/')) {
+        switch (type) {
+            case 'projects/addProject':
+                await client.projects.create(payload);
+                break;
+            case 'projects/updateProject': {
+                const { id, ...updates } = payload;
+                await client.projects.update(id, updates);
+                break;
+            }
+            case 'projects/deleteProject':
+                await client.projects.remove(payload);
+                break;
+        }
+    }
+    else if (type.startsWith('journal/')) {
+        switch (type) {
+            case 'journal/addEntry':
+                await client.journal.create(payload);
+                break;
+            case 'journal/updateEntry':
+            case 'journal/togglePin': {
+                const { id, ...updates } = payload;
+                await client.journal.update(id, updates);
+                break;
+            }
+            case 'journal/deleteEntry':
+                await client.journal.remove(payload);
+                break;
+        }
+    }
+    else if (type.startsWith('goals/')) {
+        switch (type) {
+            case 'goals/addGoal':
+                await client.goals.create(payload);
+                break;
+            case 'goals/updateGoal': {
+                const { id, ...updates } = payload;
+                await client.goals.update(id, updates);
+                break;
+            }
+            case 'goals/deleteGoal':
+                await client.goals.remove(payload);
+                break;
+        }
+    }
+}
 /**
  * Persist to SQLite using the new business logic API
  */
@@ -233,9 +381,12 @@ async function persistToSQLite(action, state) {
         else if (type.startsWith('journal/')) {
             await handleJournalPersistence(type, payload, state.journal);
         }
+        else if (type.startsWith('goals/')) {
+            await handleGoalPersistence(type, payload, state.goals);
+        }
     }
     catch (error) {
-        console.error('❌ SQLite persistence failed:', error);
+        logger_1.logger.error('SQLite persistence failed', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistToSQLite', metadata: { actionType: type } }, error);
         throw error; // Re-throw to trigger localStorage fallback
     }
 }
@@ -245,35 +396,37 @@ async function persistToSQLite(action, state) {
 async function handleTaskPersistence(actionType, payload, tasksState) {
     switch (actionType) {
         case 'tasks/addTask':
-            console.log('📝 Creating task via SQLite API:', payload.title);
+            logger_1.logger.debug('Creating task via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleTaskPersistence', metadata: { title: payload.title } });
             await window.electronAPI?.sqlite?.createTask(payload);
             break;
         case 'tasks/updateTask':
-            console.log('📝 Updating task via SQLite API:', payload.id);
+            logger_1.logger.debug('Updating task via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleTaskPersistence', metadata: { taskId: payload.id } });
             const { id, ...updates } = payload;
             await window.electronAPI?.sqlite?.updateTask(id, updates);
             break;
         case 'tasks/toggleTask':
-            console.log('📝 Toggling task via SQLite API:', payload);
+            logger_1.logger.debug('Toggling task via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleTaskPersistence', metadata: { taskId: payload } });
             // For toggleTask, payload is just the task ID (string)
             // We need to get the updated task from state
             const toggledTask = tasksState.tasks.find((t) => t.id === payload);
             if (toggledTask) {
                 await window.electronAPI?.sqlite?.updateTask(payload, {
                     completed: toggledTask.completed,
+                    completedAt: toggledTask.completedAt,
                     updatedAt: toggledTask.updatedAt
                 });
             }
             break;
         case 'tasks/deleteTask':
-            console.log('📝 Deleting task via SQLite API:', payload);
+            logger_1.logger.debug('Deleting task via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleTaskPersistence', metadata: { taskId: payload } });
             await window.electronAPI?.sqlite?.deleteTask(payload);
             break;
         case 'tasks/addSubtask':
         case 'tasks/removeSubtask':
         case 'tasks/toggleSubtask':
             // These are handled as task updates
-            const task = tasksState.tasks.find((t) => t.id === payload.taskId);
+            const payloadWithTaskId = payload;
+            const task = tasksState.tasks.find((t) => t.id === payloadWithTaskId.taskId);
             if (task) {
                 await window.electronAPI?.sqlite?.updateTask(task.id, { subtasks: task.subtasks });
             }
@@ -286,16 +439,18 @@ async function handleTaskPersistence(actionType, payload, tasksState) {
 async function handleProjectPersistence(actionType, payload, projectsState) {
     switch (actionType) {
         case 'projects/addProject':
-            console.log('📁 Creating project via SQLite API:', payload.name);
+            logger_1.logger.debug('Creating project via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleProjectPersistence', metadata: { name: payload.name } });
             await window.electronAPI?.sqlite?.createProject(payload);
             break;
-        case 'projects/updateProject':
-            console.log('📁 Updating project via SQLite API:', payload.id);
-            const { id, ...updates } = payload;
+        case 'projects/updateProject': {
+            const projectPayload = payload;
+            logger_1.logger.debug('Updating project via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleProjectPersistence', metadata: { projectId: projectPayload.id } });
+            const { id, ...updates } = projectPayload;
             await window.electronAPI?.sqlite?.updateProject(id, updates);
             break;
+        }
         case 'projects/deleteProject':
-            console.log('📁 Deleting project via SQLite API:', payload);
+            logger_1.logger.debug('Deleting project via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleProjectPersistence', metadata: { projectId: payload } });
             await window.electronAPI?.sqlite?.deleteProject(payload);
             break;
     }
@@ -306,19 +461,43 @@ async function handleProjectPersistence(actionType, payload, projectsState) {
 async function handleJournalPersistence(actionType, payload, journalState) {
     switch (actionType) {
         case 'journal/addEntry':
-            console.log('📖 Creating journal entry via SQLite API:', payload.title);
+            logger_1.logger.debug('Creating journal entry via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleJournalPersistence', metadata: { title: payload.title } });
             await window.electronAPI?.sqlite?.createJournalEntry(payload);
             break;
         case 'journal/updateEntry':
-        case 'journal/togglePin':
-            console.log('📖 Updating journal entry via SQLite API:', payload.id);
-            const { id, ...updates } = payload;
+        case 'journal/togglePin': {
+            const journalPayload = payload;
+            logger_1.logger.debug('Updating journal entry via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleJournalPersistence', metadata: { entryId: journalPayload.id } });
+            const { id, ...updates } = journalPayload;
             await window.electronAPI?.sqlite?.updateJournalEntry(id, updates);
             break;
+        }
         case 'journal/deleteEntry':
-            console.log('📖 Deleting journal entry via SQLite API:', payload);
+            logger_1.logger.debug('Deleting journal entry via SQLite API', { component: 'SimplifiedPersistenceMiddleware', operation: 'handleJournalPersistence', metadata: { entryId: payload } });
             await window.electronAPI?.sqlite?.deleteJournalEntry(payload);
             break;
+    }
+}
+/**
+ * Handle goal persistence via IPC
+ * TODO: Implement goals IPC interface in electron.d.ts
+ */
+async function handleGoalPersistence(actionType, payload, goalsState) {
+    // TODO: Add goals interface to window.electronAPI
+    logger_1.logger.debug('Goal persistence via IPC not yet implemented', {
+        component: 'SimplifiedPersistenceMiddleware',
+        operation: 'handleGoalPersistence',
+        metadata: { actionType }
+    });
+    // Store in localStorage as fallback
+    try {
+        localStorage.setItem('serenity_goals', JSON.stringify(goalsState.goals));
+    }
+    catch (e) {
+        logger_1.logger.error('Failed to persist goals to localStorage', {
+            component: 'SimplifiedPersistenceMiddleware',
+            operation: 'handleGoalPersistence'
+        }, e);
     }
 }
 /**
@@ -336,10 +515,13 @@ function persistToLocalStorage(action, state) {
         else if (type.startsWith('journal/')) {
             localStorage.setItem('serenity_journal', JSON.stringify(state.journal.entries));
         }
-        console.log('📄 Fallback: Data persisted to localStorage');
+        else if (type.startsWith('goals/')) {
+            localStorage.setItem('serenity_goals', JSON.stringify(state.goals.goals));
+        }
+        logger_1.logger.debug('Fallback: Data persisted to localStorage', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistToLocalStorage', metadata: { actionType: type } });
     }
     catch (error) {
-        console.error('❌ localStorage fallback failed:', error);
+        logger_1.logger.error('localStorage fallback failed', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistToLocalStorage', metadata: { actionType: type } }, error);
     }
 }
 /**

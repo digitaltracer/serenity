@@ -79,4 +79,3 @@ export declare const animateDropFailure: (element: HTMLElement, callback?: () =>
  * Generate drop zone visual feedback
  */
 export declare const getDropZoneStyles: (dropZone: DropZone, isDragOver: boolean) => React.CSSProperties;
-//# sourceMappingURL=dragDrop.d.ts.map

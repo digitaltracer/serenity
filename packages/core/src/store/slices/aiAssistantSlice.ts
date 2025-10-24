@@ -204,8 +204,14 @@ export const analyzeUserData = createAsyncThunk(
         });
 
         if (result.success && Array.isArray(result.insights) && result.insights.length > 0) {
+          // Apply quality scoring to AI-generated insights as well
+          const qualityInsights = AIAssistantService.applyQualityScoring(result.insights, {
+            previousInsights: state.aiAssistant.insights,
+            minimumQuality: 0.4,
+          });
+
           return {
-            insights: result.insights,
+            insights: qualityInsights,
             processedData: result.processedData || {},
             usage: result.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
             provider,
@@ -222,7 +228,7 @@ export const analyzeUserData = createAsyncThunk(
     const safeJournal = (journalEntries as JournalEntry[] | undefined) || [];
   const local = AIAssistantService.generateLocalInsights(safeTasks, safeJournal);
   const nowIso = new Date().toISOString();
-    const insights = local.map((i, idx) => ({
+    const rawInsights = local.map((i, idx) => ({
       id: `local_${Date.now()}_${idx}`,
       type: i.type,
       title: i.title,
@@ -234,6 +240,13 @@ export const analyzeUserData = createAsyncThunk(
       actionable: i.actionable,
       metadata: { ...(i.metadata || {}), fallback: true },
     }));
+
+    // Apply quality scoring, filtering, deduplication, and ranking
+    const insights = AIAssistantService.applyQualityScoring(rawInsights, {
+      previousInsights: state.aiAssistant.insights,
+      minimumQuality: 0.4,
+    });
+
   return {
     insights,
     processedData: {

@@ -19,4 +19,3 @@ export declare function isSQLiteInitialized(): boolean;
  * Force SQLite reinitialization (for testing/recovery)
  */
 export declare function reinitializeSQLite(): Promise<boolean>;
-//# sourceMappingURL=simplifiedPersistenceMiddleware.d.ts.map

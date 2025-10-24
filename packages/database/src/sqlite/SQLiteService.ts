@@ -171,6 +171,7 @@ export class SQLiteService {
 
   async addAIInsights(insights: Array<{ provider: string; type: string; title: string; description: string; confidence: number; category: string; actionable?: boolean; metadata?: Record<string, unknown> }>): Promise<void> {
     this.ensureInitialized();
+    const now = new Date().toISOString();
     const rows = insights.map(i => ({
       provider: (i.provider || 'local') as 'openai' | 'gemini' | 'anthropic' | 'local',
       type: i.type as 'productivity' | 'behavior' | 'recommendation' | 'warning',
@@ -180,6 +181,10 @@ export class SQLiteService {
       category: i.category as 'tasks' | 'journal' | 'habits' | 'goals',
       actionable: i.actionable ? 1 : 0,
       metadata: JSON.stringify(i.metadata || {}),
+      updated_at: now,
+      dismissed: 0,
+      marked_helpful: 0,
+      actionability_suggestions: JSON.stringify([]),
     }));
     await this.ai!.addInsights(rows);
   }
@@ -206,6 +211,10 @@ export class SQLiteService {
       recommendations: JSON.stringify(recap.recommendations || []),
       period: JSON.stringify(recap.period),
       metadata: JSON.stringify(recap.metadata || {}),
+      updated_at: new Date().toISOString(),
+      viewed: 0,
+      favorited: 0,
+      exported: 0,
     });
   }
 
@@ -222,6 +231,56 @@ export class SQLiteService {
   async listAIUsage(limit = 500) {
     this.ensureInitialized();
     return this.ai!.listUsage(limit);
+  }
+
+  async updateInsightFeedback(insightId: string, feedback: {
+    userRating?: number;
+    dismissed?: boolean;
+    markedHelpful?: boolean;
+    userNotes?: string;
+  }): Promise<void> {
+    this.ensureInitialized();
+    return this.ai!.updateInsightFeedback(insightId, feedback);
+  }
+
+  async dismissInsight(insightId: string): Promise<void> {
+    this.ensureInitialized();
+    return this.ai!.dismissInsight(insightId);
+  }
+
+  async getInsightsFiltered(filters: {
+    category?: string;
+    type?: string;
+    dismissed?: boolean;
+    limit?: number;
+    offset?: number;
+  }) {
+    this.ensureInitialized();
+    return this.ai!.getInsightsFiltered(filters);
+  }
+
+  async deleteOldDismissedInsights(daysOld: number = 90): Promise<number> {
+    this.ensureInitialized();
+    return this.ai!.deleteOldDismissedInsights(daysOld);
+  }
+
+  async updateRecapInteraction(recapId: string, interaction: {
+    viewed?: boolean;
+    favorited?: boolean;
+    exported?: boolean;
+  }): Promise<void> {
+    this.ensureInitialized();
+    return this.ai!.updateRecapInteraction(recapId, interaction);
+  }
+
+  async getRecapsFiltered(filters: {
+    type?: 'weekly' | 'monthly';
+    favorited?: boolean;
+    limit?: number;
+    offset?: number;
+  }) {
+    this.ensureInitialized();
+    return this.ai!.getRecapsFiltered(filters);
   }
 
   // ===== GOAL OPERATIONS =====

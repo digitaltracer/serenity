@@ -96,3 +96,5 @@ __exportStar(require("./dragDrop"), exports);
 __exportStar(require("./goalProgress"), exports);
 // Export standardized error handling
 __exportStar(require("./errorHandler"), exports);
+// Natural language quick-add
+__exportStar(require("./nlpQuickAdd"), exports);

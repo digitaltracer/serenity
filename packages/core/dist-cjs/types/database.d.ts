@@ -92,4 +92,3 @@ export interface DatabasePreferences {
     queryTimeout: number;
     showPerformanceMetrics: boolean;
 }
-//# sourceMappingURL=database.d.ts.map

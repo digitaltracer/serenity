@@ -16,3 +16,5 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", { value: true });
 // Re-export database types
 __exportStar(require("./database"), exports);
+// Re-export IPC types
+__exportStar(require("./ipc"), exports);

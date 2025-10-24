@@ -64,4 +64,3 @@ export declare class PostgreSQLAdapter implements DatabaseOperations {
      */
     private createApplicationSchema;
 }
-//# sourceMappingURL=PostgreSQLAdapter.d.ts.map

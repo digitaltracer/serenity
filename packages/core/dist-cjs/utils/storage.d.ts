@@ -31,4 +31,3 @@ export declare const updateStoredConnectionStatus: (connected: boolean) => void;
  * Test database connection using Electron IPC to main process
  */
 export declare const testStoredDatabaseConnection: (connectionUrl: string) => Promise<boolean>;
-//# sourceMappingURL=storage.d.ts.map

@@ -36,4 +36,3 @@ export declare function getGoalTypeLabel(type: Goal['type']): string;
  */
 export declare function getGoalDescription(goal: Goal, projects?: Project[]): string;
 export {};
-//# sourceMappingURL=goalProgress.d.ts.map

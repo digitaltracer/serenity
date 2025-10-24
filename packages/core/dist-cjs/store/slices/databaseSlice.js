@@ -9,6 +9,7 @@ exports.selectNeedsBackup = exports.selectCanConnect = exports.selectDatabaseTyp
 const toolkit_1 = require("@reduxjs/toolkit");
 const DatabaseManager_1 = require("../../database/DatabaseManager");
 const secureStorage_1 = require("../../utils/secureStorage");
+const logger_1 = require("../../utils/logger");
 const initialState = {
     config: null,
     connectionStatus: {
@@ -34,14 +35,14 @@ const initialState = {
 // Initialize database configuration from saved settings
 exports.initializeDatabaseConfig = (0, toolkit_1.createAsyncThunk)('database/initialize', async (_, { rejectWithValue }) => {
     try {
-        console.log('🔄 Initializing database configuration...');
+        logger_1.logger.info('🔄 Initializing database configuration...', { component: 'databaseSlice', operation: 'initializingDatabaseConfiguration...' });
         // Load saved database connection from secure storage
         const savedConnection = await (0, secureStorage_1.getDatabaseConnectionSecure)();
         if (!savedConnection) {
-            console.log('📝 No saved database configuration found');
+            logger_1.logger.info('📝 No saved database configuration found', { component: 'databaseSlice', operation: 'savedDatabaseConfiguration' });
             return { config: null, status: { connected: false, type: 'sqlite' } };
         }
-        console.log('🔍 Found saved database configuration:', savedConnection.url);
+        logger_1.logger.info('🔍 Found saved database configuration', { component: 'databaseSlice', operation: 'foundSavedDatabase', metadata: { url: savedConnection.url } });
         // Parse the connection URL to create DatabaseConfig
         let config;
         if (savedConnection.url.startsWith('sqlite:') || savedConnection.url.includes('.db')) {
@@ -68,20 +69,20 @@ exports.initializeDatabaseConfig = (0, toolkit_1.createAsyncThunk)('database/ini
             };
         }
         else {
-            console.warn('⚠️ Unknown database connection format:', savedConnection.url);
+            logger_1.logger.warn('⚠️ Unknown database connection format', { component: 'databaseSlice', operation: 'unknownDatabaseConnection', metadata: { url: savedConnection.url } });
             return { config: null, status: { connected: false, type: 'sqlite' } };
         }
         // Attempt to connect to the saved configuration
-        console.log(`🔌 Attempting to restore connection to ${config.type} database...`);
+        logger_1.logger.info(`🔌 Attempting to restore connection to ${config.type} database...`, { component: 'databaseSlice', operation: 'attemptingRestoreConnection' });
         const success = await DatabaseManager_1.databaseManager.connect(config);
         if (success) {
             const status = DatabaseManager_1.databaseManager.getConnectionStatus();
             const stats = await DatabaseManager_1.databaseManager.getStats();
-            console.log(`✅ Successfully restored ${config.type} database connection`);
+            logger_1.logger.info(`✅ Successfully restored ${config.type} database connection`, { component: 'databaseSlice', operation: 'successfullyRestored${config.type}' });
             return { config, status, stats };
         }
         else {
-            console.warn(`⚠️ Failed to restore ${config.type} database connection`);
+            logger_1.logger.warn(`⚠️ Failed to restore ${config.type} database connection`, { component: 'databaseSlice', operation: 'failedRestore${config.type}' });
             return {
                 config,
                 status: {
@@ -93,7 +94,7 @@ exports.initializeDatabaseConfig = (0, toolkit_1.createAsyncThunk)('database/ini
         }
     }
     catch (error) {
-        console.error('❌ Failed to initialize database configuration:', error);
+        logger_1.logger.error('❌ Failed to initialize database configuration:', { component: 'databaseSlice', operation: 'failedInitializeDatabase' }, error);
         return rejectWithValue(error instanceof Error ? error.message : 'Initialization failed');
     }
 });
@@ -119,10 +120,10 @@ exports.connectToDatabase = (0, toolkit_1.createAsyncThunk)('database/connect', 
                 throw new Error(`Unsupported database type: ${config.type}`);
             }
             await (0, secureStorage_1.saveDatabaseConnectionSecure)(connectionUrl);
-            console.log('💾 Database configuration saved to secure storage');
+            logger_1.logger.info('💾 Database configuration saved to secure storage', { component: 'databaseSlice', operation: 'databaseConfigurationSaved' });
         }
         catch (saveError) {
-            console.error('⚠️ Failed to save database configuration:', saveError);
+            logger_1.logger.error('⚠️ Failed to save database configuration:', { component: 'databaseSlice', operation: 'failedSaveDatabase' }, saveError);
             // Don't fail the connection if save fails, just log the warning
         }
         return { config, status, stats };

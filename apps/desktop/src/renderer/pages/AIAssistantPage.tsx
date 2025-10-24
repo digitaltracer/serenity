@@ -1,3 +1,19 @@
+/**
+ * @deprecated This page is deprecated and will be removed in a future release.
+ *
+ * Migration Path:
+ * - AI Insights → Use InsightsHubPage (#/insights)
+ * - AI Provider Configuration → Use SettingsPage > AI section (#/settings)
+ * - Analytics → Use InsightsHubPage (#/insights)
+ *
+ * Timeline:
+ * - Phase 2 (Current): Deprecation notice added
+ * - Release +1: Page remains accessible with warning
+ * - Release +2: Consider removing this file entirely
+ *
+ * Date Deprecated: 2025 (Phase 2 completion)
+ */
+
 import React, { useState, useEffect } from 'react';
 import { useLoadAISettings } from './AIAssistant/hooks/useLoadAISettings';
 import { useListProviderModels } from './AIAssistant/hooks/useListProviderModels';
@@ -79,6 +95,7 @@ import {
   BarChart3,
   BookOpen,
   Zap,
+  Sparkles,
 } from 'lucide-react';
 
 export const AIAssistantPage: React.FC = () => {
@@ -425,6 +442,42 @@ export const AIAssistantPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {/* DEPRECATION NOTICE */}
+      <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-lg p-6 shadow-md">
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0">
+            <AlertCircle className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-orange-900 dark:text-orange-200 mb-2">
+              ⚠️ This page has been deprecated
+            </h3>
+            <p className="text-sm text-orange-800 dark:text-orange-300 mb-4">
+              The AI Assistant page is being phased out. Please use the new locations below for AI features:
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={() => window.location.href = '#/insights'}
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Insights Hub - View AI Insights & Analytics
+              </Button>
+              <Button
+                onClick={() => window.location.href = '#/settings'}
+                className="bg-purple-600 hover:bg-purple-700 text-white shadow-md"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Settings - Configure AI Providers
+              </Button>
+            </div>
+            <p className="text-xs text-orange-700 dark:text-orange-400 mt-4">
+              This page will be removed in a future release. Please update your bookmarks.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Enhanced Header with Navigation */}
       <div className="flex items-center justify-between">
         <div>

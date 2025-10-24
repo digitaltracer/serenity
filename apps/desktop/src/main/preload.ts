@@ -223,6 +223,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveUsage: (entry: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; operation: 'analyze' | 'recap' | 'quickadd'; promptTokens: number; completionTokens: number; totalTokens: number; timestamp?: string }) => ipcRenderer.invoke('ai-assistant:save-usage', entry),
   },
 
+  // Insights Hub operations
+  insights: {
+    getDashboardData: (params: { timeRange: { start: string; end: string }; includeKPIs: boolean; includeInsights: boolean; includeRecaps: boolean }) => ipcRenderer.invoke('insights:getDashboardData', params),
+    getInsights: (filters: { category?: string; type?: string; dismissed?: boolean; limit?: number; offset?: number }) => ipcRenderer.invoke('insights:getInsights', filters),
+    updateFeedback: (id: string, feedback: { userRating?: number; dismissed?: boolean; markedHelpful?: boolean; userNotes?: string }) => ipcRenderer.invoke('insights:updateFeedback', id, feedback),
+    dismiss: (id: string) => ipcRenderer.invoke('insights:dismiss', id),
+    getRecaps: (filters: { type?: 'weekly' | 'monthly'; favorited?: boolean; limit?: number; offset?: number }) => ipcRenderer.invoke('insights:getRecaps', filters),
+    updateRecapInteraction: (id: string, interaction: { viewed?: boolean; favorited?: boolean; exported?: boolean }) => ipcRenderer.invoke('insights:updateRecapInteraction', id, interaction),
+    getVisualizationData: (params: { metric: 'completion' | 'mood' | 'productivity' | 'velocity'; granularity: 'day' | 'week' | 'month'; timeRange: { start: string; end: string } }) => ipcRenderer.invoke('insights:getVisualizationData', params),
+    getKPIMetrics: (params: { timeRange: { start: string; end: string } }) => ipcRenderer.invoke('insights:getKPIMetrics', params),
+  },
+
 });
 
 // Type definitions for the exposed API

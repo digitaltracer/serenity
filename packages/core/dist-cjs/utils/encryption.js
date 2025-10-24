@@ -6,6 +6,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getEncryptionConfig = exports.DataClassificationManager = exports.KeyRotationManager = exports.EncryptionService = exports.DEFAULT_CLASSIFICATION = exports.DEFAULT_KEY_ROTATION = void 0;
 const errorHandler_1 = require("./errorHandler");
+const logger_1 = require("./logger");
 exports.DEFAULT_KEY_ROTATION = {
     rotationIntervalDays: 90, // Rotate every 3 months
     maxKeyAge: 365, // Max 1 year
@@ -367,7 +368,7 @@ class KeyRotationManager {
         this.currentVersion = newVersion;
         // Clean up old versions if needed
         await this.cleanupOldVersions();
-        console.log(`🔄 Key rotated to version ${newVersion}`);
+        logger_1.logger.info(`🔄 Key rotated to version ${newVersion}`, { component: 'encryption', operation: 'keyRotatedVersion' });
         return newVersion;
     }
     /**
@@ -389,7 +390,7 @@ class KeyRotationManager {
         const versionsToRemove = versions.slice(versionsToKeep);
         versionsToRemove.forEach(version => {
             if (version !== this.currentVersion) {
-                console.log(`🗑️ Removing old key version ${version}`);
+                logger_1.logger.info(`🗑️ Removing old key version ${version}`, { component: 'encryption', operation: '🗑️RemovingOld' });
                 this.keyVersions.delete(version);
             }
         });
@@ -414,7 +415,7 @@ class KeyRotationManager {
             throw new Error(`Key version ${keyVersion} not found`);
         }
         if (versionInfo.status === 'expired') {
-            console.warn(`⚠️ Decrypting with expired key version ${keyVersion}`);
+            logger_1.logger.warn(`⚠️ Decrypting with expired key version ${keyVersion}`, { component: 'encryption', operation: 'decryptingWithExpired' });
         }
         return EncryptionService.decrypt(encryptedData, password, classification);
     }
@@ -440,10 +441,10 @@ class KeyRotationManager {
                 try {
                     const reencrypted = await this.reencryptData(item.data, password, item.classification);
                     results.push(reencrypted);
-                    console.log(`🔄 Re-encrypted item ${i + 1}/${total} to version ${this.currentVersion}`);
+                    logger_1.logger.info(`🔄 Re-encrypted item ${i + 1}/${total} to version ${this.currentVersion}`, { component: 'encryption', operation: 're-encryptedItem${i' });
                 }
                 catch (error) {
-                    console.error(`❌ Failed to re-encrypt item ${i + 1}:`, error);
+                    logger_1.logger.error(`❌ Failed to re-encrypt item ${i + 1}:`, { component: 'encryption', operation: 'failedRe-encryptItem' }, error);
                     // Keep original if re-encryption fails
                     results.push(item.data);
                 }

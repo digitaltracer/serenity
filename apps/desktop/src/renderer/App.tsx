@@ -35,6 +35,7 @@ const TodayPage = lazy(() => import('./pages/TodayPage').then(module => ({ defau
 const JournalPage = lazy(() => import('./pages/JournalPage').then(module => ({ default: module.JournalPage })));
 const GoalsPage = lazy(() => import('./pages/GoalsPage').then(module => ({ default: module.GoalsPage })));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(module => ({ default: module.AnalyticsPage })));
+const InsightsHubPage = lazy(() => import('./pages/InsightsHubPage').then(module => ({ default: module.InsightsHubPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
 const DatabasePage = lazy(() => import('./pages/DatabasePage').then(module => ({ default: module.DatabasePage })));
 const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage').then(module => ({ default: module.IntegrationsPage })));
@@ -379,7 +380,9 @@ function AppContent() {
                     <Route path="/today" element={<TodayPage />} />
                     <Route path="/journal" element={<JournalPage />} />
                     <Route path="/goals" element={<GoalsPage />} />
-                    <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/insights" element={<InsightsHubPage />} />
+                    {/* Backward compatibility redirect */}
+                    <Route path="/analytics" element={<InsightsHubPage />} />
                     <Route path="/ai-assistant" element={<AIAssistantPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/database" element={<DatabasePage />} />

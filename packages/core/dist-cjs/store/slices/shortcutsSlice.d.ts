@@ -51,4 +51,3 @@ export declare const selectShortcutById: (state: {
 export declare const selectHasConflicts: (state: {
     shortcuts: ShortcutsState;
 }) => boolean;
-//# sourceMappingURL=shortcutsSlice.d.ts.map

@@ -38,6 +38,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.databaseManager = exports.DatabaseManager = void 0;
+const logger_1 = require("../utils/logger");
 class DatabaseManager {
     constructor() {
         this.currentAdapter = null;
@@ -52,7 +53,7 @@ class DatabaseManager {
      */
     async connect(config) {
         try {
-            console.log(`🔌 Connecting to ${config.type} database...`);
+            logger_1.logger.info(`🔌 Connecting to ${config.type} database...`, { component: 'DatabaseManager', operation: 'connecting${config.type}Database...' });
             // Disconnect from current database if connected
             if (this.currentAdapter) {
                 await this.disconnect();
@@ -68,7 +69,7 @@ class DatabaseManager {
                     type: config.type,
                     lastConnected: new Date(),
                 };
-                console.log(`✅ Connected to ${config.type} database successfully`);
+                logger_1.logger.info(`✅ Connected to ${config.type} database successfully`, { component: 'DatabaseManager', operation: 'connected${config.type}Database' });
                 // Run migrations if needed
                 await this.migrate();
                 return true;
@@ -78,7 +79,7 @@ class DatabaseManager {
             }
         }
         catch (error) {
-            console.error(`❌ Failed to connect to ${config.type} database:`, error);
+            logger_1.logger.error(`❌ Failed to connect to ${config.type} database:`, { component: 'DatabaseManager', operation: 'failedConnect${config.type}' }, error);
             this.connectionStatus = {
                 connected: false,
                 type: config.type,
@@ -96,10 +97,10 @@ class DatabaseManager {
         if (this.currentAdapter) {
             try {
                 await this.currentAdapter.disconnect();
-                console.log('🔌 Database disconnected');
+                logger_1.logger.info('🔌 Database disconnected', { component: 'DatabaseManager', operation: 'databaseDisconnected' });
             }
             catch (error) {
-                console.error('Error during disconnect:', error);
+                logger_1.logger.error('Error during disconnect:', { component: 'DatabaseManager', operation: 'errorDuringDisconnect:' }, error);
             }
             this.currentAdapter = null;
             this.config = null;
@@ -145,9 +146,9 @@ class DatabaseManager {
         if (!this.currentAdapter) {
             throw new Error('No database connection available');
         }
-        console.log('📋 Running database migrations...');
+        logger_1.logger.info('📋 Running database migrations...', { component: 'DatabaseManager', operation: 'runningDatabaseMigrations...' });
         await this.currentAdapter.migrate();
-        console.log('✅ Migrations completed successfully');
+        logger_1.logger.info('✅ Migrations completed successfully', { component: 'DatabaseManager', operation: 'migrationsCompletedSuccessfully' });
     }
     /**
      * Get current database schema version
@@ -165,9 +166,9 @@ class DatabaseManager {
         if (!this.currentAdapter) {
             throw new Error('No database connection available');
         }
-        console.log(`💾 Creating database backup at: ${path}`);
+        logger_1.logger.info(`💾 Creating database backup at: ${path}`, { component: 'DatabaseManager', operation: 'creatingDatabaseBackup' });
         await this.currentAdapter.backup(path);
-        console.log('✅ Backup completed successfully');
+        logger_1.logger.info('✅ Backup completed successfully', { component: 'DatabaseManager', operation: 'backupCompletedSuccessfully' });
     }
     /**
      * Restore database from backup
@@ -176,9 +177,9 @@ class DatabaseManager {
         if (!this.currentAdapter) {
             throw new Error('No database connection available');
         }
-        console.log(`📂 Restoring database from: ${path}`);
+        logger_1.logger.info(`📂 Restoring database from: ${path}`, { component: 'DatabaseManager', operation: 'restoringDatabaseFrom:' });
         await this.currentAdapter.restore(path);
-        console.log('✅ Restore completed successfully');
+        logger_1.logger.info('✅ Restore completed successfully', { component: 'DatabaseManager', operation: 'restoreCompletedSuccessfully' });
     }
     /**
      * Optimize database (vacuum, analyze, etc.)
@@ -187,9 +188,9 @@ class DatabaseManager {
         if (!this.currentAdapter) {
             throw new Error('No database connection available');
         }
-        console.log('🧹 Optimizing database...');
+        logger_1.logger.info('🧹 Optimizing database...', { component: 'DatabaseManager', operation: 'optimizingDatabase...' });
         await this.currentAdapter.vacuum();
-        console.log('✅ Database optimization completed');
+        logger_1.logger.info('✅ Database optimization completed', { component: 'DatabaseManager', operation: 'databaseOptimizationCompleted' });
     }
     /**
      * Get database statistics and health information
@@ -216,16 +217,16 @@ class DatabaseManager {
      * Switch to a different database configuration
      */
     async switchDatabase(config) {
-        console.log(`🔄 Switching from ${this.config?.type || 'none'} to ${config.type}`);
+        logger_1.logger.info(`🔄 Switching from ${this.config?.type || 'none'} to ${config.type}`, { component: 'DatabaseManager', operation: 'switchingFrom${this.config?.type' });
         // Backup current data if switching between different types
         if (this.config && this.config.type !== config.type && this.isConnected()) {
             const backupPath = `serenity-backup-${Date.now()}.sql`;
             try {
                 await this.backup(backupPath);
-                console.log(`📄 Created backup before switching: ${backupPath}`);
+                logger_1.logger.info(`📄 Created backup before switching: ${backupPath}`, { component: 'DatabaseManager', operation: 'createdBackupBefore' });
             }
             catch (error) {
-                console.warn('Failed to create backup before switching:', error);
+                logger_1.logger.warn('Failed to create backup before switching', { component: 'DatabaseManager', operation: 'failedCreateBackup' });
             }
         }
         return this.connect(config);

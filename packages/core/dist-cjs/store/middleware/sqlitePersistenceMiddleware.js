@@ -4,6 +4,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sqlitePersistenceMiddleware = void 0;
+const logger_1 = require("../../utils/logger");
 // Actions that should trigger persistence
 const TASKS_ACTIONS = [
     'tasks/addTask',
@@ -44,7 +45,7 @@ function isElectron() {
  */
 function getSQLiteAPI() {
     if (!isElectron()) {
-        console.warn('SQLite API not available - not in Electron environment');
+        logger_1.logger.warn('SQLite API not available - not in Electron environment', { component: 'sqlitePersistenceMiddleware', operation: 'sqliteApiNot' });
         return null;
     }
     return window.electronAPI.sqlite;
@@ -60,24 +61,24 @@ const sqlitePersistenceMiddleware = (store) => (next) => (action) => {
     const sqliteAPI = getSQLiteAPI();
     if (!sqliteAPI) {
         // Fallback to localStorage if SQLite is not available
-        console.log('🔄 Falling back to localStorage persistence');
+        logger_1.logger.info('🔄 Falling back to localStorage persistence', { component: 'sqlitePersistenceMiddleware', operation: 'fallingBackLocalstorage' });
         return result;
     }
     // Check if we need to persist based on the action type
     if (TASKS_ACTIONS.includes(action.type)) {
-        console.log('📄 Persisting tasks to SQLite');
+        logger_1.logger.info('📄 Persisting tasks to SQLite', { component: 'sqlitePersistenceMiddleware', operation: 'persistingTasksSqlite' });
         handleTaskPersistence(action, state.tasks, sqliteAPI);
     }
     if (JOURNAL_ACTIONS.includes(action.type)) {
-        console.log('📖 Persisting journal entries to SQLite');
+        logger_1.logger.info('📖 Persisting journal entries to SQLite', { component: 'sqlitePersistenceMiddleware', operation: 'persistingJournalEntries' });
         handleJournalPersistence(action, state.journal, sqliteAPI);
     }
     if (PROJECTS_ACTIONS.includes(action.type)) {
-        console.log('📁 Persisting projects to SQLite');
+        logger_1.logger.info('📁 Persisting projects to SQLite', { component: 'sqlitePersistenceMiddleware', operation: 'persistingProjectsSqlite' });
         handleProjectPersistence(action, state.projects, sqliteAPI);
     }
     if (USER_ACTIONS.includes(action.type)) {
-        console.log('👤 Persisting user preferences to localStorage');
+        logger_1.logger.info('👤 Persisting user preferences to localStorage', { component: 'sqlitePersistenceMiddleware', operation: 'persistingUserPreferences' });
         // User preferences still go to localStorage for quick access
         localStorage.setItem('serenity_user_preferences', JSON.stringify(state.user));
     }
@@ -108,12 +109,12 @@ async function handleTaskPersistence(action, tasksState, sqliteAPI) {
                 break;
             default:
                 // For other actions, sync all tasks
-                console.log('🔄 Syncing all tasks to SQLite');
+                logger_1.logger.info('🔄 Syncing all tasks to SQLite', { component: 'sqlitePersistenceMiddleware', operation: 'syncingAllTasks' });
                 break;
         }
     }
     catch (error) {
-        console.error('Failed to persist task to SQLite:', error);
+        logger_1.logger.error('Failed to persist task to SQLite:', { component: 'sqlitePersistenceMiddleware', operation: 'failedPersistTask' }, error);
     }
 }
 /**
@@ -139,12 +140,12 @@ async function handleJournalPersistence(action, journalState, sqliteAPI) {
                 }
                 break;
             default:
-                console.log('🔄 Syncing all journal entries to SQLite');
+                logger_1.logger.info('🔄 Syncing all journal entries to SQLite', { component: 'sqlitePersistenceMiddleware', operation: 'syncingAllJournal' });
                 break;
         }
     }
     catch (error) {
-        console.error('Failed to persist journal entry to SQLite:', error);
+        logger_1.logger.error('Failed to persist journal entry to SQLite:', { component: 'sqlitePersistenceMiddleware', operation: 'failedPersistJournal' }, error);
     }
 }
 /**
@@ -164,11 +165,11 @@ async function handleProjectPersistence(action, projectsState, sqliteAPI) {
                 await sqliteAPI.deleteProject(action.payload);
                 break;
             default:
-                console.log('🔄 Syncing all projects to SQLite');
+                logger_1.logger.info('🔄 Syncing all projects to SQLite', { component: 'sqlitePersistenceMiddleware', operation: 'syncingAllProjects' });
                 break;
         }
     }
     catch (error) {
-        console.error('Failed to persist project to SQLite:', error);
+        logger_1.logger.error('Failed to persist project to SQLite:', { component: 'sqlitePersistenceMiddleware', operation: 'failedPersistProject' }, error);
     }
 }

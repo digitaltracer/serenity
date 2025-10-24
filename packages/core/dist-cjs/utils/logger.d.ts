@@ -44,6 +44,7 @@ declare class Logger {
     private formatTimestamp;
     private createLogEntry;
     private writeLog;
+    private persistToFile;
     error(message: string, context?: LogContext, error?: Error): void;
     warn(message: string, context?: LogContext): void;
     info(message: string, context?: LogContext): void;
@@ -58,4 +59,3 @@ declare class Logger {
 export declare const logger: Logger;
 export declare const error: (message: string, context?: LogContext, error?: Error) => void, warn: (message: string, context?: LogContext) => void, info: (message: string, context?: LogContext) => void, debug: (message: string, context?: LogContext) => void, trace: (message: string, context?: LogContext) => void, time: (label: string) => void, timeEnd: (label: string, context?: LogContext) => void;
 export {};
-//# sourceMappingURL=logger.d.ts.map

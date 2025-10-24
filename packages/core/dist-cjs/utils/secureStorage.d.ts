@@ -87,4 +87,3 @@ export declare const getPostgreSQLConfigSecure: () => Promise<{
  * Remove PostgreSQL configuration and credentials
  */
 export declare const removePostgreSQLConfigSecure: () => Promise<void>;
-//# sourceMappingURL=secureStorage.d.ts.map

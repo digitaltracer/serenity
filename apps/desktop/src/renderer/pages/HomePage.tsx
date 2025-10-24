@@ -13,7 +13,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { addTask, addEntry, parseQuickInput, selectActiveProjects, selectAllEntries, logger } from '@serenity/core';
 import { RootState } from '@serenity/core';
-import { CheckSquare, BookOpen, FolderOpen, BarChart3, Loader2 } from 'lucide-react';
+import { CheckSquare, BookOpen, FolderOpen, BarChart3, Lightbulb, Loader2 } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -138,10 +138,10 @@ export const HomePage: React.FC = () => {
       route: '/actionhub',
     },
     {
-      title: 'Analytics',
-      description: 'Gain insights into your productivity patterns and achievements.',
-      icon: BarChart3,
-      route: '/analytics',
+      title: 'Insights Hub',
+      description: 'AI-powered insights, analytics, and personalized recommendations.',
+      icon: Lightbulb,
+      route: '/insights',
     },
   ];
 

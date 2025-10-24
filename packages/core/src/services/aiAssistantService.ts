@@ -6,6 +6,7 @@
 import { Task, JournalEntry } from '../types';
 import { AIInsight, AIRecap } from '../store/slices/aiAssistantSlice';
 import { logger } from '../utils/logger';
+import { InsightQualityService, ScoredInsight } from './insightQualityService';
 
 export interface AIApiResponse<T = unknown> {
   success: boolean;
@@ -720,6 +721,68 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
     };
 
     return configs[provider];
+  }
+
+  /**
+   * Apply quality scoring, filtering, deduplication, and ranking to insights
+   * This is the integration point for InsightQualityService
+   */
+  static applyQualityScoring(
+    rawInsights: AIInsight[],
+    context?: {
+      previousInsights?: AIInsight[];
+      focusAreas?: string[];
+      recentCategories?: string[];
+      minimumQuality?: number;
+    }
+  ): AIInsight[] {
+    logger.info(`📊 Applying quality scoring to ${rawInsights.length} insights`, {
+      component: 'aiAssistantService',
+      operation: 'applyQualityScoring',
+    });
+
+    // Use InsightQualityService to process insights through the full pipeline:
+    // validate → score → filter → deduplicate → rank
+    const scoredInsights = InsightQualityService.processInsights(rawInsights, context);
+
+    // Convert ScoredInsight back to AIInsight (strip quality metadata for state storage)
+    const processedInsights: AIInsight[] = scoredInsights.map((insight: ScoredInsight) => {
+      // Keep the quality score in metadata for potential UI display
+      const baseInsight: AIInsight = {
+        id: insight.id,
+        type: insight.type,
+        title: insight.title,
+        description: insight.description,
+        confidence: insight.confidence,
+        createdAt: insight.createdAt,
+        source: insight.source,
+        category: insight.category,
+        actionable: insight.actionable,
+        metadata: {
+          ...(insight.metadata || {}),
+          qualityScore: insight.qualityScore,
+          similarTo: insight.similarTo,
+          supersedes: insight.supersedes,
+        },
+      };
+      return baseInsight;
+    });
+
+    logger.info(
+      `✅ Quality scoring complete: ${rawInsights.length} → ${processedInsights.length} high-quality insights`,
+      {
+        component: 'aiAssistantService',
+        operation: 'applyQualityScoring',
+        metadata: {
+          filtered: rawInsights.length - processedInsights.length,
+          avgQuality: processedInsights.length > 0
+            ? (processedInsights.reduce((sum, i: any) => sum + (i.metadata?.qualityScore?.overall || 0), 0) / processedInsights.length).toFixed(2)
+            : '0.00',
+        },
+      }
+    );
+
+    return processedInsights;
   }
 }
 

@@ -19,7 +19,7 @@ export interface AIInsight {
     source: 'openai' | 'gemini' | 'anthropic';
     category: 'tasks' | 'journal' | 'habits' | 'goals';
     actionable?: boolean;
-    metadata?: any;
+    metadata?: Record<string, unknown>;
 }
 export interface AIRecap {
     id: string;
@@ -35,7 +35,7 @@ export interface AIRecap {
     };
     createdAt: string;
     source: 'openai' | 'gemini' | 'anthropic';
-    metadata?: any;
+    metadata?: Record<string, unknown>;
 }
 export interface AnalysisTracker {
     lastTaskAnalysis?: string;
@@ -103,7 +103,7 @@ export declare const testApiKey: import("@reduxjs/toolkit").AsyncThunk<{
     rejectedMeta?: unknown;
 }>;
 export declare const analyzeUserData: import("@reduxjs/toolkit").AsyncThunk<{
-    insights: any;
+    insights: AIInsight[];
     processedData: any;
     usage: any;
     provider: "openai" | "gemini" | "anthropic";
@@ -114,6 +114,7 @@ export declare const analyzeUserData: import("@reduxjs/toolkit").AsyncThunk<{
     forceReAnalyze?: boolean;
     tasks?: any[];
     journalEntries?: any[];
+    forceLocal?: boolean;
 }, {
     state?: unknown;
     dispatch?: import("redux").Dispatch;
@@ -152,14 +153,14 @@ export declare const setActiveProvider: import("@reduxjs/toolkit").ActionCreator
     includeTasks: boolean;
     includeJournal: boolean;
     includeProjects: boolean;
-}>, "aiAssistant/setDataTypes">, addInsight: import("@reduxjs/toolkit").ActionCreatorWithPayload<AIInsight, "aiAssistant/addInsight">, removeInsight: import("@reduxjs/toolkit").ActionCreatorWithPayload<string, "aiAssistant/removeInsight">, clearInsights: import("@reduxjs/toolkit").ActionCreatorWithoutPayload<"aiAssistant/clearInsights">, addRecap: import("@reduxjs/toolkit").ActionCreatorWithPayload<AIRecap, "aiAssistant/addRecap">, removeRecap: import("@reduxjs/toolkit").ActionCreatorWithPayload<string, "aiAssistant/removeRecap">, updateAnalysisTracker: import("@reduxjs/toolkit").ActionCreatorWithPayload<Partial<AnalysisTracker>, "aiAssistant/updateAnalysisTracker">, clearAIError: import("@reduxjs/toolkit").ActionCreatorWithoutPayload<"aiAssistant/clearAIError">, clearAllErrors: import("@reduxjs/toolkit").ActionCreatorWithoutPayload<"aiAssistant/clearAllErrors">, updateProvidersWithModelInfo: import("@reduxjs/toolkit").ActionCreatorWithPayload<{
+}>, "aiAssistant/setDataTypes">, addInsight: import("@reduxjs/toolkit").ActionCreatorWithPayload<AIInsight, "aiAssistant/addInsight">, removeInsight: import("@reduxjs/toolkit").ActionCreatorWithPayload<string, "aiAssistant/removeInsight">, clearInsights: import("@reduxjs/toolkit").ActionCreatorWithoutPayload<"aiAssistant/clearInsights">, restoreInsights: import("@reduxjs/toolkit").ActionCreatorWithPayload<AIInsight[], "aiAssistant/restoreInsights">, addRecap: import("@reduxjs/toolkit").ActionCreatorWithPayload<AIRecap, "aiAssistant/addRecap">, removeRecap: import("@reduxjs/toolkit").ActionCreatorWithPayload<string, "aiAssistant/removeRecap">, restoreRecaps: import("@reduxjs/toolkit").ActionCreatorWithPayload<AIRecap[], "aiAssistant/restoreRecaps">, updateAnalysisTracker: import("@reduxjs/toolkit").ActionCreatorWithPayload<Partial<AnalysisTracker>, "aiAssistant/updateAnalysisTracker">, clearAIError: import("@reduxjs/toolkit").ActionCreatorWithoutPayload<"aiAssistant/clearAIError">, clearAllErrors: import("@reduxjs/toolkit").ActionCreatorWithoutPayload<"aiAssistant/clearAllErrors">, updateProvidersWithModelInfo: import("@reduxjs/toolkit").ActionCreatorWithPayload<{
     [key: string]: {
         model: string;
         version: string;
     };
 }, "aiAssistant/updateProvidersWithModelInfo">, updateProvidersWithApiKeys: import("@reduxjs/toolkit").ActionCreatorWithPayload<{
     [key: string]: boolean;
-}, "aiAssistant/updateProvidersWithApiKeys">, clearProviderModelInfo: import("@reduxjs/toolkit").ActionCreatorWithPayload<"openai" | "gemini" | "anthropic", "aiAssistant/clearProviderModelInfo">, recordUsage: import("@reduxjs/toolkit").ActionCreatorWithPayload<AIUsageEntry, "aiAssistant/recordUsage">, clearUsage: import("@reduxjs/toolkit").ActionCreatorWithoutPayload<"aiAssistant/clearUsage">;
+}, "aiAssistant/updateProvidersWithApiKeys">, clearProviderModelInfo: import("@reduxjs/toolkit").ActionCreatorWithPayload<"openai" | "gemini" | "anthropic", "aiAssistant/clearProviderModelInfo">, recordUsage: import("@reduxjs/toolkit").ActionCreatorWithPayload<AIUsageEntry, "aiAssistant/recordUsage">, clearUsage: import("@reduxjs/toolkit").ActionCreatorWithoutPayload<"aiAssistant/clearUsage">, restoreUsage: import("@reduxjs/toolkit").ActionCreatorWithPayload<AIUsageEntry[], "aiAssistant/restoreUsage">;
 export declare const selectAIProviders: (state: {
     aiAssistant: AIAssistantState;
 }) => AIProvider[];
@@ -175,6 +176,9 @@ export declare const selectAnalysisProgress: (state: {
 export declare const selectAnalysisStatus: (state: {
     aiAssistant: AIAssistantState;
 }) => string;
+export declare const selectLastAnalysis: (state: {
+    aiAssistant: AIAssistantState;
+}) => string | undefined;
 export declare const selectAIInsights: (state: {
     aiAssistant: AIAssistantState;
 }) => AIInsight[];
@@ -206,4 +210,3 @@ export declare const selectAIUsage: (state: {
 }) => AIUsageEntry[];
 declare const _default: import("redux").Reducer<AIAssistantState>;
 export default _default;
-//# sourceMappingURL=aiAssistantSlice.d.ts.map

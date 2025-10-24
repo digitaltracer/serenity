@@ -68,7 +68,8 @@ import {
   Target,
   Database,
   Globe,
-  Brain
+  Brain,
+  Sparkles
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -184,7 +185,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/today', label: 'Today', icon: Calendar },
     { path: '/journal', label: 'Journal', icon: BookOpen },
     { path: '/goals', label: 'Goals', icon: Target },
-    { path: '/analytics', label: 'Analytics', icon: BarChart3 },
+    { path: '/insights', label: 'Insights', icon: Sparkles },
     { path: '/ai-assistant', label: 'AI Assistant', icon: Brain },
   ];
 

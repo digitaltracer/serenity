@@ -113,4 +113,3 @@ export declare class DatabaseManager implements DatabaseOperations {
     };
 }
 export declare const databaseManager: DatabaseManager;
-//# sourceMappingURL=DatabaseManager.d.ts.map

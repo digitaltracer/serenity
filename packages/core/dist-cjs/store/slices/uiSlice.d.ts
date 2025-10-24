@@ -47,7 +47,7 @@ export declare const setSidebarCollapsed: import("@reduxjs/toolkit").ActionCreat
 }, "ui/toggleItemSelection">, selectAllItems: import("@reduxjs/toolkit").ActionCreatorWithPayload<{
     type: "tasks" | "journalEntries" | "projects";
     items: string[];
-}, "ui/selectAllItems">, deselectAllItems: import("@reduxjs/toolkit").ActionCreatorWithPayload<"journalEntries" | "tasks" | "projects", "ui/deselectAllItems">, setSelectedItems: import("@reduxjs/toolkit").ActionCreatorWithPayload<{
+}, "ui/selectAllItems">, deselectAllItems: import("@reduxjs/toolkit").ActionCreatorWithPayload<"tasks" | "journalEntries" | "projects", "ui/deselectAllItems">, setSelectedItems: import("@reduxjs/toolkit").ActionCreatorWithPayload<{
     type: "tasks" | "journalEntries" | "projects";
     items: string[];
 }, "ui/setSelectedItems">;
@@ -134,4 +134,3 @@ export declare const selectProjectSelectAllState: (state: {
 }) => boolean;
 declare const _default: import("redux").Reducer<UIState>;
 export default _default;
-//# sourceMappingURL=uiSlice.d.ts.map

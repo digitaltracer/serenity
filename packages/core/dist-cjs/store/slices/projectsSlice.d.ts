@@ -21,4 +21,3 @@ export declare const selectProjectsError: (state: {
 }) => string | null;
 declare const _default: import("redux").Reducer<ProjectsState>;
 export default _default;
-//# sourceMappingURL=projectsSlice.d.ts.map

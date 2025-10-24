@@ -5,13 +5,14 @@ exports.selectPinnedEntries = exports.selectFilteredEntries = exports.selectJour
 const toolkit_1 = require("@reduxjs/toolkit");
 const utils_1 = require("../../utils");
 const persistence_1 = require("../../utils/persistence");
+const logger_1 = require("../../utils/logger");
 // Load journal entries from localStorage on initialization
 const initialEntries = (() => {
     try {
         return (0, persistence_1.loadJournalEntries)();
     }
     catch (error) {
-        console.error('Failed to load journal entries from storage:', error);
+        logger_1.logger.error('Failed to load journal entries from storage:', { component: 'journalSlice', operation: 'failedLoadJournal' }, error);
         return [];
     }
 })();

@@ -6,4 +6,3 @@ import { Middleware } from '@reduxjs/toolkit';
  * Middleware that persists state changes to SQLite database
  */
 export declare const sqlitePersistenceMiddleware: Middleware;
-//# sourceMappingURL=sqlitePersistenceMiddleware.d.ts.map

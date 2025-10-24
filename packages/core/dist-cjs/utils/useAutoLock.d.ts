@@ -12,4 +12,3 @@ export declare const useAutoLock: () => {
         type: "auth/checkAutoLock";
     };
 };
-//# sourceMappingURL=useAutoLock.d.ts.map

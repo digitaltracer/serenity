@@ -5,6 +5,10 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SQLiteAdapter = void 0;
+// Note: In a real implementation, these would be used in the main process
+// import { join } from 'path';
+// import { existsSync, mkdirSync } from 'fs';
+const logger_1 = require("../../utils/logger");
 // For now, we'll use a simple implementation without external dependencies
 // In a real implementation, you would import sqlite3 or better-sqlite3
 class SQLiteAdapter {
@@ -35,13 +39,13 @@ class SQLiteAdapter {
                 // In a real implementation, this would be handled by the main process
                 this.dbPath = './serenity.db';
             }
-            console.log(`📂 SQLite database path: ${this.dbPath}`);
+            logger_1.logger.info(`📂 SQLite database path: ${this.dbPath}`, { component: 'SQLiteAdapter', operation: 'sqliteDatabasePath:' });
             // For now, simulate connection (in real implementation, open SQLite connection)
             this.connected = true;
             return true;
         }
         catch (error) {
-            console.error('SQLite connection failed:', error);
+            logger_1.logger.error('SQLite connection failed:', { component: 'SQLiteAdapter', operation: 'sqliteConnectionFailed:' }, error);
             this.connected = false;
             return false;
         }
@@ -55,7 +59,7 @@ class SQLiteAdapter {
             this.connected = false;
             this.dbPath = null;
             this.config = null;
-            console.log('🔌 SQLite database disconnected');
+            logger_1.logger.info('🔌 SQLite database disconnected', { component: 'SQLiteAdapter', operation: 'sqliteDatabaseDisconnected' });
         }
     }
     /**
@@ -76,7 +80,7 @@ class SQLiteAdapter {
             return true;
         }
         catch (error) {
-            console.error('SQLite connection test failed:', error);
+            logger_1.logger.error('SQLite connection test failed:', { component: 'SQLiteAdapter', operation: 'sqliteConnectionTest' }, error);
             return false;
         }
     }
@@ -87,11 +91,11 @@ class SQLiteAdapter {
         if (!this.connected) {
             throw new Error('Not connected to database');
         }
-        console.log('📋 Running SQLite migrations...');
+        logger_1.logger.info('📋 Running SQLite migrations...', { component: 'SQLiteAdapter', operation: 'runningSqliteMigrations...' });
         // In real implementation, run SQLite schema migrations
         // For now, just simulate
         await this.simulateDelay(100);
-        console.log('✅ SQLite migrations completed');
+        logger_1.logger.info('✅ SQLite migrations completed', { component: 'SQLiteAdapter', operation: 'sqliteMigrationsCompleted' });
     }
     /**
      * Get database version
@@ -105,7 +109,7 @@ class SQLiteAdapter {
             return '1.0.0';
         }
         catch (error) {
-            console.error('Failed to get SQLite version:', error);
+            logger_1.logger.error('Failed to get SQLite version:', { component: 'SQLiteAdapter', operation: 'failedGetSqlite' }, error);
             return null;
         }
     }
@@ -119,20 +123,20 @@ class SQLiteAdapter {
         if (this.dbPath === ':memory:') {
             throw new Error('Cannot backup in-memory database');
         }
-        console.log(`💾 Creating SQLite backup: ${this.dbPath} -> ${path}`);
+        logger_1.logger.info(`💾 Creating SQLite backup: ${this.dbPath} -> ${path}`, { component: 'SQLiteAdapter', operation: 'creatingSqliteBackup:' });
         // In real implementation, use SQLite backup API or file copy
         await this.simulateDelay(500);
-        console.log('✅ SQLite backup completed');
+        logger_1.logger.info('✅ SQLite backup completed', { component: 'SQLiteAdapter', operation: 'sqliteBackupCompleted' });
     }
     /**
      * Restore database from backup
      */
     async restore(path) {
         // In a real implementation, check if backup file exists
-        console.log(`📂 Restoring SQLite database from: ${path}`);
+        logger_1.logger.info(`📂 Restoring SQLite database from: ${path}`, { component: 'SQLiteAdapter', operation: 'restoringSqliteDatabase' });
         // In real implementation, restore from backup file
         await this.simulateDelay(1000);
-        console.log('✅ SQLite restore completed');
+        logger_1.logger.info('✅ SQLite restore completed', { component: 'SQLiteAdapter', operation: 'sqliteRestoreCompleted' });
     }
     /**
      * Vacuum/optimize database
@@ -141,10 +145,10 @@ class SQLiteAdapter {
         if (!this.connected) {
             throw new Error('Not connected to database');
         }
-        console.log('🧹 Running SQLite VACUUM...');
+        logger_1.logger.info('🧹 Running SQLite VACUUM...', { component: 'SQLiteAdapter', operation: 'runningSqliteVacuum...' });
         // In real implementation, execute "VACUUM" command
         await this.simulateDelay(200);
-        console.log('✅ SQLite VACUUM completed');
+        logger_1.logger.info('✅ SQLite VACUUM completed', { component: 'SQLiteAdapter', operation: 'sqliteVacuumCompleted' });
     }
     /**
      * Get database statistics
@@ -185,7 +189,7 @@ class SQLiteAdapter {
             return 1024 * 1024; // Placeholder
         }
         catch (error) {
-            console.error('Failed to get database size:', error);
+            logger_1.logger.error('Failed to get database size:', { component: 'SQLiteAdapter', operation: 'failedGetDatabase' }, error);
             return 0;
         }
     }
@@ -201,7 +205,7 @@ class SQLiteAdapter {
             return true;
         }
         catch (error) {
-            console.error('SQLite integrity check failed:', error);
+            logger_1.logger.error('SQLite integrity check failed:', { component: 'SQLiteAdapter', operation: 'sqliteIntegrityCheck' }, error);
             return false;
         }
     }

@@ -163,4 +163,3 @@ export declare const selectCanConnect: (state: {
 export declare const selectNeedsBackup: (state: {
     database: DatabaseState;
 }) => boolean;
-//# sourceMappingURL=databaseSlice.d.ts.map

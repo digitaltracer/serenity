@@ -38,4 +38,3 @@ export declare function loadInitialDataFromSQLite(): Promise<{
  * Backup current data before migration
  */
 export declare function createMigrationBackup(): Promise<boolean>;
-//# sourceMappingURL=migration.d.ts.map

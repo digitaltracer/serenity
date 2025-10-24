@@ -54,4 +54,3 @@ export declare class IntegrationSyncService {
      */
     static getIntegrationSource(task: Task): 'google-calendar' | 'github' | null;
 }
-//# sourceMappingURL=integrationSyncService.d.ts.map

@@ -40,9 +40,9 @@ function calculateWeeklyTasksProgress(goal, data) {
     const { start, end } = getCurrentPeriod(goal.config.timeframe);
     const target = goal.config.targetCount || 0;
     const completedTasks = data.tasks.filter(task => {
-        if (!task.completed || !task.updatedAt)
+        if (!task.completed || !(task.completedAt || task.updatedAt))
             return false;
-        const completionDate = new Date(task.updatedAt);
+        const completionDate = new Date(task.completedAt || task.updatedAt);
         return completionDate >= start && completionDate <= end;
     });
     const current = completedTasks.length;
@@ -64,11 +64,11 @@ function calculateProjectTasksProgress(goal, data) {
     const target = goal.config.targetCount || 0;
     const projectId = goal.config.projectId;
     const completedTasks = data.tasks.filter(task => {
-        if (!task.completed || !task.updatedAt)
+        if (!task.completed || !(task.completedAt || task.updatedAt))
             return false;
         if (projectId && task.projectId !== projectId)
             return false;
-        const completionDate = new Date(task.updatedAt);
+        const completionDate = new Date(task.completedAt || task.updatedAt);
         return completionDate >= start && completionDate <= end;
     });
     const current = completedTasks.length;
@@ -94,9 +94,9 @@ function calculatePriorityTasksProgress(goal, data) {
         return task.priority === priority && createdDate >= start && createdDate <= end;
     });
     const completedPriorityTasks = priorityTasks.filter(task => {
-        if (!task.completed || !task.updatedAt)
+        if (!task.completed || !(task.completedAt || task.updatedAt))
             return false;
-        const completionDate = new Date(task.updatedAt);
+        const completionDate = new Date(task.completedAt || task.updatedAt);
         return completionDate >= start && completionDate <= end;
     });
     const target = priorityTasks.length;
@@ -123,9 +123,9 @@ function calculateDailyStreakProgress(goal, data) {
     for (let i = 0; i < targetDays + 10; i++) { // Check a few extra days to find actual streak
         const dateKey = checkDate.toISOString().split('T')[0];
         const hasTasksOnDay = data.tasks.some(task => {
-            if (!task.completed || !task.updatedAt)
+            if (!task.completed || !(task.completedAt || task.updatedAt))
                 return false;
-            const completionDate = new Date(task.updatedAt);
+            const completionDate = new Date(task.completedAt || task.updatedAt);
             return completionDate.toISOString().split('T')[0] === dateKey;
         });
         if (hasTasksOnDay) {

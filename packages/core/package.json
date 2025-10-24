@@ -13,12 +13,12 @@
     }
   },
   "scripts": {
-    "build": "npm run clean && tsc && npm run copy-types",
+    "build": "npm run clean && tsc && tsc -p tsconfig.cjs.json && npm run copy-types",
     "copy-types": "cp src/types/electron.d.ts dist/types/electron.d.ts",
     "dev": "tsc --watch",
     "lint": "eslint src/**/*.ts",
     "test": "jest",
-    "clean": "rm -rf dist tsconfig.tsbuildinfo"
+    "clean": "rm -rf dist dist-cjs tsconfig.tsbuildinfo tsconfig.cjs.tsbuildinfo"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^1.9.5",

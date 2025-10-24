@@ -6,6 +6,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.cleanupOrphanedData = exports.validateStoredData = exports.getStorageStats = exports.hasExistingData = exports.clearAllData = exports.saveProjects = exports.loadProjects = exports.saveJournalEntries = exports.loadJournalEntries = exports.saveTasks = exports.loadTasks = void 0;
+const logger_1 = require("./logger");
 const validation_1 = require("../validation");
 /**
  * Check if localStorage is available (browser/renderer process)
@@ -40,21 +41,21 @@ const safeJSONParse = (data, fallback, validator) => {
         return parsed;
     }
     catch (error) {
-        console.error('Failed to parse stored data:', error);
+        logger_1.logger.error('Failed to parse stored data:', { component: 'persistence', operation: 'failedParseStored' }, error);
         return fallback;
     }
 };
 // Helper to safely stringify and save to localStorage
 const safeSave = (key, data) => {
     if (!isLocalStorageAvailable()) {
-        console.warn(`localStorage not available, skipping save of ${key}`);
+        logger_1.logger.warn(`localStorage not available, skipping save of ${key}`, { component: 'persistence', operation: 'operation' });
         return;
     }
     try {
         localStorage.setItem(key, JSON.stringify(data));
     }
     catch (error) {
-        console.error(`Failed to save ${key} to localStorage:`, error);
+        logger_1.logger.error(`Failed to save ${key} to localStorage:`, { component: 'persistence', operation: `failedSave${key}` }, error);
     }
 };
 /**
@@ -62,7 +63,7 @@ const safeSave = (key, data) => {
  */
 const loadTasks = () => {
     if (!isLocalStorageAvailable()) {
-        console.warn('localStorage not available, returning empty tasks array');
+        logger_1.logger.warn('localStorage not available, returning empty tasks array', { component: 'persistence', operation: 'operation' });
         return [];
     }
     const data = localStorage.getItem(STORAGE_KEYS.TASKS);
@@ -77,10 +78,10 @@ const saveTasks = (tasks) => {
         // Validate tasks before saving
         const validatedTasks = (0, validation_1.safeValidateTasks)(tasks);
         safeSave(STORAGE_KEYS.TASKS, validatedTasks);
-        console.log(`💾 Saved ${validatedTasks.length} tasks to localStorage`);
+        logger_1.logger.info(`💾 Saved ${validatedTasks.length} tasks to localStorage`, { component: 'persistence', operation: 'saved${validatedtasks.length}Tasks' });
     }
     catch (error) {
-        console.error('Failed to save tasks:', error);
+        logger_1.logger.error('Failed to save tasks:', { component: 'persistence', operation: 'failedSaveTasks:' }, error);
     }
 };
 exports.saveTasks = saveTasks;
@@ -89,7 +90,7 @@ exports.saveTasks = saveTasks;
  */
 const loadJournalEntries = () => {
     if (!isLocalStorageAvailable()) {
-        console.warn('localStorage not available, returning empty journal entries array');
+        logger_1.logger.warn('localStorage not available, returning empty journal entries array', { component: 'persistence', operation: 'operation' });
         return [];
     }
     const data = localStorage.getItem(STORAGE_KEYS.JOURNAL);
@@ -104,10 +105,10 @@ const saveJournalEntries = (entries) => {
         // Validate entries before saving
         const validatedEntries = (0, validation_1.safeValidateJournalEntries)(entries);
         safeSave(STORAGE_KEYS.JOURNAL, validatedEntries);
-        console.log(`📖 Saved ${validatedEntries.length} journal entries to localStorage`);
+        logger_1.logger.info(`📖 Saved ${validatedEntries.length} journal entries to localStorage`, { component: 'persistence', operation: 'saved${validatedentries.length}Journal' });
     }
     catch (error) {
-        console.error('Failed to save journal entries:', error);
+        logger_1.logger.error('Failed to save journal entries:', { component: 'persistence', operation: 'failedSaveJournal' }, error);
     }
 };
 exports.saveJournalEntries = saveJournalEntries;
@@ -116,7 +117,7 @@ exports.saveJournalEntries = saveJournalEntries;
  */
 const loadProjects = () => {
     if (!isLocalStorageAvailable()) {
-        console.warn('localStorage not available, returning empty projects array');
+        logger_1.logger.warn('localStorage not available, returning empty projects array', { component: 'persistence', operation: 'operation' });
         return [];
     }
     const data = localStorage.getItem(STORAGE_KEYS.PROJECTS);
@@ -131,10 +132,10 @@ const saveProjects = (projects) => {
         // Validate projects before saving
         const validatedProjects = (0, validation_1.safeValidateProjects)(projects);
         safeSave(STORAGE_KEYS.PROJECTS, validatedProjects);
-        console.log(`📁 Saved ${validatedProjects.length} projects to localStorage`);
+        logger_1.logger.info(`📁 Saved ${validatedProjects.length} projects to localStorage`, { component: 'persistence', operation: 'saved${validatedprojects.length}Projects' });
     }
     catch (error) {
-        console.error('Failed to save projects:', error);
+        logger_1.logger.error('Failed to save projects:', { component: 'persistence', operation: 'failedSaveProjects:' }, error);
     }
 };
 exports.saveProjects = saveProjects;
@@ -143,7 +144,7 @@ exports.saveProjects = saveProjects;
  */
 const clearAllData = () => {
     if (!isLocalStorageAvailable()) {
-        console.warn('localStorage not available, cannot clear data');
+        logger_1.logger.warn('localStorage not available, cannot clear data', { component: 'persistence', operation: 'operation' });
         return;
     }
     localStorage.removeItem(STORAGE_KEYS.TASKS);
@@ -299,7 +300,7 @@ const cleanupOrphanedData = () => {
     });
     // Save cleaned data
     (0, exports.saveTasks)(cleanedTasks);
-    console.log(`🧹 Cleanup completed: ${fixed} references fixed, ${removed} items removed`);
+    logger_1.logger.info(`🧹 Cleanup completed: ${fixed} references fixed, ${removed} items removed`, { component: 'persistence', operation: 'operation' });
     return { fixed, removed };
 };
 exports.cleanupOrphanedData = cleanupOrphanedData;

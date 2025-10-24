@@ -19,4 +19,3 @@ export declare const selectUserError: (state: {
 }) => string | null;
 declare const _default: import("redux").Reducer<UserState>;
 export default _default;
-//# sourceMappingURL=userSlice.d.ts.map

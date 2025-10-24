@@ -124,4 +124,3 @@ export declare const selectResultsByType: (state: {
 export declare const selectHasActiveSearch: (state: {
     search: SearchState;
 }) => boolean;
-//# sourceMappingURL=searchSlice.d.ts.map

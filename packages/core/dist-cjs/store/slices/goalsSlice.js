@@ -1,7 +1,7 @@
 "use strict";
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.selectGoalsError = exports.selectGoalsLoading = exports.selectGoalFilters = exports.selectSelectedGoalId = exports.selectReminderModalOpen = exports.selectGoalModalOpen = exports.selectFilteredGoals = exports.selectUpcomingReminders = exports.selectPendingReminders = exports.selectAllReminders = exports.selectGoalsByType = exports.selectGoalById = exports.selectCompletedGoals = exports.selectActiveGoals = exports.selectAllGoals = exports.clearGoalFilters = exports.setGoalFilters = exports.selectGoal = exports.closeReminderModal = exports.openReminderModal = exports.closeGoalModal = exports.openGoalModal = exports.snoozeReminder = exports.dismissReminder = exports.deleteReminder = exports.updateReminder = exports.addReminder = exports.updateGoalsProgress = exports.deleteGoal = exports.updateGoal = exports.addGoal = void 0;
+exports.selectGoalsError = exports.selectGoalsLoading = exports.selectGoalFilters = exports.selectSelectedGoalId = exports.selectReminderModalOpen = exports.selectGoalModalOpen = exports.selectFilteredGoals = exports.selectUpcomingReminders = exports.selectPendingReminders = exports.selectAllReminders = exports.selectGoalsByType = exports.selectGoalById = exports.selectCompletedGoals = exports.selectActiveGoals = exports.selectAllGoals = exports.clearGoalFilters = exports.setGoalFilters = exports.selectGoal = exports.closeReminderModal = exports.openReminderModal = exports.closeGoalModal = exports.openGoalModal = exports.snoozeReminder = exports.dismissReminder = exports.deleteReminder = exports.updateReminder = exports.addReminder = exports.updateGoalsProgress = exports.deleteGoal = exports.updateGoal = exports.addGoal = exports.setGoals = void 0;
 const toolkit_1 = require("@reduxjs/toolkit");
 const goalProgress_1 = require("../../utils/goalProgress");
 const initialState = {
@@ -22,6 +22,9 @@ const goalsSlice = (0, toolkit_1.createSlice)({
     name: 'goals',
     initialState,
     reducers: {
+        setGoals: (state, action) => {
+            state.goals = action.payload || [];
+        },
         // Goal CRUD operations
         addGoal: (state, action) => {
             const now = new Date();
@@ -145,7 +148,7 @@ const goalsSlice = (0, toolkit_1.createSlice)({
         },
     },
 });
-_a = goalsSlice.actions, exports.addGoal = _a.addGoal, exports.updateGoal = _a.updateGoal, exports.deleteGoal = _a.deleteGoal, exports.updateGoalsProgress = _a.updateGoalsProgress, exports.addReminder = _a.addReminder, exports.updateReminder = _a.updateReminder, exports.deleteReminder = _a.deleteReminder, exports.dismissReminder = _a.dismissReminder, exports.snoozeReminder = _a.snoozeReminder, exports.openGoalModal = _a.openGoalModal, exports.closeGoalModal = _a.closeGoalModal, exports.openReminderModal = _a.openReminderModal, exports.closeReminderModal = _a.closeReminderModal, exports.selectGoal = _a.selectGoal, exports.setGoalFilters = _a.setGoalFilters, exports.clearGoalFilters = _a.clearGoalFilters;
+_a = goalsSlice.actions, exports.setGoals = _a.setGoals, exports.addGoal = _a.addGoal, exports.updateGoal = _a.updateGoal, exports.deleteGoal = _a.deleteGoal, exports.updateGoalsProgress = _a.updateGoalsProgress, exports.addReminder = _a.addReminder, exports.updateReminder = _a.updateReminder, exports.deleteReminder = _a.deleteReminder, exports.dismissReminder = _a.dismissReminder, exports.snoozeReminder = _a.snoozeReminder, exports.openGoalModal = _a.openGoalModal, exports.closeGoalModal = _a.closeGoalModal, exports.openReminderModal = _a.openReminderModal, exports.closeReminderModal = _a.closeReminderModal, exports.selectGoal = _a.selectGoal, exports.setGoalFilters = _a.setGoalFilters, exports.clearGoalFilters = _a.clearGoalFilters;
 // Selectors
 const selectAllGoals = (state) => state.goals.goals;
 exports.selectAllGoals = selectAllGoals;

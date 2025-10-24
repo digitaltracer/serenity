@@ -52,4 +52,3 @@ export declare const selectIsDraggingType: (itemType: string) => (state: {
 }) => boolean;
 declare const _default: import("redux").Reducer<DragDropReduxState>;
 export default _default;
-//# sourceMappingURL=dragDropSlice.d.ts.map

@@ -5,6 +5,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BiometricAuthService = void 0;
+const logger_1 = require("../utils/logger");
 class BiometricAuthService {
     /**
      * Check if biometric authentication is available on this system
@@ -17,7 +18,7 @@ class BiometricAuthService {
             return { available: false, type: null };
         }
         catch (error) {
-            console.error('Failed to check biometric availability:', error);
+            logger_1.logger.error('Failed to check biometric availability:', { component: 'biometricAuthService', operation: 'failedCheckBiometric' }, error);
             return { available: false, type: null };
         }
     }
@@ -27,27 +28,27 @@ class BiometricAuthService {
     static async storeMasterPasswordForBiometric(masterPassword) {
         try {
             if (!window.electronAPI?.safeStorage?.encryptString) {
-                console.warn('Safe storage not available - cannot store master password for biometric auth');
+                logger_1.logger.warn('Safe storage not available - cannot store master password for biometric auth', { component: 'biometricAuthService', operation: 'safeStorageNot' });
                 return false;
             }
-            console.log('🔐 Storing master password for biometric authentication...');
+            logger_1.logger.info('🔐 Storing master password for biometric authentication...', { component: 'biometricAuthService', operation: 'storingMasterPassword' });
             // Encrypt the master password using system keychain
             const encryptedPassword = await window.electronAPI.safeStorage.encryptString(masterPassword);
             // Store the encrypted password using secure settings API
             if (window.electronAPI?.auth?.setSecureSetting) {
                 const res = await window.electronAPI.auth.setSecureSetting(this.MASTER_PASSWORD_KEY, encryptedPassword);
                 if (res.success) {
-                    console.log('✅ Master password stored for biometric authentication');
+                    logger_1.logger.info('✅ Master password stored for biometric authentication', { component: 'biometricAuthService', operation: 'masterPasswordStored' });
                     return true;
                 }
-                console.error('❌ Failed to store encrypted master password:', res.error);
+                logger_1.logger.error('❌ Failed to store encrypted master password:', { component: 'biometricAuthService', operation: 'failedStoreEncrypted' }, new Error(res.error));
                 return false;
             }
-            console.warn('Secure settings API not available - cannot store encrypted master password');
+            logger_1.logger.warn('Secure settings API not available - cannot store encrypted master password', { component: 'biometricAuthService', operation: 'secureSettingsApi' });
             return false;
         }
         catch (error) {
-            console.error('❌ Failed to store master password for biometric auth:', error);
+            logger_1.logger.error('❌ Failed to store master password for biometric auth:', { component: 'biometricAuthService', operation: 'failedStoreMaster' }, error);
             return false;
         }
     }
@@ -73,10 +74,10 @@ class BiometricAuthService {
                     error: 'No master password stored for biometric authentication. Please authenticate with your master password first.'
                 };
             }
-            console.log('🔒 Starting biometric authentication via keychain access...');
+            logger_1.logger.info('🔒 Starting biometric authentication via keychain access...', { component: 'biometricAuthService', operation: 'startingBiometricAuthentication' });
             // Use only safeStorage decryption - no separate Touch ID prompt needed
             // The safeStorage.decryptString call will trigger the system authentication (Touch ID/Face ID)
-            console.log('🔓 Accessing encrypted master password from secure keychain...');
+            logger_1.logger.info('🔓 Accessing encrypted master password from secure keychain...', { component: 'biometricAuthService', operation: 'accessingEncryptedMaster' });
             // Retrieve and decrypt the master password (this will trigger biometric authentication)
             const masterPassword = await this.retrieveStoredMasterPassword();
             if (!masterPassword) {
@@ -85,14 +86,14 @@ class BiometricAuthService {
                     error: 'Failed to retrieve stored master password from keychain'
                 };
             }
-            console.log('✅ Successfully retrieved master password via biometric keychain authentication');
+            logger_1.logger.info('✅ Successfully retrieved master password via biometric keychain authentication', { component: 'biometricAuthService', operation: 'successfullyRetrievedMaster' });
             return {
                 success: true,
                 masterPassword
             };
         }
         catch (error) {
-            console.error('❌ Biometric authentication error:', error);
+            logger_1.logger.error('❌ Biometric authentication error:', { component: 'biometricAuthService', operation: 'biometricAuthenticationError:' }, error);
             return {
                 success: false,
                 error: `Biometric authentication failed: ${error}`
@@ -111,7 +112,7 @@ class BiometricAuthService {
             return result.success && !!result.data && result.data.value != null;
         }
         catch (error) {
-            console.error('Failed to check for stored master password:', error);
+            logger_1.logger.error('Failed to check for stored master password:', { component: 'biometricAuthService', operation: 'failedCheckFor' }, error);
             return false;
         }
     }
@@ -126,7 +127,7 @@ class BiometricAuthService {
             // Get encrypted password from secure settings
             const result = await window.electronAPI.auth.getSecureSetting(this.MASTER_PASSWORD_KEY);
             if (!result.success || !result.data || result.data.value == null) {
-                console.warn('No encrypted master password found in database');
+                logger_1.logger.warn('No encrypted master password found in database', { component: 'biometricAuthService', operation: 'encryptedMasterPassword' });
                 return null;
             }
             const encryptedPassword = result.data.value;
@@ -135,7 +136,7 @@ class BiometricAuthService {
             return decryptedPassword;
         }
         catch (error) {
-            console.error('Failed to retrieve stored master password:', error);
+            logger_1.logger.error('Failed to retrieve stored master password:', { component: 'biometricAuthService', operation: 'failedRetrieveStored' }, error);
             return null;
         }
     }
@@ -149,16 +150,16 @@ class BiometricAuthService {
             }
             const result = await window.electronAPI.auth.deleteSecureSetting(this.MASTER_PASSWORD_KEY);
             if (result.success) {
-                console.log('✅ Removed stored master password for biometric authentication');
+                logger_1.logger.info('✅ Removed stored master password for biometric authentication', { component: 'biometricAuthService', operation: 'removedStoredMaster' });
                 return true;
             }
             else {
-                console.error('❌ Failed to remove stored master password:', result.error);
+                logger_1.logger.error('❌ Failed to remove stored master password:', { component: 'biometricAuthService', operation: 'failedRemoveStored' }, new Error(result.error));
                 return false;
             }
         }
         catch (error) {
-            console.error('❌ Failed to remove stored master password:', error);
+            logger_1.logger.error('❌ Failed to remove stored master password:', { component: 'biometricAuthService', operation: 'failedRemoveStored' }, error);
             return false;
         }
     }

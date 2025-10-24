@@ -21,6 +21,10 @@ export { AIPreprocessingService, PreprocessingConfig } from './services/aiPrepro
 export * from './services/promptEngineeringService';
 export * from './services/insightQualityService';
 export * from './services/userProfileService';
+// Export visualizationService but avoid duplicating KPIMetrics and TimeRange from insightsSlice
+export { VisualizationService } from './services/visualizationService';
+export * from './services/actionabilityService';
+export * from './services/feedbackService';
 // Export secure storage functions
 export { 
   savePostgreSQLConfigSecure,

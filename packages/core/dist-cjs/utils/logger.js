@@ -87,43 +87,58 @@ class Logger {
         if (this.logHistory.length > this.maxHistorySize) {
             this.logHistory.shift();
         }
-        // Format for console output
-        const levelColors = {
-            [LogLevel.ERROR]: '\x1b[31m', // Red
-            [LogLevel.WARN]: '\x1b[33m', // Yellow
-            [LogLevel.INFO]: '\x1b[36m', // Cyan
-            [LogLevel.DEBUG]: '\x1b[35m', // Magenta
-            [LogLevel.TRACE]: '\x1b[37m' // White
-        };
-        const reset = '\x1b[0m';
-        const levelName = LogLevel[entry.level];
-        const color = levelColors[entry.level] || '';
-        const contextStr = entry.context ?
-            ` [${entry.context.component || 'Unknown'}${entry.context.operation ? ':' + entry.context.operation : ''}]` : '';
-        const logMessage = `${color}[${entry.timestamp}] ${levelName}${contextStr}: ${entry.message}${reset}`;
-        // Route to appropriate console method
-        switch (entry.level) {
-            case LogLevel.ERROR:
-                console.error(logMessage, entry.context, entry.error);
-                break;
-            case LogLevel.WARN:
-                console.warn(logMessage, entry.context);
-                break;
-            case LogLevel.INFO:
-                console.info(logMessage, entry.context);
-                break;
-            case LogLevel.DEBUG:
-            case LogLevel.TRACE:
-                if (this.isDevelopment) {
+        // Format for console output (only in development)
+        if (this.isDevelopment) {
+            const levelColors = {
+                [LogLevel.ERROR]: '\x1b[31m', // Red
+                [LogLevel.WARN]: '\x1b[33m', // Yellow
+                [LogLevel.INFO]: '\x1b[36m', // Cyan
+                [LogLevel.DEBUG]: '\x1b[35m', // Magenta
+                [LogLevel.TRACE]: '\x1b[37m' // White
+            };
+            const reset = '\x1b[0m';
+            const levelName = LogLevel[entry.level];
+            const color = levelColors[entry.level] || '';
+            const contextStr = entry.context ?
+                ` [${entry.context.component || 'Unknown'}${entry.context.operation ? ':' + entry.context.operation : ''}]` : '';
+            const logMessage = `${color}[${entry.timestamp}] ${levelName}${contextStr}: ${entry.message}${reset}`;
+            // Route to appropriate console method
+            switch (entry.level) {
+                case LogLevel.ERROR:
+                    console.error(logMessage, entry.context, entry.error);
+                    break;
+                case LogLevel.WARN:
+                    console.warn(logMessage, entry.context);
+                    break;
+                case LogLevel.INFO:
+                    console.info(logMessage, entry.context);
+                    break;
+                case LogLevel.DEBUG:
+                case LogLevel.TRACE:
                     console.log(logMessage, entry.context);
-                }
-                break;
+                    break;
+            }
         }
-        // TODO: Implement file logging via Electron main process
-        // For now, critical errors are logged to console and can be captured by Electron's logging
-        if (this.isElectron && entry.level <= LogLevel.ERROR) {
-            // Could add file logging by extending the Electron API in the future
-            // window.electronAPI?.system?.logToFile?.(entry);
+        // Write to file via Electron IPC (async, non-blocking)
+        // Only persist WARN and ERROR to file to avoid excessive disk writes
+        if (this.isElectron && entry.level <= LogLevel.WARN) {
+            this.persistToFile(entry);
+        }
+    }
+    persistToFile(entry) {
+        try {
+            if (typeof window !== 'undefined' && 'electronAPI' in window) {
+                const api = window.electronAPI;
+                if (api?.system?.writeLog) {
+                    // Fire and forget - don't await to avoid blocking
+                    api.system.writeLog(entry).catch(() => {
+                        // Silently fail to avoid infinite logging loops
+                    });
+                }
+            }
+        }
+        catch {
+            // Silently fail - logging infrastructure shouldn't crash the app
         }
     }
     error(message, context, error) {

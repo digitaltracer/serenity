@@ -18,6 +18,7 @@ import goalsReducer from './slices/goalsSlice';
 import integrationsReducer from './slices/integrationsSlice';
 import aiAssistantReducer from './slices/aiAssistantSlice';
 import { restoreInsights, restoreRecaps } from './slices/aiAssistantSlice';
+import insightsReducer from './slices/insightsSlice';
 import { simplifiedPersistenceMiddleware, initializeSQLitePersistence } from './middleware/simplifiedPersistenceMiddleware';
 import { logger } from '../utils/logger';
 
@@ -42,6 +43,7 @@ export function createEnhancedStore() {
       goals: goalsReducer,
       integrations: integrationsReducer,
       aiAssistant: aiAssistantReducer,
+      insights: insightsReducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({

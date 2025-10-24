@@ -69,5 +69,9 @@ export * from './GoalSuggestions';
 export * from './TagsManager';
 export * from './ProjectIcon';
 export * from './VirtualizedList';
+// Charts
+export * from './charts';
+// Insights
+export * from './insights';
 // Error handling components
 export * from './ErrorBoundary';

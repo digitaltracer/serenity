@@ -11,6 +11,7 @@ import { registerIntegrationHandlers } from './integrationHandlers';
 import { registerAuthHandlers } from './authHandlers';
 import { registerAIAssistantHandlers } from './aiAssistantHandlers';
 import { registerGoalHandlers } from './goalsHandlers';
+import { registerInsightsHandlers } from './insightsHandlers';
 import { logger } from '@serenity/core';
 
 /**
@@ -18,7 +19,7 @@ import { logger } from '@serenity/core';
  */
 export function registerAllIpcHandlers(): void {
   logger.info('🚀 Registering all IPC handlers...', { component: 'index', operation: 'registeringAllIpc' });
-  
+
   // Register domain-specific handlers
   registerSystemHandlers();
   registerTaskHandlers();
@@ -28,6 +29,7 @@ export function registerAllIpcHandlers(): void {
   registerAuthHandlers();
   registerAIAssistantHandlers();
   registerGoalHandlers();
-  
+  registerInsightsHandlers();
+
   logger.info('✅ All IPC handlers registered successfully', { component: 'index', operation: 'allIpcHandlers' });
 }

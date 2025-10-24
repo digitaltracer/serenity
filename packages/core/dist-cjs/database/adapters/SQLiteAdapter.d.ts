@@ -72,4 +72,3 @@ export declare class SQLiteAdapter implements DatabaseOperations {
      */
     private simulateDelay;
 }
-//# sourceMappingURL=SQLiteAdapter.d.ts.map

@@ -187,4 +187,3 @@ export declare const importDataSecurely: (file: File, password: string, settings
     settings: any;
     metadata: any;
 }>;
-//# sourceMappingURL=secureExport.d.ts.map

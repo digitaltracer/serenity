@@ -27,4 +27,4 @@ export * from './searchEngine';
 export * from './dragDrop';
 export * from './goalProgress';
 export * from './errorHandler';
-//# sourceMappingURL=index.d.ts.map
+export * from './nlpQuickAdd';

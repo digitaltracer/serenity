@@ -1,1 +1,0 @@
-{"version":3,"file":"sampleData.d.ts","sourceRoot":"","sources":["../../../src/store/slices/sampleData.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,IAAI,EAAE,OAAO,EAAE,YAAY,EAAE,MAAM,aAAa,CAAC;AAG1D,eAAO,MAAM,cAAc,EAAE,OAAO,EA+BnC,CAAC;AAEF,eAAO,MAAM,WAAW,EAAE,IAAI,EAgD7B,CAAC;AAEF,eAAO,MAAM,oBAAoB,EAAE,YAAY,EA6C9C,CAAC;AAEF,eAAO,MAAM,wBAAwB,GAAI,UAAU,GAAG,SAmBrD,CAAC"}

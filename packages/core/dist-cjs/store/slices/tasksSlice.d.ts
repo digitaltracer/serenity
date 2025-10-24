@@ -9,6 +9,11 @@ export interface TasksState {
         status: 'all' | 'pending' | 'completed';
         project: string | null;
     };
+    pagination: {
+        currentPage: number;
+        tasksPerPage: number;
+        hasMore: boolean;
+    };
 }
 export declare const addTask: import("@reduxjs/toolkit").ActionCreatorWithPreparedPayload<[taskData: Omit<Task, "id" | "createdAt" | "updatedAt">], Task, "tasks/addTask", never, never>, updateTask: import("@reduxjs/toolkit").ActionCreatorWithPayload<Partial<Task> & {
     id: string;
@@ -49,7 +54,7 @@ export declare const addTask: import("@reduxjs/toolkit").ActionCreatorWithPrepar
 }, "tasks/reorderSubtasks">, bulkUpdateTasks: import("@reduxjs/toolkit").ActionCreatorWithPayload<{
     taskIds: string[];
     updates: Partial<Task>;
-}, "tasks/bulkUpdateTasks">, bulkDeleteTasks: import("@reduxjs/toolkit").ActionCreatorWithPayload<string[], "tasks/bulkDeleteTasks">, updateAllTasks: import("@reduxjs/toolkit").ActionCreatorWithPayload<Task[], "tasks/updateAllTasks">;
+}, "tasks/bulkUpdateTasks">, bulkDeleteTasks: import("@reduxjs/toolkit").ActionCreatorWithPayload<string[], "tasks/bulkDeleteTasks">, updateAllTasks: import("@reduxjs/toolkit").ActionCreatorWithPayload<Task[], "tasks/updateAllTasks">, loadMoreTasks: import("@reduxjs/toolkit").ActionCreatorWithoutPayload<"tasks/loadMoreTasks">, resetPagination: import("@reduxjs/toolkit").ActionCreatorWithoutPayload<"tasks/resetPagination">, setPaginationHasMore: import("@reduxjs/toolkit").ActionCreatorWithPayload<boolean, "tasks/setPaginationHasMore">;
 export declare const selectAllTasks: (state: {
     tasks: TasksState;
 }) => Task[];
@@ -66,6 +71,13 @@ export declare const selectTaskFilters: (state: {
     priority: "all" | "high" | "medium" | "low";
     status: "all" | "pending" | "completed";
     project: string | null;
+};
+export declare const selectTasksPagination: (state: {
+    tasks: TasksState;
+}) => {
+    currentPage: number;
+    tasksPerPage: number;
+    hasMore: boolean;
 };
 export declare const selectFilteredTasks: ((state: {
     tasks: TasksState;
@@ -88,6 +100,30 @@ export declare const selectTodayTasks: ((state: {
 }> & {
     clearCache: () => void;
 };
+export declare const selectPaginatedTasks: ((state: {
+    tasks: TasksState;
+} & {
+    tasks: TasksState;
+} & {
+    tasks: TasksState;
+}) => {
+    tasks: Task[];
+    hasMore: boolean;
+    totalTasks: number;
+    currentlyShowing: number;
+}) & import("reselect").OutputSelectorFields<(args_0: Task[], args_1: {
+    currentPage: number;
+    tasksPerPage: number;
+    hasMore: boolean;
+}) => {
+    tasks: Task[];
+    hasMore: boolean;
+    totalTasks: number;
+    currentlyShowing: number;
+}, {
+    clearCache: () => void;
+}> & {
+    clearCache: () => void;
+};
 declare const _default: import("redux").Reducer<TasksState>;
 export default _default;
-//# sourceMappingURL=tasksSlice.d.ts.map

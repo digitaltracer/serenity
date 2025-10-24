@@ -43,4 +43,3 @@ export declare class BiometricAuthService {
      */
     static updateStoredMasterPassword(newMasterPassword: string): Promise<boolean>;
 }
-//# sourceMappingURL=biometricAuthService.d.ts.map

@@ -13,4 +13,3 @@ export declare const selectTagSuggestions: (query: string) => (state: {
 }) => string[];
 declare const _default: import("redux").Reducer<TagsState>;
 export default _default;
-//# sourceMappingURL=tagsSlice.d.ts.map

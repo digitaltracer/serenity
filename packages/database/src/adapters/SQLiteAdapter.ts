@@ -215,7 +215,16 @@ export class SQLiteAdapter {
         category TEXT NOT NULL CHECK (category IN ('tasks', 'journal', 'habits', 'goals')),
         actionable INTEGER DEFAULT 0,
         metadata TEXT DEFAULT '{}',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        -- User feedback fields
+        user_rating INTEGER CHECK (user_rating >= 1 AND user_rating <= 5),
+        dismissed INTEGER DEFAULT 0,
+        marked_helpful INTEGER DEFAULT 0,
+        user_notes TEXT,
+        -- Visualization and actionability fields
+        visualization_data TEXT,
+        actionability_suggestions TEXT DEFAULT '[]'
       );
 
       CREATE TABLE IF NOT EXISTS ai_recaps (
@@ -229,11 +238,19 @@ export class SQLiteAdapter {
         recommendations TEXT DEFAULT '[]',
         period TEXT NOT NULL,
         metadata TEXT DEFAULT '{}',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        -- User interaction fields
+        viewed INTEGER DEFAULT 0,
+        favorited INTEGER DEFAULT 0,
+        exported INTEGER DEFAULT 0
       );
 
-      CREATE INDEX IF NOT EXISTS idx_ai_insights_created_at ON ai_insights (created_at);
-      CREATE INDEX IF NOT EXISTS idx_ai_recaps_created_at ON ai_recaps (created_at);
+      CREATE INDEX IF NOT EXISTS idx_ai_insights_created_at ON ai_insights (created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_ai_insights_category ON ai_insights (category);
+      CREATE INDEX IF NOT EXISTS idx_ai_insights_type ON ai_insights (type);
+      CREATE INDEX IF NOT EXISTS idx_ai_recaps_created_at ON ai_recaps (created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_ai_recaps_type ON ai_recaps (type);
 
       -- AI token usage persistence (per operation)
       CREATE TABLE IF NOT EXISTS ai_usage (
@@ -271,6 +288,9 @@ export class SQLiteAdapter {
 
       // Migration: Add completed_at column to tasks table if it doesn't exist
       await this.migrateTasksCompletedAt();
+
+      // Migration: Add feedback and visualization columns to AI insights and recaps
+      await this.migrateAIInsightsEnhancements();
     } catch (error) {
       logger.error('Failed to create database schema:', { component: 'SQLiteAdapter', operation: 'failedCreateDatabase' }, error as Error);
       throw error;
@@ -383,6 +403,101 @@ export class SQLiteAdapter {
       logger.info('✅ completed_at column added to tasks table successfully', { component: 'SQLiteAdapter', operation: 'completed_atColumnAdded' });
     } catch (error) {
       logger.error('❌ Failed to migrate tasks table for completed_at column:', { component: 'SQLiteAdapter', operation: 'failedMigrateTasks' }, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Migrate AI insights and recaps tables to add feedback and visualization columns
+   */
+  private async migrateAIInsightsEnhancements(): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      // Check ai_insights table columns
+      const insightsTableInfo = this.db.prepare('PRAGMA table_info(ai_insights)').all() as Array<{
+        cid: number;
+        name: string;
+        type: string;
+        notnull: number;
+        dflt_value: any;
+        pk: number;
+      }>;
+
+      const insightsColumns = insightsTableInfo.map(col => col.name);
+      const insightsColumnsToAdd = [
+        { name: 'updated_at', sql: 'ALTER TABLE ai_insights ADD COLUMN updated_at DATETIME;' },
+        { name: 'user_rating', sql: 'ALTER TABLE ai_insights ADD COLUMN user_rating INTEGER;' },
+        { name: 'dismissed', sql: 'ALTER TABLE ai_insights ADD COLUMN dismissed INTEGER DEFAULT 0;' },
+        { name: 'marked_helpful', sql: 'ALTER TABLE ai_insights ADD COLUMN marked_helpful INTEGER DEFAULT 0;' },
+        { name: 'user_notes', sql: 'ALTER TABLE ai_insights ADD COLUMN user_notes TEXT;' },
+        { name: 'visualization_data', sql: 'ALTER TABLE ai_insights ADD COLUMN visualization_data TEXT;' },
+        { name: 'actionability_suggestions', sql: "ALTER TABLE ai_insights ADD COLUMN actionability_suggestions TEXT DEFAULT '[]';" }
+      ];
+
+      let insightsAdded = 0;
+      for (const column of insightsColumnsToAdd) {
+        if (!insightsColumns.includes(column.name)) {
+          logger.info(`🔄 Adding ${column.name} column to ai_insights table...`, { component: 'SQLiteAdapter', operation: `adding${column.name}Column` });
+          this.db.exec(column.sql);
+          insightsAdded++;
+        }
+      }
+
+      if (insightsAdded > 0) {
+        logger.info(`✅ Added ${insightsAdded} new columns to ai_insights table`, { component: 'SQLiteAdapter', operation: 'addedInsightsColumns' });
+      } else {
+        logger.info('✅ ai_insights table already has all enhancement columns', { component: 'SQLiteAdapter', operation: 'ai_insightsTableAlready' });
+      }
+
+      // Check ai_recaps table columns
+      const recapsTableInfo = this.db.prepare('PRAGMA table_info(ai_recaps)').all() as Array<{
+        cid: number;
+        name: string;
+        type: string;
+        notnull: number;
+        dflt_value: any;
+        pk: number;
+      }>;
+
+      const recapsColumns = recapsTableInfo.map(col => col.name);
+      const recapsColumnsToAdd = [
+        { name: 'updated_at', sql: 'ALTER TABLE ai_recaps ADD COLUMN updated_at DATETIME;' },
+        { name: 'viewed', sql: 'ALTER TABLE ai_recaps ADD COLUMN viewed INTEGER DEFAULT 0;' },
+        { name: 'favorited', sql: 'ALTER TABLE ai_recaps ADD COLUMN favorited INTEGER DEFAULT 0;' },
+        { name: 'exported', sql: 'ALTER TABLE ai_recaps ADD COLUMN exported INTEGER DEFAULT 0;' }
+      ];
+
+      let recapsAdded = 0;
+      for (const column of recapsColumnsToAdd) {
+        if (!recapsColumns.includes(column.name)) {
+          logger.info(`🔄 Adding ${column.name} column to ai_recaps table...`, { component: 'SQLiteAdapter', operation: `adding${column.name}Column` });
+          this.db.exec(column.sql);
+          recapsAdded++;
+        }
+      }
+
+      if (recapsAdded > 0) {
+        logger.info(`✅ Added ${recapsAdded} new columns to ai_recaps table`, { component: 'SQLiteAdapter', operation: 'addedRecapsColumns' });
+      } else {
+        logger.info('✅ ai_recaps table already has all enhancement columns', { component: 'SQLiteAdapter', operation: 'ai_recapsTableAlready' });
+      }
+
+      // Create index on dismissed column after adding it
+      if (insightsColumns.includes('dismissed') || insightsAdded > 0) {
+        try {
+          this.db.exec('CREATE INDEX IF NOT EXISTS idx_ai_insights_dismissed ON ai_insights (dismissed);');
+          logger.info('✅ Created index on ai_insights.dismissed', { component: 'SQLiteAdapter', operation: 'createdDismissedIndex' });
+        } catch (indexError) {
+          // Index might already exist, that's ok
+          logger.debug('Index on dismissed may already exist', { component: 'SQLiteAdapter', operation: 'dismissedIndexExists' });
+        }
+      }
+
+    } catch (error) {
+      logger.error('❌ Failed to migrate AI insights/recaps tables:', { component: 'SQLiteAdapter', operation: 'failedMigrateAiInsights' }, error as Error);
       throw error;
     }
   }

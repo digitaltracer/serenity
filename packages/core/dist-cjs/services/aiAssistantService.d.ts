@@ -4,9 +4,9 @@
  */
 import { Task, JournalEntry } from '../types';
 import { AIInsight, AIRecap } from '../store/slices/aiAssistantSlice';
-export interface AIApiResponse {
+export interface AIApiResponse<T = unknown> {
     success: boolean;
-    data?: any;
+    data?: T;
     error?: string;
     usage?: {
         promptTokens: number;
@@ -35,27 +35,81 @@ export interface RecapRequest {
     tasks: Task[];
     journalEntries: JournalEntry[];
 }
+export interface PreprocessedTask {
+    id: string;
+    title: string;
+    description: string;
+    completed: boolean;
+    priority: string;
+    tags: string[];
+    createdAt: Date;
+    updatedAt: Date;
+    dueDate?: Date;
+    daysSinceCreated: number;
+    isOverdue: boolean;
+    completionTime: number | null;
+}
+export interface PreprocessedJournalEntry {
+    id: string;
+    content: string;
+    mood?: string;
+    tags: string[];
+    createdAt: Date;
+    updatedAt: Date;
+    wordCount: number;
+    dayOfWeek: number;
+    hourOfDay: number;
+}
+export interface GoalSuggestion {
+    title: string;
+    description: string;
+    type: 'weekly_tasks' | 'project_tasks' | 'priority_tasks' | 'daily_streak' | 'journal_weekly' | 'completion_rate';
+    priority: 'low' | 'medium' | 'high';
+    targetCount?: number;
+    timeframe: 'daily' | 'weekly' | 'monthly';
+    reasoning: string;
+    confidence: number;
+}
 export declare class AIAssistantService {
+    /**
+     * Generate goal suggestions based on user activity patterns
+     */
+    static generateGoalSuggestions(data: {
+        tasks: Task[];
+        journalEntries: JournalEntry[];
+        existingGoals?: any[];
+    }): GoalSuggestion[];
     /**
      * Preprocess tasks for AI analysis
      * Removes sensitive information and structures data
      */
-    static preprocessTasks(tasks: Task[]): any[];
+    static preprocessTasks(tasks: Task[]): PreprocessedTask[];
+    /**
+     * Generate basic, local insights without calling external providers.
+     * Provides a sensible fallback when no provider is configured.
+     */
+    static generateLocalInsights(tasks: Task[], journalEntries: JournalEntry[]): {
+        type: "productivity" | "behavior" | "recommendation" | "warning";
+        title: string;
+        description: string;
+        category: "tasks" | "journal" | "habits" | "goals";
+        actionable?: boolean;
+        confidence: number;
+        metadata?: Record<string, unknown>;
+    }[];
     /**
      * Preprocess journal entries for AI analysis
      * Removes sensitive information and structures data
      */
-    static preprocessJournalEntries(entries: JournalEntry[]): any[];
+    static preprocessJournalEntries(entries: JournalEntry[]): PreprocessedJournalEntry[];
     /**
      * Generate prompts for behavioral analysis
      */
     static generateInsightPrompts(data: {
-        tasks: any[];
-        journalEntries: any[];
+        tasks: PreprocessedTask[];
+        journalEntries: PreprocessedJournalEntry[];
         dataTypes: string[];
-    }): {
-        [key: string]: string;
-    };
+    }): Record<string, string>;
     /**
      * Generate prompts for recap generation
      */
@@ -65,8 +119,8 @@ export declare class AIAssistantService {
             start: string;
             end: string;
         };
-        tasks: any[];
-        journalEntries: any[];
+        tasks: PreprocessedTask[];
+        journalEntries: PreprocessedJournalEntry[];
     }): string;
     /**
      * Filter new data that hasn't been analyzed yet
@@ -132,6 +186,15 @@ export declare class AIAssistantService {
         apiEndpoint: string;
         keyPrefix: string;
     };
+    /**
+     * Apply quality scoring, filtering, deduplication, and ranking to insights
+     * This is the integration point for InsightQualityService
+     */
+    static applyQualityScoring(rawInsights: AIInsight[], context?: {
+        previousInsights?: AIInsight[];
+        focusAreas?: string[];
+        recentCategories?: string[];
+        minimumQuality?: number;
+    }): AIInsight[];
 }
 export default AIAssistantService;
-//# sourceMappingURL=aiAssistantService.d.ts.map

@@ -266,4 +266,3 @@ export declare class DataClassificationManager {
  * Export utilities
  */
 export { getEncryptionConfig };
-//# sourceMappingURL=encryption.d.ts.map

@@ -3,4 +3,3 @@ export declare const sampleProjects: Project[];
 export declare const sampleTasks: Task[];
 export declare const sampleJournalEntries: JournalEntry[];
 export declare const initializeWithSampleData: (dispatch: any) => void;
-//# sourceMappingURL=sampleData.d.ts.map

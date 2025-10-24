@@ -5,6 +5,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GitHubService = void 0;
+const logger_1 = require("../utils/logger");
 class GitHubService {
     /**
      * Validate GitHub access token and get user info
@@ -47,31 +48,31 @@ class GitHubService {
      * This includes ALL repositories where the user can create PRs, not just owned ones
      */
     static async getAllAccessibleRepositories(accessToken) {
-        console.log('🚀 getAllAccessibleRepositories called - fetching comprehensive repository list...');
+        logger_1.logger.info('🚀 getAllAccessibleRepositories called - fetching comprehensive repository list...', { component: 'githubService', operation: 'getallaccessiblerepositoriesCalledFetching' });
         const allRepos = [];
         // Get owned and collaborated repositories
-        console.log('📂 Fetching owned + collaborator + organization_member repositories...');
+        logger_1.logger.info('📂 Fetching owned + collaborator + organization_member repositories...', { component: 'githubService', operation: 'fetchingOwnedCollaborator' });
         await this.fetchRepositoriesFromEndpoint(accessToken, '/user/repos?affiliation=owner,collaborator,organization_member&sort=updated', allRepos);
-        console.log(`📊 Found ${allRepos.length} repositories from user/repos with comprehensive affiliation`);
+        logger_1.logger.info(`📊 Found ${allRepos.length} repositories from user/repos with comprehensive affiliation`, { component: 'githubService', operation: 'found${allrepos.length}Repositories' });
         // Also get repositories from organizations the user belongs to
         try {
-            console.log('🏢 Fetching user organizations...');
+            logger_1.logger.info('🏢 Fetching user organizations...', { component: 'githubService', operation: 'fetchingUserOrganizations...' });
             const orgs = await this.getUserOrganizations(accessToken);
-            console.log(`🏢 Found ${orgs.length} organizations: ${orgs.map(org => org.login).join(', ')}`);
+            logger_1.logger.info(`🏢 Found ${orgs.length} organizations: ${orgs.map(org => org.login).join(', ')}`, { component: 'githubService', operation: 'found${orgs.length}Organizations:' });
             for (const org of orgs) {
                 const beforeCount = allRepos.length;
                 await this.fetchRepositoriesFromEndpoint(accessToken, `/orgs/${org.login}/repos?sort=updated`, allRepos, org.login);
-                console.log(`📊 Added ${allRepos.length - beforeCount} repositories from organization ${org.login}`);
+                logger_1.logger.info(`📊 Added ${allRepos.length - beforeCount} repositories from organization ${org.login}`, { component: 'githubService', operation: 'added${allrepos.lengthBeforecount}' });
             }
         }
         catch (error) {
-            console.warn('⚠️ Could not fetch organization repositories:', error);
+            logger_1.logger.warn('⚠️ Could not fetch organization repositories', { component: 'githubService', operation: 'couldNotFetch' });
         }
-        console.log(`📊 Total repositories before deduplication: ${allRepos.length}`);
+        logger_1.logger.info(`📊 Total repositories before deduplication: ${allRepos.length}`, { component: 'githubService', operation: 'totalRepositoriesBefore' });
         // Remove duplicates based on repository ID
         const uniqueRepos = allRepos.filter((repo, index, self) => index === self.findIndex(r => r.id === repo.id));
-        console.log(`📚 Found ${uniqueRepos.length} total accessible repositories (owned + collaborator + org) after deduplication`);
-        console.log(`🔍 Sample repositories: ${uniqueRepos.slice(0, 5).map(r => r.full_name).join(', ')}${uniqueRepos.length > 5 ? '...' : ''}`);
+        logger_1.logger.info(`📚 Found ${uniqueRepos.length} total accessible repositories (owned + collaborator + org) after deduplication`, { component: 'githubService', operation: 'found${uniquerepos.length}Total' });
+        logger_1.logger.info(`🔍 Sample repositories: ${uniqueRepos.slice(0, 5).map(r => r.full_name).join(', ')}${uniqueRepos.length > 5 ? '...' : ''}`, { component: 'githubService', operation: 'operation' });
         return uniqueRepos;
     }
     /**
@@ -93,7 +94,7 @@ class GitHubService {
             });
             if (!response.ok) {
                 if (response.status === 403) {
-                    console.warn(`Access denied to ${orgName || 'repositories'}: ${response.statusText}`);
+                    logger_1.logger.warn(`Access denied to ${orgName || 'repositories'}: ${response.statusText}`, { component: 'githubService', operation: 'accessDenied' });
                     break;
                 }
                 throw new Error(`GitHub repositories request failed: ${response.statusText}`);
@@ -130,9 +131,9 @@ class GitHubService {
      */
     static async getRecentActiveRepositories(accessToken) {
         const user = await this.validateToken(accessToken);
-        console.log('🔍 Getting all accessible repositories for recent activity check...');
+        logger_1.logger.info('🔍 Getting all accessible repositories for recent activity check...', { component: 'githubService', operation: 'gettingAllAccessible' });
         const allRepos = await this.getAllAccessibleRepositories(accessToken); // Get ALL accessible repositories
-        console.log(`📚 Found ${allRepos.length} accessible repositories to check for recent activity`);
+        logger_1.logger.info(`📚 Found ${allRepos.length} accessible repositories to check for recent activity`, { component: 'githubService', operation: 'found${allrepos.length}Accessible' });
         // Filter to repositories where user has made recent commits or PRs
         const activeRepos = [];
         for (const repo of allRepos.slice(0, 20)) { // Check first 20 repos for activity
@@ -149,7 +150,7 @@ class GitHubService {
             }
             catch (error) {
                 // Skip repos we can't access or have errors
-                console.warn(`Could not check activity for ${repo.full_name}:`, error);
+                logger_1.logger.warn(`Could not check activity for ${repo.full_name}: ${error}`, { component: 'githubService', operation: 'couldNotCheck' });
                 continue;
             }
         }
@@ -238,7 +239,7 @@ class GitHubService {
                 allCommits.push(...commits);
             }
             catch (error) {
-                console.error(`Failed to fetch commits for ${repoFullName}:`, error);
+                logger_1.logger.error(`Failed to fetch commits for ${repoFullName}:`, { component: 'githubService', operation: 'failedFetchCommits' }, error);
                 // Continue with other repositories
             }
         }
@@ -258,7 +259,7 @@ class GitHubService {
                 allPullRequests.push(...pullRequests);
             }
             catch (error) {
-                console.error(`Failed to fetch pull requests for ${repoFullName}:`, error);
+                logger_1.logger.error(`Failed to fetch pull requests for ${repoFullName}:`, { component: 'githubService', operation: 'failedFetchPull' }, error);
                 // Continue with other repositories
             }
         }
@@ -290,25 +291,25 @@ class GitHubService {
      * This queries ALL pull requests by the user across all tokens, regardless of repository ownership
      */
     static async getTodaysPullRequestsMultiToken(tokens, startOfDay, endOfDay) {
-        console.log(`🚀 Using multi-token approach with ${tokens.length} tokens...`);
+        logger_1.logger.info(`🚀 Using multi-token approach with ${tokens.length} tokens...`, { component: 'githubService', operation: 'usingMulti-tokenApproach' });
         const allPullRequests = [];
         const activeTokens = tokens.filter(t => t.isActive);
         if (activeTokens.length === 0) {
-            console.warn('⚠️ No active tokens found');
+            logger_1.logger.warn('⚠️ No active tokens found', { component: 'githubService', operation: 'activeTokensFound' });
             return [];
         }
-        console.log(`📊 Found ${activeTokens.length} active tokens to query`);
+        logger_1.logger.info(`📊 Found ${activeTokens.length} active tokens to query`, { component: 'githubService', operation: 'found${activetokens.length}Active' });
         // Process all active tokens in parallel for better performance
         const tokenPromises = activeTokens.map(async (tokenInfo) => {
             try {
-                console.log(`🔍 Processing token for user: ${tokenInfo.username}`);
+                logger_1.logger.info(`🔍 Processing token for user: ${tokenInfo.username}`, { component: 'githubService', operation: 'processingTokenFor' });
                 const tokenPRs = await this.getTodaysPullRequestsSingleToken(tokenInfo.token, null, // Use GraphQL for comprehensive PR fetching
                 startOfDay, endOfDay);
-                console.log(`✅ Token ${tokenInfo.username}: Found ${tokenPRs.length} PRs from today`);
+                logger_1.logger.info(`✅ Token ${tokenInfo.username}: Found ${tokenPRs.length} PRs from today`, { component: 'githubService', operation: 'token${tokeninfo.username}:Found' });
                 return tokenPRs;
             }
             catch (error) {
-                console.error(`❌ Failed to fetch PRs for token ${tokenInfo.username}:`, error);
+                logger_1.logger.error(`❌ Failed to fetch PRs for token ${tokenInfo.username}:`, { component: 'githubService', operation: 'failedFetchPrs' }, error);
                 return [];
             }
         });
@@ -320,13 +321,13 @@ class GitHubService {
                 allPullRequests.push(...result.value);
             }
             else {
-                console.error(`❌ Token ${activeTokens[index].username} query failed:`, result.reason);
+                logger_1.logger.error(`❌ Token ${activeTokens[index].username} query failed:`, { component: 'githubService', operation: 'token${activetokens[index].username}Query' }, result.reason);
             }
         });
-        console.log(`📊 Total PRs collected from all tokens: ${allPullRequests.length}`);
+        logger_1.logger.info(`📊 Total PRs collected from all tokens: ${allPullRequests.length}`, { component: 'githubService', operation: 'totalPrsCollected' });
         // Deduplicate PRs by URL (same PR might be accessible through multiple tokens)
         const uniquePRs = this.deduplicatePullRequests(allPullRequests);
-        console.log(`✅ After deduplication: ${uniquePRs.length} unique PRs from today`);
+        logger_1.logger.info(`✅ After deduplication: ${uniquePRs.length} unique PRs from today`, { component: 'githubService', operation: 'afterDeduplication:${uniqueprs.length}' });
         return uniquePRs;
     }
     /**
@@ -354,11 +355,11 @@ class GitHubService {
         const user = await this.validateToken(accessToken);
         // If specific repositories are provided, use the old REST API approach
         if (repositories !== null) {
-            console.log(`📚 Using REST API for ${repositories.length} specified repositories`);
+            logger_1.logger.info(`📚 Using REST API for ${repositories.length} specified repositories`, { component: 'githubService', operation: 'usingRestApi' });
             return this.getTodaysPullRequestsSingleToken(accessToken, repositories, startOfDay, endOfDay);
         }
         // Use GraphQL to query all PRs by the user directly
-        console.log('🚀 Using GitHub GraphQL API to fetch all PRs by user (regardless of repository)...');
+        logger_1.logger.info('🚀 Using GitHub GraphQL API to fetch all PRs by user (regardless of repository)...', { component: 'githubService', operation: 'usingGithubGraphql' });
         const graphqlQuery = `
       query getUserPullRequests($login: String!, $after: String) {
         user(login: $login) {
@@ -398,7 +399,7 @@ class GitHubService {
         try {
             while (hasNextPage && pageCount < 10) { // Limit to 10 pages (1000 PRs max) to avoid excessive API calls
                 pageCount++;
-                console.log(`🔍 Fetching GraphQL page ${pageCount}...`);
+                logger_1.logger.info(`🔍 Fetching GraphQL page ${pageCount}...`, { component: 'githubService', operation: 'fetchingGraphqlPage' });
                 const response = await fetch('https://api.github.com/graphql', {
                     method: 'POST',
                     headers: {
@@ -422,47 +423,47 @@ class GitHubService {
                 }
                 const pullRequests = data.data?.user?.pullRequests;
                 if (!pullRequests) {
-                    console.warn('No pull requests data returned from GraphQL');
+                    logger_1.logger.warn('No pull requests data returned from GraphQL', { component: 'githubService', operation: 'pullRequestsData' });
                     break;
                 }
                 allPullRequests.push(...pullRequests.nodes);
                 hasNextPage = pullRequests.pageInfo.hasNextPage;
                 cursor = pullRequests.pageInfo.endCursor;
-                console.log(`📊 Page ${pageCount}: Found ${pullRequests.nodes.length} PRs, total so far: ${allPullRequests.length}`);
+                logger_1.logger.info(`📊 Page ${pageCount}: Found ${pullRequests.nodes.length} PRs, total so far: ${allPullRequests.length}`, { component: 'githubService', operation: 'operation' });
             }
-            console.log(`📚 GraphQL API returned ${allPullRequests.length} total PRs by user ${user.login}`);
+            logger_1.logger.info(`📚 GraphQL API returned ${allPullRequests.length} total PRs by user ${user.login}`, { component: 'githubService', operation: 'graphqlApiReturned' });
             // Log all PRs returned for debugging
-            console.log('🔍 All PRs returned by GraphQL:');
+            logger_1.logger.info('🔍 All PRs returned by GraphQL:', { component: 'githubService', operation: 'allPrsReturned' });
             allPullRequests.forEach((pr, index) => {
                 const createdDate = new Date(pr.createdAt);
                 const updatedDate = new Date(pr.updatedAt);
-                console.log(`   ${index + 1}. #${pr.number} in ${pr.repository.nameWithOwner}: "${pr.title}"`);
-                console.log(`      State: ${pr.state}, Created: ${createdDate.toISOString()}`);
-                console.log(`      Updated: ${updatedDate.toISOString()}`);
-                console.log(`      Created (local): ${createdDate.toLocaleString()}`);
-                console.log(`      Updated (local): ${updatedDate.toLocaleString()}`);
+                logger_1.logger.info(`   ${index + 1}. #${pr.number} in ${pr.repository.nameWithOwner}: "${pr.title}"`, { component: 'githubService', operation: '${index1}.#${pr.number}' });
+                logger_1.logger.info(`      State: ${pr.state}, Created: ${createdDate.toISOString()}`, { component: 'githubService', operation: 'operation' });
+                logger_1.logger.info(`      Updated: ${updatedDate.toISOString()}`, { component: 'githubService', operation: 'updated:${updateddate.toisostring()}' });
+                logger_1.logger.info(`      Created (local): ${createdDate.toLocaleString()}`, { component: 'githubService', operation: 'created(local):${createddate.tolocalestring()}' });
+                logger_1.logger.info(`      Updated (local): ${updatedDate.toLocaleString()}`, { component: 'githubService', operation: 'updated(local):${updateddate.tolocalestring()}' });
             });
             // Use user's local timezone for date comparison
             const now = new Date();
             const localStartOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const localEndOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-            console.log(`📅 User's local timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
-            console.log(`📅 Local date range for "today": ${localStartOfDay.toLocaleString()} to ${localEndOfDay.toLocaleString()}`);
-            console.log(`📅 UTC date range for "today": ${localStartOfDay.toISOString()} to ${localEndOfDay.toISOString()}`);
+            logger_1.logger.info(`📅 User's local timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, { component: 'githubService', operation: 'user' });
+            logger_1.logger.info(`📅 Local date range for "today": ${localStartOfDay.toLocaleString()} to ${localEndOfDay.toLocaleString()}`, { component: 'githubService', operation: 'localDateRange' });
+            logger_1.logger.info(`📅 UTC date range for "today": ${localStartOfDay.toISOString()} to ${localEndOfDay.toISOString()}`, { component: 'githubService', operation: 'utcDateRange' });
             // Filter PRs that were created or updated today (using local timezone)
             const todaysPullRequests = allPullRequests.filter(pr => {
                 const createdDate = new Date(pr.createdAt);
                 const updatedDate = new Date(pr.updatedAt);
                 const createdToday = createdDate >= localStartOfDay && createdDate <= localEndOfDay;
                 const updatedToday = updatedDate >= localStartOfDay && updatedDate <= localEndOfDay;
-                console.log(`   🔍 PR #${pr.number}: Created ${createdToday ? '✅' : '❌'} today, Updated ${updatedToday ? '✅' : '❌'} today`);
+                logger_1.logger.info(`   🔍 PR #${pr.number}: Created ${createdToday ? '✅' : '❌'} today, Updated ${updatedToday ? '✅' : '❌'} today`, { component: 'githubService', operation: '#${pr.number}:Created${createdtoday' });
                 return createdToday || updatedToday;
             });
-            console.log(`✅ Found ${todaysPullRequests.length} PRs from today (created or updated in local timezone)`);
+            logger_1.logger.info(`✅ Found ${todaysPullRequests.length} PRs from today (created or updated in local timezone)`, { component: 'githubService', operation: 'found${todayspullrequests.length}Prs' });
             if (todaysPullRequests.length > 0) {
-                console.log('📝 Today\'s PRs:');
+                logger_1.logger.info("📝 Today's PRs:", { component: 'githubService', operation: 'todaysPrs' });
                 todaysPullRequests.forEach(pr => {
-                    console.log(`   ✅ #${pr.number} in ${pr.repository.nameWithOwner}: "${pr.title}" (${pr.state})`);
+                    logger_1.logger.info(`   ✅ #${pr.number} in ${pr.repository.nameWithOwner}: "${pr.title}" (${pr.state})`, { component: 'githubService', operation: '#${pr.number}${pr.repository.namewithowner}:' });
                 });
             }
             // Convert GraphQL format to REST API format for compatibility
@@ -489,9 +490,9 @@ class GitHubService {
             return convertedPRs.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
         }
         catch (error) {
-            console.error('❌ GraphQL query failed, falling back to REST API:', error);
+            logger_1.logger.error('❌ GraphQL query failed', { component: 'githubService', operation: 'graphqlQueryFailed' }, error);
             // Fallback to REST API approach with accessible repositories
-            console.log('🔄 Falling back to REST API with comprehensive repository access...');
+            logger_1.logger.info('🔄 Falling back to REST API with comprehensive repository access...', { component: 'githubService', operation: 'fallingBackRest' });
             const allRepos = await this.getAllAccessibleRepositories(accessToken);
             const repoList = allRepos.map(repo => repo.full_name);
             return this.getTodaysPullRequestsREST(accessToken, repoList, startOfDay, endOfDay);
@@ -503,19 +504,19 @@ class GitHubService {
     static async getTodaysPullRequestsREST(accessToken, repositories, startOfDay, endOfDay) {
         const user = await this.validateToken(accessToken);
         const todaysPullRequests = [];
-        console.log(`📚 REST API: Checking PRs from ${repositories.length} repositories`);
+        logger_1.logger.info(`📚 REST API: Checking PRs from ${repositories.length} repositories`, { component: 'githubService', operation: 'restApi:Checking' });
         let reposChecked = 0;
         let totalPRsFound = 0;
         for (const repoFullName of repositories.slice(0, 50)) { // Limit to first 50 repos to avoid excessive API calls
             try {
                 const [owner, repo] = repoFullName.split('/');
                 reposChecked++;
-                console.log(`🔍 Checking repository ${reposChecked}/${Math.min(repositories.length, 50)}: ${repoFullName}`);
+                logger_1.logger.info(`🔍 Checking repository ${reposChecked}/${Math.min(repositories.length, 50)}: ${repoFullName}`, { component: 'githubService', operation: 'operation' });
                 // Get PRs by the authenticated user only
                 const allPRsByUser = await this.getRepositoryPullRequests(accessToken, owner, repo, 'all', // Get all states (open, closed, merged)
                 user.login // Only get PRs created by the authenticated user
                 );
-                console.log(`📊 Repository ${repoFullName}: ${allPRsByUser.length} PRs by user ${user.login}`);
+                logger_1.logger.info(`📊 Repository ${repoFullName}: ${allPRsByUser.length} PRs by user ${user.login}`, { component: 'githubService', operation: 'repository${repofullname}:${allprsbyuser.length}' });
                 totalPRsFound += allPRsByUser.length;
                 // Filter PRs that were created or updated today
                 const todaysPRs = allPRsByUser.filter(pr => {
@@ -526,20 +527,20 @@ class GitHubService {
                     return createdToday || updatedToday;
                 });
                 if (todaysPRs.length > 0) {
-                    console.log(`📝 Found ${todaysPRs.length} PR(s) from today in ${repoFullName}`);
+                    logger_1.logger.info(`📝 Found ${todaysPRs.length} PR(s) from today in ${repoFullName}`, { component: 'githubService', operation: 'found${todaysprs.length}Pr(s)' });
                     for (const pr of todaysPRs) {
-                        console.log(`   ✅ PR #${pr.number}: "${pr.title}" (${pr.state})`);
+                        logger_1.logger.info(`   ✅ PR #${pr.number}: "${pr.title}" (${pr.state})`, { component: 'githubService', operation: '#${pr.number}:' });
                     }
                 }
                 todaysPullRequests.push(...todaysPRs);
             }
             catch (error) {
-                console.error(`❌ Failed to fetch today's pull requests for ${repoFullName}:`, error);
+                logger_1.logger.error(`❌ Failed to fetch today's pull requests for ${repoFullName}:`, { component: 'githubService', operation: 'failedFetchToday' }, error);
                 // Continue with other repositories
             }
         }
-        console.log(`📊 REST API Summary: Checked ${reposChecked} repositories, found ${totalPRsFound} total PRs by user`);
-        console.log(`✅ Total PRs from today: ${todaysPullRequests.length}`);
+        logger_1.logger.info(`📊 REST API Summary: Checked ${reposChecked} repositories, found ${totalPRsFound} total PRs by user`, { component: 'githubService', operation: 'operation' });
+        logger_1.logger.info(`✅ Total PRs from today: ${todaysPullRequests.length}`, { component: 'githubService', operation: 'totalPrsFrom' });
         // Sort by updated date (newest first)
         return todaysPullRequests.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
     }
@@ -556,14 +557,14 @@ class GitHubService {
                 uniquePRs.push(pr);
             }
         }
-        console.log(`🔄 Deduplicated ${pullRequests.length} PRs down to ${uniquePRs.length} unique PRs`);
+        logger_1.logger.info(`🔄 Deduplicated ${pullRequests.length} PRs down to ${uniquePRs.length} unique PRs`, { component: 'githubService', operation: 'deduplicated${pullrequests.length}Prs' });
         return uniquePRs;
     }
     /**
      * Validate multiple GitHub tokens and return their info
      */
     static async validateTokens(tokens) {
-        console.log(`🔍 Validating ${tokens.length} GitHub tokens...`);
+        logger_1.logger.info(`🔍 Validating ${tokens.length} GitHub tokens...`, { component: 'githubService', operation: 'validating${tokens.length}Github' });
         const validationPromises = tokens.map(async (tokenInfo) => {
             try {
                 const userInfo = await this.validateToken(tokenInfo.token);
@@ -617,7 +618,7 @@ class GitHubService {
                 repositoriesByToken: []
             };
         }
-        console.log(`📊 Getting repository stats for ${activeTokens.length} active tokens...`);
+        logger_1.logger.info(`📊 Getting repository stats for ${activeTokens.length} active tokens...`, { component: 'githubService', operation: 'gettingRepositoryStats' });
         const tokenPromises = activeTokens.map(async (tokenInfo) => {
             try {
                 const repos = await this.getAllAccessibleRepositories(tokenInfo.token);
@@ -629,7 +630,7 @@ class GitHubService {
                 };
             }
             catch (error) {
-                console.error(`❌ Failed to get repositories for token ${tokenInfo.username}:`, error);
+                logger_1.logger.error(`❌ Failed to get repositories for token ${tokenInfo.username}:`, { component: 'githubService', operation: 'failedGetRepositories' }, error);
                 return {
                     tokenId: tokenInfo.id,
                     username: tokenInfo.username,
@@ -653,7 +654,7 @@ class GitHubService {
         });
         // Deduplicate repositories by ID
         const uniqueRepos = allRepos.filter((repo, index, self) => index === self.findIndex(r => r.id === repo.id));
-        console.log(`📚 Total unique repositories across all tokens: ${uniqueRepos.length}`);
+        logger_1.logger.info(`📚 Total unique repositories across all tokens: ${uniqueRepos.length}`, { component: 'githubService', operation: 'totalUniqueRepositories' });
         return {
             totalRepositories: uniqueRepos.length,
             repositoriesByToken

@@ -3,44 +3,12 @@
  * Integration sync service
  * Handles syncing data from external services to tasks
  */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IntegrationSyncService = void 0;
 const googleCalendarService_1 = require("./googleCalendarService");
 const githubService_1 = require("./githubService");
 const utils_1 = require("../utils");
+const logger_1 = require("../utils/logger");
 class IntegrationSyncService {
     /**
      * Sync Google Calendar events to tasks
@@ -86,13 +54,13 @@ class IntegrationSyncService {
                         };
                         syncedTasks.push(updatedTask);
                         result.tasksUpdated++;
-                        console.log(`📝 Updated existing calendar task: ${event.summary}`);
+                        logger_1.logger.info(`📝 Updated existing calendar task: ${event.summary}`, { component: 'integrationSyncService', operation: 'updatedExistingCalendar' });
                     }
                     else {
                         // Create new task
                         syncedTasks.push(task);
                         result.tasksCreated++;
-                        console.log(`📋 Created new calendar task: ${event.summary}`);
+                        logger_1.logger.info(`📋 Created new calendar task: ${event.summary}`, { component: 'integrationSyncService', operation: 'createdNewCalendar' });
                     }
                 }
                 catch (error) {
@@ -125,8 +93,7 @@ class IntegrationSyncService {
             let githubProjectId;
             if (!githubProject) {
                 // Create Github project
-                const { generateId } = await Promise.resolve().then(() => __importStar(require('../utils')));
-                githubProjectId = generateId();
+                githubProjectId = (0, utils_1.generateId)();
                 githubProject = {
                     id: githubProjectId,
                     name: 'Github',
@@ -136,21 +103,21 @@ class IntegrationSyncService {
                     createdAt: new Date(),
                     updatedAt: new Date()
                 };
-                console.log('📁 Created new "Github" project for synced items');
+                logger_1.logger.info('📁 Created new "Github" project for synced items', { component: 'integrationSyncService', operation: 'createdNew' });
                 result.errors.push('CREATED_GITHUB_PROJECT'); // Signal to caller to create project
             }
             else {
                 githubProjectId = githubProject.id;
-                console.log('📁 Using existing "Github" project:', githubProjectId);
+                logger_1.logger.info('📁 Using existing "Github" project', { component: 'integrationSyncService', operation: 'usingExisting', metadata: { githubProjectId } });
             }
             // Get today's date range in user's local timezone (start of day to end of day)
             const today = new Date();
             const localStartOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
             const localEndOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
-            console.log(`🕒 Using local timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
-            console.log(`📅 Local "today" range: ${localStartOfDay.toLocaleString()} to ${localEndOfDay.toLocaleString()}`);
+            logger_1.logger.info(`🕒 Using local timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, { component: 'integrationSyncService', operation: 'usingLocalTimezone:' });
+            logger_1.logger.info(`📅 Local "today" range: ${localStartOfDay.toLocaleString()} to ${localEndOfDay.toLocaleString()}`, { component: 'integrationSyncService', operation: 'local' });
             // Fetch pull requests from today across ALL accessible repositories (owned + collaborator + org)
-            console.log('🔍 Syncing GitHub PRs from ALL accessible repositories (owned + collaborator + org)...');
+            logger_1.logger.info('🔍 Syncing GitHub PRs from ALL accessible repositories (owned + collaborator + org)...', { component: 'integrationSyncService', operation: 'syncingGithubPrs' });
             const pullRequests = await githubService_1.GitHubService.getTodaysPullRequests(accessToken, null, // null = fetch from all repositories, not just displayed ones
             localStartOfDay, localEndOfDay);
             const syncedTasks = [];
@@ -166,10 +133,10 @@ class IntegrationSyncService {
                     if (!existingTask) {
                         syncedTasks.push(task);
                         result.tasksCreated++;
-                        console.log(`📋 Created task for PR: ${pr.title} (${pr.repository.name})`);
+                        logger_1.logger.info(`📋 Created task for PR: ${pr.title} (${pr.repository.name})`, { component: 'integrationSyncService', operation: 'createdTaskFor' });
                     }
                     else {
-                        console.log(`⏭️ Skipped existing PR: ${pr.title} (${pr.repository.name})`);
+                        logger_1.logger.info(`⏭️ Skipped existing PR: ${pr.title} (${pr.repository.name})`, { component: 'integrationSyncService', operation: 'skippedExistingPr:' });
                     }
                 }
                 catch (error) {

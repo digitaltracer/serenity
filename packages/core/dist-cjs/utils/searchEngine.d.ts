@@ -119,4 +119,3 @@ export declare class SearchEngine {
     private trackQuery;
 }
 export declare const searchEngine: SearchEngine;
-//# sourceMappingURL=searchEngine.d.ts.map

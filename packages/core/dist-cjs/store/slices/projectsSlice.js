@@ -5,13 +5,14 @@ exports.selectProjectsError = exports.selectProjectsLoading = exports.selectActi
 const toolkit_1 = require("@reduxjs/toolkit");
 const utils_1 = require("../../utils");
 const persistence_1 = require("../../utils/persistence");
+const logger_1 = require("../../utils/logger");
 // Load projects from localStorage on initialization
 const initialProjects = (() => {
     try {
         return (0, persistence_1.loadProjects)();
     }
     catch (error) {
-        console.error('Failed to load projects from storage:', error);
+        logger_1.logger.error('Failed to load projects from storage:', { component: 'projectsSlice', operation: 'failedLoadProjects' }, error);
         return [];
     }
 })();

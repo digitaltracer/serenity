@@ -61,4 +61,3 @@ export declare const shouldIgnoreShortcuts: (target: EventTarget | null) => bool
  * Get shortcut conflicts (same key combination)
  */
 export declare const getShortcutConflicts: (shortcuts: KeyboardShortcut[]) => KeyboardShortcut[][];
-//# sourceMappingURL=keyboardShortcuts.d.ts.map

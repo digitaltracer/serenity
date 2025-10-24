@@ -61,5 +61,54 @@ export {
   selectAIUsage,
 } from './slices/aiAssistantSlice';
 export { default as aiAssistantReducer } from './slices/aiAssistantSlice';
+// Export insights slice
+export type {
+  AIInsightEnhanced,
+  AIRecapEnhanced,
+  KPIMetrics,
+  TimeRange,
+  InsightsFilters,
+  RecapsFilters,
+  InsightsState
+} from './slices/insightsSlice';
+export {
+  // Async thunks
+  fetchDashboardData,
+  fetchInsights,
+  dismissInsight,
+  rateInsight,
+  markInsightHelpful,
+  addInsightNote,
+  fetchRecaps,
+  toggleRecapFavorite,
+  markRecapViewed,
+  fetchKPIMetrics,
+  // Actions
+  setTimeRange,
+  setTimeRangePreset,
+  setInsightsFilters,
+  setRecapsFilters,
+  clearKPIs,
+  restoreKPIs,
+  // Selectors
+  selectKPIs,
+  selectInsights,
+  selectRecaps,
+  selectTimeRange,
+  selectInsightsFilters,
+  selectRecapsFilters,
+  selectIsLoadingDashboard,
+  selectIsLoadingInsights,
+  selectIsLoadingRecaps,
+  selectIsLoadingKPIs,
+  selectLastRefresh,
+  selectInsightsErrors,
+  selectLastInsightsError,
+  selectNonDismissedInsights,
+  selectInsightsByCategory,
+  selectFavoritedRecaps,
+  selectRecapsByType,
+} from './slices/insightsSlice';
+export { default as insightsReducer } from './slices/insightsSlice';
 export * from './slices/goalsSlice';
 export * from './slices/sampleData';

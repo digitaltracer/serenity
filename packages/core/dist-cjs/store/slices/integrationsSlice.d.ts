@@ -110,4 +110,3 @@ export declare const selectIsSyncing: (state: {
 export declare const selectLastSyncError: (state: {
     integrations: IntegrationsState;
 }) => string | undefined;
-//# sourceMappingURL=integrationsSlice.d.ts.map

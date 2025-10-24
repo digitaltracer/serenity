@@ -82,14 +82,16 @@ Before running Serenity Notes locally, ensure you have:
 git clone https://github.com/your-username/serenity-notes.git
 cd serenity-notes
 
-# Install dependencies (automatically rebuilds native modules)
+# Install dependencies (automatically builds all packages and rebuilds native modules)
 npm install
-
-# Build shared packages
-npm run build
 ```
 
-**Important**: The installation automatically rebuilds native modules (like better-sqlite3) for your specific Node.js/Electron version, ensuring compatibility across different computers.
+**Important**: The installation automatically:
+- Rebuilds native modules (like better-sqlite3) for your specific Node.js/Electron version
+- Builds all packages in the correct order (core → database → ui → desktop)
+- Generates both ESM and CommonJS outputs for maximum compatibility
+
+If you encounter any "Cannot find module" errors, run `npm run clean && npm run build` to clear stale build caches.
 
 ### 2. Database Setup (Optional)
 
@@ -369,13 +371,14 @@ npm run test:watch
 
 ### Common Issues
 
-1. **Build Failures**
+1. **Build Failures / "Cannot find module" errors**
    ```bash
-   # Clean and rebuild
+   # Clean stale build caches and rebuild
    npm run clean
-   npm install
    npm run build
    ```
+
+   **Note**: The `npm install` postinstall hook automatically builds all packages, but if you encounter module resolution errors (especially `dist-cjs/index.js` not found), running `clean` then `build` will clear stale TypeScript incremental build caches.
 
 2. **Database Connection Issues**
    - Verify PostgreSQL is running: `brew services list | grep postgresql`

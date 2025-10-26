@@ -2,6 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Documentation
+
+**Comprehensive documentation available in `/docs/` folder:**
+
+- **`docs/STATUS.md`** - Current implementation status (what's working, what's not)
+- **`docs/DEVELOPMENT.md`** - Development patterns, best practices, how-tos
+- **`docs/architecture/decisions/`** - Architecture Decision Records (ADRs)
+  - ADR-001: SQLite as Primary Database
+  - ADR-002: AI Insights Context Continuity
+  - ADR-003: Turborepo Monorepo Structure
+  - ADR-004: Electron IPC Architecture
+- **`docs/features/`** - Feature-specific documentation
+  - `ai-insights.md` - AI Insights architecture and usage
+  - `database.md` - Database schema, migrations, best practices
+  - `ipc-communication.md` - IPC architecture and patterns
+- **`docs/api/`** - Auto-generated API reference (run `npm run docs:generate`)
+
+**Before implementing features, check:**
+1. `docs/STATUS.md` - Is it already implemented?
+2. `docs/architecture/decisions/` - Are there relevant ADRs?
+3. `docs/features/` - Is there a feature guide?
+4. `docs/DEVELOPMENT.md` - Are there relevant patterns?
+
 ## Plan & Review
 
 ### Before starting work
@@ -95,9 +118,15 @@ serenity/
     ├── core/                  # Business logic, Redux store, utilities
     │   ├── src/
     │   │   ├── store/         # Redux Toolkit setup
-    │   │   │   ├── slices/    # Redux slices (tasks, journal, auth, ui, goals, etc.)
+    │   │   │   ├── slices/    # Redux slices (tasks, journal, auth, ui, goals, insights, etc.)
     │   │   │   └── middleware/# Custom middleware (persistence, error handling)
-    │   │   ├── services/      # Core services (AI, integrations, encryption)
+    │   │   ├── services/      # Core services
+    │   │   │   ├── AI services: aiAssistantService, aiPreprocessingService
+    │   │   │   │              promptEngineeringService, insightQualityService
+    │   │   │   │              userProfileService, themeTrackingService
+    │   │   │   ├── Integrations: googleCalendarService, githubService
+    │   │   │   │               integrationSyncService, encryptedIntegrationService
+    │   │   │   └── Other: actionabilityService, feedbackService, visualizationService
     │   │   ├── database/      # DatabaseManager (adapter pattern)
     │   │   ├── utils/         # Utilities (logger, crypto, privacy, secureStorage)
     │   │   ├── types/         # TypeScript type definitions
@@ -138,6 +167,11 @@ serenity/
 - **Optional**: PostgreSQL for server deployments
 - **Adapters**: `SQLiteAdapter` and `PostgresAdapter` implement common `DatabaseOperations` interface
 - **Queries**: Separate implementations in `packages/database/src/queries/sqlite/` and `packages/database/src/queries/postgres/`
+- **AI Insights Tables** (SQLite):
+  - `ai_insights`: Stores all AI-generated insights with quality scores and metadata
+  - `analysis_summaries`: Stores summaries of each analysis session for context continuity (automatically limited to last 10 summaries)
+  - `insight_themes`: Tracks recurring themes across insights with occurrence counts and severity trends
+  - Schema migrations are automatic on app startup via `SQLiteAdapter.initialize()`
 
 #### 3. State Management
 - **Redux Toolkit** with multiple slices:
@@ -161,12 +195,19 @@ serenity/
 - **CSP**: Content Security Policy enforcement
 - **Sandboxing**: Renderer process runs in sandbox with restricted Node.js access
 
-#### 5. AI Services
+#### 5. AI Services & Insights Architecture
 - **AIPreprocessingService**: Smart data summarization, temporal weighting, entity extraction
-- **PromptEngineeringService**: Context-rich prompts with chain-of-thought reasoning
+- **PromptEngineeringService**: Context-rich prompts with chain-of-thought reasoning, includes previous analysis summaries for longitudinal tracking
 - **InsightQualityService**: Multi-dimensional quality scoring (relevance, actionability, novelty)
 - **UserProfileService**: User behavior profiling for personalized insights
-- See `AI-IMPROVEMENTS-SUMMARY.md` for detailed architecture
+- **ThemeTrackingService**: Automatic theme extraction from insights using pattern matching (12 predefined themes)
+- **AI Analysis Modes**:
+  - **Incremental** (default): Analyzes only new/updated tasks and journals since last analysis
+  - **Window**: Analyzes specific date ranges (e.g., "last 7 days", "monthly review")
+  - **Full**: Re-analyzes all data regardless of previous analyses
+- **Context Continuity**: After each analysis, a summary is generated and stored in the `analysis_summaries` table. Future analyses automatically include previous summaries in the prompt, enabling the AI to track longitudinal patterns, identify improvements, and detect worsening trends.
+- **Insight Evolution Tracking**: Insights are categorized into themes (procrastination, burnout, focus_issues, etc.) and tracked over time with occurrence counts and severity trends (improving/stable/worsening).
+- See `AI-INSIGHTS-IMPLEMENTATION-SUMMARY.md` for complete implementation details
 
 #### 6. Module System & Build
 - **core package**: Dual build (ESM + CommonJS) to support both Electron main and renderer
@@ -195,6 +236,63 @@ serenity/
 2. Update both SQLite and PostgreSQL adapters
 3. Add migration script in `packages/database/src/migrations/`
 4. Update query functions in `packages/database/src/queries/sqlite/` and `packages/database/src/queries/postgres/`
+
+### Working with AI Insights
+The AI Insights system has three main components:
+
+**1. Generating Insights**
+```typescript
+// In renderer or IPC handler
+await window.api.analyzeData({
+  provider: 'anthropic',
+  dataTypes: ['tasks', 'journal'],
+  analysisMode: 'incremental',  // 'incremental' | 'window' | 'full'
+  timeWindow: {                   // optional, for 'window' mode
+    start: '2025-10-01',
+    end: '2025-10-31'
+  }
+});
+```
+
+**2. Context Continuity (Automatic)**
+- Analysis summaries are automatically generated and stored after each analysis
+- Previous summaries (last 2-3) are automatically included in future prompts
+- No manual intervention needed - the system handles longitudinal tracking
+
+**3. Theme Tracking (Optional Integration)**
+```typescript
+import { ThemeTrackingService } from '@serenity/core';
+
+// Extract theme from an insight
+const theme = ThemeTrackingService.extractTheme(insight);
+
+if (theme) {
+  // Get or create theme in database
+  const themeRow = await sqliteService.ai.getOrCreateTheme(
+    theme.themeName,
+    insight.category
+  );
+
+  // Track occurrence and update severity trend
+  await sqliteService.ai.trackThemeOccurrence(
+    themeRow.id,
+    insight.id,
+    theme.confidence
+  );
+}
+```
+
+**Database Operations**
+```typescript
+// Get recent analysis summaries
+const summaries = await sqliteService.getRecentAnalysisSummaries(3);
+
+// Get recurring themes
+const themes = await sqliteService.ai.getRecurringThemes();
+
+// Cleanup old summaries (keeps last 10)
+await sqliteService.deleteOldAnalysisSummaries(10);
+```
 
 ### Adding UI Components
 1. Add to `packages/ui/src/components/` if reusable across apps
@@ -270,3 +368,25 @@ See `.env.example` for configuration options:
 - Native module rebuilding required when switching Node.js/Electron versions
 - Dual module system (ESM + CJS) required for Electron compatibility
 - Renderer cannot directly access Node.js APIs (use IPC through preload)
+
+## Documentation Maintenance
+
+**When making changes, update documentation:**
+
+### For New Features
+1. Create ADR in `docs/architecture/decisions/` if architectural decision
+2. Create or update feature doc in `docs/features/`
+3. Add JSDoc comments to new services/methods
+4. Run `npm run docs:generate` to update API docs
+5. Update `docs/STATUS.md` with new status
+
+### For Bug Fixes
+1. Update feature doc if behavior changes
+2. Update `docs/STATUS.md` if changing status (⚠️ → ✅)
+
+### For Refactoring
+1. Create ADR if changing architecture
+2. Update affected feature docs
+3. Regenerate API docs if interfaces changed
+
+**Documentation workflow prevents knowledge loss and speeds up future development.**

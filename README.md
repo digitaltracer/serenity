@@ -6,6 +6,12 @@
 
 ## 🚀 Recent Major Improvements
 
+**AI Insights Enhancements (October 2025):**
+- ✅ **Context Continuity**: AI now remembers previous analyses and tracks longitudinal patterns
+- ✅ **Time-Window Analysis**: Analyze specific time periods (last 7 days, monthly reviews, etc.)
+- ✅ **Insight Evolution Tracking**: Automatically tracks recurring themes and calculates trends (improving/worsening)
+- ✅ **Smart Preprocessing**: Intelligent data summarization with quality scoring and entity extraction
+
 **Production-Ready Enhancements (January 2025):**
 - ✅ **Advanced Security**: Enhanced cryptographic security with dynamic salt generation and secure session management
 - ✅ **Performance Optimized**: Fixed N+1 database queries (~98% performance improvement)
@@ -19,7 +25,8 @@
 
 - **ActionHub**: Advanced task management with subtasks, drag & drop, bulk operations, and smart analytics
 - **Journal**: Private, secure journaling with rich text editing, mood tracking, and tagging
-- **Analytics**: AI-powered productivity insights with interactive charts and activity heatmaps
+- **AI Insights**: Context-aware productivity analysis with pattern tracking, time-window reviews, and longitudinal trend analysis
+- **Analytics**: Interactive charts and activity heatmaps with AI-powered insights
 - **Security**: Master password protection with biometric authentication and encrypted storage
 - **Integrations**: Google Calendar and GitHub synchronization with encrypted token storage
 - **Keyboard Shortcuts**: 40+ cross-platform shortcuts with beautiful help modal

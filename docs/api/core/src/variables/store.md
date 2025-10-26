@@ -1,0 +1,11 @@
+[**serenity-notes v0.1.0**](../../../README.md)
+
+***
+
+[serenity-notes](../../../README.md) / [core/src](../README.md) / store
+
+# Variable: store
+
+> `const` **store**: `ToolkitStore`\<\{ `tasks`: [`TasksState`](../interfaces/TasksState.md); `projects`: [`ProjectsState`](../interfaces/ProjectsState.md); `journal`: [`JournalState`](../interfaces/JournalState.md); `user`: [`UserState`](../interfaces/UserState.md); `ui`: [`UIState`](../interfaces/UIState.md); `tags`: [`TagsState`](../interfaces/TagsState.md); `auth`: [`AuthState`](../interfaces/AuthState.md); `database`: [`DatabaseState`](../interfaces/DatabaseState.md); `shortcuts`: [`ShortcutsState`](../interfaces/ShortcutsState.md); `search`: [`SearchState`](../interfaces/SearchState.md); `dragDrop`: [`DragDropReduxState`](../interfaces/DragDropReduxState.md); `goals`: [`GoalsState`](../interfaces/GoalsState.md); `integrations`: [`IntegrationsState`](../interfaces/IntegrationsState.md); `aiAssistant`: [`AIAssistantState`](../interfaces/AIAssistantState.md); `insights`: [`InsightsState`](../interfaces/InsightsState.md); \}, `AnyAction`, `MiddlewareArray`\<\[`ThunkMiddleware`\<\{ `tasks`: [`TasksState`](../interfaces/TasksState.md); `projects`: [`ProjectsState`](../interfaces/ProjectsState.md); `journal`: [`JournalState`](../interfaces/JournalState.md); `user`: [`UserState`](../interfaces/UserState.md); `ui`: [`UIState`](../interfaces/UIState.md); `tags`: [`TagsState`](../interfaces/TagsState.md); `auth`: [`AuthState`](../interfaces/AuthState.md); `database`: [`DatabaseState`](../interfaces/DatabaseState.md); `shortcuts`: [`ShortcutsState`](../interfaces/ShortcutsState.md); `search`: [`SearchState`](../interfaces/SearchState.md); `dragDrop`: [`DragDropReduxState`](../interfaces/DragDropReduxState.md); `goals`: [`GoalsState`](../interfaces/GoalsState.md); `integrations`: [`IntegrationsState`](../interfaces/IntegrationsState.md); `aiAssistant`: [`AIAssistantState`](../interfaces/AIAssistantState.md); `insights`: [`InsightsState`](../interfaces/InsightsState.md); \}, `AnyAction`\>, `Middleware`\<\{ \}, `any`, `Dispatch`\<`AnyAction`\>\>\]\>\>
+
+Defined in: [packages/core/src/store/enhancedStore.ts:71](https://github.com/digitaltracer/serenity/blob/improv/code-improvements/packages/core/src/store/enhancedStore.ts#L71)

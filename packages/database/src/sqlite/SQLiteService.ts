@@ -283,6 +283,46 @@ export class SQLiteService {
     return this.ai!.getRecapsFiltered(filters);
   }
 
+  // ===== ANALYSIS SUMMARIES =====
+
+  async addAnalysisSummary(summary: {
+    summary_text: string;
+    key_themes?: string[] | string;
+    tracked_patterns?: unknown[] | string;
+    user_focus_areas?: string[] | string;
+    tasks_analyzed?: number;
+    journals_analyzed?: number;
+    insights_generated?: number;
+  }): Promise<string> {
+    this.ensureInitialized();
+    return this.ai!.addAnalysisSummary(summary as any);
+  }
+
+  async getRecentAnalysisSummaries(limit: number = 3) {
+    this.ensureInitialized();
+    return this.ai!.getRecentAnalysisSummaries(limit);
+  }
+
+  async getAllAnalysisSummaries(limit: number = 50) {
+    this.ensureInitialized();
+    return this.ai!.getAllAnalysisSummaries(limit);
+  }
+
+  async getAnalysisSummaryById(id: string) {
+    this.ensureInitialized();
+    return this.ai!.getAnalysisSummaryById(id);
+  }
+
+  async deleteOldAnalysisSummaries(keepCount: number = 10): Promise<number> {
+    this.ensureInitialized();
+    return this.ai!.deleteOldAnalysisSummaries(keepCount);
+  }
+
+  async getAnalysisSummariesByDateRange(startDate: string, endDate: string) {
+    this.ensureInitialized();
+    return this.ai!.getAnalysisSummariesByDateRange(startDate, endDate);
+  }
+
   // ===== GOAL OPERATIONS =====
 
   async getGoals(): Promise<Goal[]> {

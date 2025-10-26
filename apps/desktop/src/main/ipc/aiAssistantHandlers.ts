@@ -64,7 +64,12 @@ const AISettingsSchema = z.object({
 const AnalyzeOptionsSchema = z.object({
   provider: ProviderSchema,
   dataTypes: z.array(z.string()),
-  forceReAnalyze: z.boolean().optional(),
+  forceReAnalyze: z.boolean().optional(), // deprecated, use analysisMode instead
+  analysisMode: z.enum(['incremental', 'window', 'full']).optional(),
+  timeWindow: z.object({
+    start: z.string(),
+    end: z.string(),
+  }).optional(),
   tasks: z.array(z.any()).optional(),
   journalEntries: z.array(z.any()).optional(),
   analysisTracker: z.any().optional(),
@@ -1200,7 +1205,9 @@ export function registerAIAssistantHandlers(): void {
   ipcMain.handle('ai-assistant:analyze-data', async (event, options: {
     provider: 'openai' | 'gemini' | 'anthropic';
     dataTypes: string[];
-    forceReAnalyze?: boolean;
+    forceReAnalyze?: boolean; // deprecated, use analysisMode instead
+    analysisMode?: 'incremental' | 'window' | 'full';
+    timeWindow?: { start: string; end: string };
     tasks?: any[];
     journalEntries?: any[];
     analysisTracker?: any;
@@ -1244,24 +1251,120 @@ export function registerAIAssistantHandlers(): void {
         }
       }
       
-      // Filter unanalyzed data if not forcing re-analysis
+      // Determine analysis mode (support backward compatibility with forceReAnalyze)
+      const analysisMode = options.analysisMode || (options.forceReAnalyze ? 'full' : 'incremental');
+
+      logger.info(`📋 Analysis mode: ${analysisMode}`, {
+        component: 'Aiassistanthandlers',
+        operation: 'analysisMode',
+        metadata: {
+          mode: analysisMode,
+          hasTimeWindow: !!options.timeWindow,
+          hasTracker: !!options.analysisTracker
+        }
+      });
+
+      // Filter data based on analysis mode
       let analyzeTasks = tasks;
       let analyzeJournalEntries = journalEntries;
-      
-      if (!options.forceReAnalyze && options.analysisTracker) {
-        logger.info(`🔍 Filtering data based on analysis tracker...`, { component: 'Aiassistanthandlers', operation: 'if' });
-        const filtered = AIAssistantService.filterUnanalyzedData(
-          tasks,
-          journalEntries,
-          options.analysisTracker
-        );
-        analyzeTasks = filtered.newTasks;
-        analyzeJournalEntries = filtered.newJournalEntries;
-        
-        logger.info(`📊 After filtering: ${analyzeTasks.length} new tasks, ${analyzeJournalEntries.length} new journal entries`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`📈 Previously analyzed: ${options.analysisTracker.totalTasksAnalyzed} tasks, ${options.analysisTracker.totalJournalEntriesAnalyzed} journal entries`, { component: 'Aiassistanthandlers', operation: 'analyze' });
-      } else if (options.forceReAnalyze) {
-        logger.info(`🔄 Force re-analysis enabled, analyzing all ${tasks.length} tasks and ${journalEntries.length} journal entries`, { component: 'Aiassistanthandlers', operation: 'if' });
+
+      switch (analysisMode) {
+        case 'incremental':
+          // Only analyze new/updated data since last analysis
+          if (options.analysisTracker) {
+            logger.info(`🔍 Incremental mode: Filtering data based on analysis tracker...`, {
+              component: 'Aiassistanthandlers',
+              operation: 'incrementalMode'
+            });
+            const filtered = AIAssistantService.filterUnanalyzedData(
+              tasks,
+              journalEntries,
+              options.analysisTracker
+            );
+            analyzeTasks = filtered.newTasks;
+            analyzeJournalEntries = filtered.newJournalEntries;
+
+            logger.info(`📊 Incremental filtering complete: ${analyzeTasks.length} new tasks, ${analyzeJournalEntries.length} new journal entries`, {
+              component: 'Aiassistanthandlers',
+              operation: 'incrementalComplete',
+              metadata: {
+                newTasks: analyzeTasks.length,
+                newJournals: analyzeJournalEntries.length,
+                previouslyAnalyzedTasks: options.analysisTracker.totalTasksAnalyzed || 0,
+                previouslyAnalyzedJournals: options.analysisTracker.totalJournalEntriesAnalyzed || 0
+              }
+            });
+          } else {
+            logger.info(`⚠️ Incremental mode requested but no tracker found, analyzing all data`, {
+              component: 'Aiassistanthandlers',
+              operation: 'incrementalNoTracker'
+            });
+          }
+          break;
+
+        case 'window':
+          // Analyze data within specific time range
+          if (options.timeWindow) {
+            const startDate = new Date(options.timeWindow.start);
+            const endDate = new Date(options.timeWindow.end);
+
+            logger.info(`📅 Window mode: Filtering data between ${options.timeWindow.start} and ${options.timeWindow.end}`, {
+              component: 'Aiassistanthandlers',
+              operation: 'windowMode',
+              metadata: {
+                startDate: options.timeWindow.start,
+                endDate: options.timeWindow.end
+              }
+            });
+
+            // Filter tasks within time window
+            analyzeTasks = tasks.filter((task: any) => {
+              const taskDate = new Date(task.updatedAt || task.createdAt);
+              return taskDate >= startDate && taskDate <= endDate;
+            });
+
+            // Filter journal entries within time window
+            analyzeJournalEntries = journalEntries.filter((entry: any) => {
+              const entryDate = new Date(entry.createdAt || entry.date);
+              return entryDate >= startDate && entryDate <= endDate;
+            });
+
+            logger.info(`📊 Window filtering complete: ${analyzeTasks.length} tasks, ${analyzeJournalEntries.length} journal entries`, {
+              component: 'Aiassistanthandlers',
+              operation: 'windowComplete',
+              metadata: {
+                tasksInWindow: analyzeTasks.length,
+                journalsInWindow: analyzeJournalEntries.length,
+                totalTasks: tasks.length,
+                totalJournals: journalEntries.length
+              }
+            });
+          } else {
+            logger.warn(`⚠️ Window mode requested but no timeWindow provided, falling back to all data`, {
+              component: 'Aiassistanthandlers',
+              operation: 'windowNoTimeWindow'
+            });
+          }
+          break;
+
+        case 'full':
+          // Analyze all data (re-analyze everything)
+          logger.info(`🔄 Full mode: Re-analyzing all ${tasks.length} tasks and ${journalEntries.length} journal entries`, {
+            component: 'Aiassistanthandlers',
+            operation: 'fullMode',
+            metadata: {
+              totalTasks: tasks.length,
+              totalJournals: journalEntries.length
+            }
+          });
+          // analyzeTasks and analyzeJournalEntries already set to all tasks/journals
+          break;
+
+        default:
+          logger.warn(`⚠️ Unknown analysis mode: ${analysisMode}, defaulting to incremental`, {
+            component: 'Aiassistanthandlers',
+            operation: 'unknownMode'
+          });
       }
       
       // Check if we have data to analyze
@@ -1466,8 +1569,48 @@ export function registerAIAssistantHandlers(): void {
         });
       }
 
+      // Fetch previous analysis summaries for context continuity
+      let previousSummaries: Array<{
+        created_at: string;
+        summary_text: string;
+        key_themes: string;
+        tracked_patterns: string;
+      }> = [];
+      logger.info('📚 Fetching previous analysis summaries for context continuity...', {
+        component: 'Aiassistanthandlers',
+        operation: 'previous-summaries'
+      });
+      try {
+        const { sqliteService } = await import('@serenity/database');
+        await sqliteService.initialize();
+        const recentSummaries = await sqliteService.getRecentAnalysisSummaries(2); // Get last 2 summaries
+        previousSummaries = recentSummaries.map((s: any) => ({
+          created_at: s.created_at,
+          summary_text: s.summary_text,
+          key_themes: s.key_themes,
+          tracked_patterns: s.tracked_patterns
+        }));
+        logger.info(`✅ Fetched ${previousSummaries.length} previous analysis summaries`, {
+          component: 'Aiassistanthandlers',
+          operation: 'previous-summaries-success',
+          metadata: {
+            summariesCount: previousSummaries.length,
+            oldestSummary: previousSummaries.length > 0 ? previousSummaries[previousSummaries.length - 1].created_at : null
+          }
+        });
+      } catch (summariesError) {
+        logger.warn('⚠️ Could not fetch previous analysis summaries', {
+          component: 'Aiassistanthandlers',
+          operation: 'previous-summaries-warning'
+        });
+      }
+
       if (previousInsights.length > 0 && promptContext) {
         (promptContext as any).previousInsights = previousInsights;
+      }
+
+      if (previousSummaries.length > 0 && promptContext) {
+        (promptContext as any).previousAnalyses = previousSummaries;
       }
 
       logger.info('🔨 Generating enhanced prompt...', { component: 'Aiassistanthandlers', operation: 'prompt-generate' });
@@ -1680,6 +1823,38 @@ export function registerAIAssistantHandlers(): void {
             logger.info('🧪 Persisted insights sample (first 3):', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: sample } });
           } catch {}
         }
+
+        // Generate and store analysis summary for context continuity
+        if (allInsights.length > 0) {
+          logger.info('📝 Generating analysis summary for context continuity...', {
+            component: 'Aiassistanthandlers',
+            operation: 'generatingSummary'
+          });
+
+          const analysisSummary = AIAssistantService.generateAnalysisSummary({
+            insights: allInsights,
+            tasksAnalyzed: analyzeTasks.length,
+            journalsAnalyzed: analyzeJournalEntries.length,
+            userProfile: userProfile ? {
+              focusAreas: userProfile.focusAreas,
+              activeGoals: userProfile.activeGoals,
+              commonTags: userProfile.commonTags
+            } : undefined
+          });
+
+          const summaryId = await sqliteService.addAnalysisSummary(analysisSummary);
+
+          logger.info('✅ Analysis summary stored successfully', {
+            component: 'Aiassistanthandlers',
+            operation: 'summaryStored',
+            metadata: {
+              summaryId,
+              themes: analysisSummary.key_themes.length,
+              patterns: analysisSummary.tracked_patterns.length
+            }
+          });
+        }
+
         // Usage will be persisted via Redux middleware when fulfilled action is dispatched
       } catch (persistError) {
         logger.error('⚠️ Failed to persist AI insights to database:', { component: 'Aiassistanthandlers', operation: 'catch' }, persistError as Error);

@@ -25,6 +25,7 @@ export * from './services/userProfileService';
 export { VisualizationService } from './services/visualizationService';
 export * from './services/actionabilityService';
 export * from './services/feedbackService';
+export { ThemeTrackingService } from './services/themeTrackingService';
 // Export secure storage functions
 export { 
   savePostgreSQLConfigSecure,

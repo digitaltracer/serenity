@@ -17,6 +17,7 @@ export * from './services/userProfileService';
 export { VisualizationService } from './services/visualizationService';
 export * from './services/actionabilityService';
 export * from './services/feedbackService';
+export { ThemeTrackingService } from './services/themeTrackingService';
 export { savePostgreSQLConfigSecure, getPostgreSQLConfigSecure, removePostgreSQLConfigSecure } from './utils/secureStorage';
 export { needsPasswordMigration, migratePasswordHash } from './utils/privacy';
 export { store, initializeStoreData, getDatabaseStats, checkSQLiteAvailability } from './store/enhancedStore';

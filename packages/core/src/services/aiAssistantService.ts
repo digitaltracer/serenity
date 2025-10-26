@@ -724,6 +724,127 @@ Keep the tone positive, encouraging, and forward-looking while being honest abou
   }
 
   /**
+   * Generate an analysis summary from insights for context continuity
+   * This summary will be used in future analyses to track longitudinal patterns
+   */
+  static generateAnalysisSummary(params: {
+    insights: AIInsight[];
+    tasksAnalyzed: number;
+    journalsAnalyzed: number;
+    userProfile?: {
+      focusAreas: string[];
+      activeGoals: Array<{ title: string; type: string }>;
+      commonTags: Array<{ tag: string; frequency: number }>;
+    };
+  }): {
+    summary_text: string;
+    key_themes: string[];
+    tracked_patterns: Array<{ pattern: string; confidence: number; category: string }>;
+    user_focus_areas: string[];
+    tasks_analyzed: number;
+    journals_analyzed: number;
+    insights_generated: number;
+  } {
+    const { insights, tasksAnalyzed, journalsAnalyzed, userProfile } = params;
+
+    // Extract key themes from insights (top themes by frequency and importance)
+    const themeMap = new Map<string, { count: number; totalConfidence: number }>();
+
+    insights.forEach(insight => {
+      // Extract theme from insight type and category
+      const theme = `${insight.category}_${insight.type}`;
+      const existing = themeMap.get(theme) || { count: 0, totalConfidence: 0 };
+      themeMap.set(theme, {
+        count: existing.count + 1,
+        totalConfidence: existing.totalConfidence + insight.confidence
+      });
+    });
+
+    // Get top 5 themes sorted by frequency and confidence
+    const keyThemes = Array.from(themeMap.entries())
+      .map(([theme, data]) => ({
+        theme,
+        score: data.count * data.totalConfidence
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map(t => t.theme);
+
+    // Extract tracked patterns from high-confidence insights
+    const trackedPatterns = insights
+      .filter(insight => insight.confidence >= 0.6) // Only track high-confidence patterns
+      .map(insight => ({
+        pattern: insight.title,
+        confidence: insight.confidence,
+        category: insight.category
+      }))
+      .slice(0, 10); // Keep top 10 patterns
+
+    // Get user focus areas from profile
+    const userFocusAreas = userProfile?.focusAreas || [];
+
+    // Generate summary text
+    const topInsights = insights
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 3);
+
+    const summaryParts: string[] = [];
+
+    // Overview
+    summaryParts.push(
+      `Analyzed ${tasksAnalyzed} tasks and ${journalsAnalyzed} journal entries, generating ${insights.length} insights.`
+    );
+
+    // Top insights
+    if (topInsights.length > 0) {
+      summaryParts.push('\n\nKey Findings:');
+      topInsights.forEach((insight, idx) => {
+        summaryParts.push(`\n${idx + 1}. ${insight.title} (confidence: ${(insight.confidence * 100).toFixed(0)}%)`);
+      });
+    }
+
+    // User focus
+    if (userFocusAreas.length > 0) {
+      summaryParts.push(`\n\nCurrent Focus Areas: ${userFocusAreas.slice(0, 3).join(', ')}`);
+    }
+
+    // Active goals
+    if (userProfile?.activeGoals && userProfile.activeGoals.length > 0) {
+      const goalTitles = userProfile.activeGoals.slice(0, 3).map(g => g.title);
+      summaryParts.push(`\n\nActive Goals: ${goalTitles.join(', ')}`);
+    }
+
+    // Common tags/themes
+    if (userProfile?.commonTags && userProfile.commonTags.length > 0) {
+      const topTags = userProfile.commonTags.slice(0, 3).map(t => t.tag);
+      summaryParts.push(`\n\nCommon Themes: ${topTags.join(', ')}`);
+    }
+
+    const summary_text = summaryParts.join('');
+
+    logger.info('📝 Generated analysis summary', {
+      component: 'aiAssistantService',
+      operation: 'generatedAnalysisSummary',
+      metadata: {
+        insightsCount: insights.length,
+        keyThemesCount: keyThemes.length,
+        trackedPatternsCount: trackedPatterns.length,
+        summaryLength: summary_text.length
+      }
+    });
+
+    return {
+      summary_text,
+      key_themes: keyThemes,
+      tracked_patterns: trackedPatterns,
+      user_focus_areas: userFocusAreas,
+      tasks_analyzed: tasksAnalyzed,
+      journals_analyzed: journalsAnalyzed,
+      insights_generated: insights.length
+    };
+  }
+
+  /**
    * Apply quality scoring, filtering, deduplication, and ranking to insights
    * This is the integration point for InsightQualityService
    */

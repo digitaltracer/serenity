@@ -13,6 +13,12 @@ export interface PromptContext {
         type: string;
         title: string;
     }>;
+    previousAnalyses?: Array<{
+        created_at: string;
+        summary_text: string;
+        key_themes: string;
+        tracked_patterns: string;
+    }>;
     currentPriorities?: string[];
     timeframe?: string;
     userPreferences?: {

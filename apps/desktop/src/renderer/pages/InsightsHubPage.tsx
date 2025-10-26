@@ -11,6 +11,8 @@ import {
   selectIsLoadingRecaps,
   selectNonDismissedInsights,
   selectFavoritedRecaps,
+  selectAllTasks,
+  selectAllEntries,
   // Redux actions
   fetchDashboardData,
   setTimeRangePreset,
@@ -20,6 +22,8 @@ import {
   addInsightNote,
   fetchRecaps,
   toggleRecapFavorite,
+  // Services
+  VisualizationService,
   // Types
   type AppDispatch,
   type AIInsightEnhanced,
@@ -63,12 +67,18 @@ export const InsightsHubPage: React.FC = () => {
   const isLoadingDashboard = useSelector(selectIsLoadingDashboard);
   const isLoadingInsights = useSelector(selectIsLoadingInsights);
   const isLoadingRecaps = useSelector(selectIsLoadingRecaps);
+  const tasks = useSelector(selectAllTasks);
+  const journalEntries = useSelector(selectAllEntries);
 
   // Local state
   const [selectedTimeRange, setSelectedTimeRange] = useState<'7d' | '30d' | '90d' | 'year'>('7d');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'tasks' | 'journal' | 'habits' | 'goals'>('all');
   const [selectedTab, setSelectedTab] = useState<'overview' | 'trends' | 'insights' | 'recaps'>('overview');
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+
+  // Trend visualization controls
+  const [selectedMetric, setSelectedMetric] = useState<'completion' | 'mood' | 'productivity' | 'velocity'>('completion');
+  const [selectedGranularity, setSelectedGranularity] = useState<'day' | 'week' | 'month'>('day');
 
   // Load dashboard data on mount
   useEffect(() => {
@@ -162,6 +172,41 @@ export const InsightsHubPage: React.FC = () => {
   const handleToggleFavorite = (id: string, favorited: boolean) => {
     dispatch(toggleRecapFavorite({ id, favorited }));
   };
+
+  // Helper: Convert time range preset to TimeRange object
+  const getTimeRangeFromPreset = (preset: '7d' | '30d' | '90d' | 'year'): { start: Date; end: Date } => {
+    const end = new Date();
+    const start = new Date();
+
+    switch (preset) {
+      case '7d':
+        start.setDate(end.getDate() - 7);
+        break;
+      case '30d':
+        start.setDate(end.getDate() - 30);
+        break;
+      case '90d':
+        start.setDate(end.getDate() - 90);
+        break;
+      case 'year':
+        start.setFullYear(end.getFullYear() - 1);
+        break;
+    }
+
+    return { start, end };
+  };
+
+  // Generate trend data based on selected metric, granularity, and time range
+  const trendData = React.useMemo(() => {
+    const timeRangeObj = getTimeRangeFromPreset(selectedTimeRange);
+    return VisualizationService.generateTrendData(
+      tasks,
+      journalEntries,
+      selectedMetric,
+      selectedGranularity,
+      timeRangeObj
+    );
+  }, [tasks, journalEntries, selectedMetric, selectedGranularity, selectedTimeRange]);
 
   return (
     <div className="flex-1 h-full bg-background">
@@ -429,15 +474,155 @@ export const InsightsHubPage: React.FC = () => {
             {/* Trends Tab */}
             {selectedTab === 'trends' && (
               <div className="space-y-6">
-                <div className="text-center py-12">
-                  <TrendingUp className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                    Trend Visualizations Coming Soon
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-                    Interactive charts and trend analysis will be available in the next phase.
-                  </p>
-                </div>
+                {/* Controls */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex flex-wrap items-center gap-4">
+                      {/* Metric Selector */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Metric:
+                        </span>
+                        <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                          <button
+                            onClick={() => setSelectedMetric('completion')}
+                            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                              selectedMetric === 'completion'
+                                ? 'bg-blue-500 text-white'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                            }`}
+                          >
+                            Completion
+                          </button>
+                          <button
+                            onClick={() => setSelectedMetric('mood')}
+                            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                              selectedMetric === 'mood'
+                                ? 'bg-blue-500 text-white'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                            }`}
+                          >
+                            Mood
+                          </button>
+                          <button
+                            onClick={() => setSelectedMetric('productivity')}
+                            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                              selectedMetric === 'productivity'
+                                ? 'bg-blue-500 text-white'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                            }`}
+                          >
+                            Productivity
+                          </button>
+                          <button
+                            onClick={() => setSelectedMetric('velocity')}
+                            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                              selectedMetric === 'velocity'
+                                ? 'bg-blue-500 text-white'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                            }`}
+                          >
+                            Velocity
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Granularity Selector */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Granularity:
+                        </span>
+                        <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                          <button
+                            onClick={() => setSelectedGranularity('day')}
+                            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                              selectedGranularity === 'day'
+                                ? 'bg-blue-500 text-white'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                            }`}
+                          >
+                            Daily
+                          </button>
+                          <button
+                            onClick={() => setSelectedGranularity('week')}
+                            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                              selectedGranularity === 'week'
+                                ? 'bg-blue-500 text-white'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                            }`}
+                          >
+                            Weekly
+                          </button>
+                          <button
+                            onClick={() => setSelectedGranularity('month')}
+                            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                              selectedGranularity === 'month'
+                                ? 'bg-blue-500 text-white'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                            }`}
+                          >
+                            Monthly
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Trend Chart */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-blue-500" />
+                      {selectedMetric === 'completion' && 'Task Completion Trend'}
+                      {selectedMetric === 'mood' && 'Mood Trend'}
+                      {selectedMetric === 'productivity' && 'Productivity Score Trend'}
+                      {selectedMetric === 'velocity' && 'Task Velocity Trend'}
+                    </CardTitle>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      {selectedMetric === 'completion' && 'Track how many tasks you complete over time'}
+                      {selectedMetric === 'mood' && 'Monitor your average mood from journal entries'}
+                      {selectedMetric === 'productivity' && 'Visualize your productivity score trends'}
+                      {selectedMetric === 'velocity' && 'Measure your task completion velocity'}
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {trendData.length === 0 ? (
+                      <div className="text-center py-12">
+                        <BarChart3 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                          No data available
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+                          {selectedMetric === 'mood'
+                            ? 'Create journal entries with mood ratings to see your mood trends.'
+                            : 'Complete tasks to see your trend data.'}
+                        </p>
+                      </div>
+                    ) : (
+                      <TrendChart
+                        data={trendData}
+                        type="area"
+                        height={400}
+                        color={
+                          selectedMetric === 'completion' ? '#3b82f6' :
+                          selectedMetric === 'mood' ? '#10b981' :
+                          selectedMetric === 'productivity' ? '#8b5cf6' :
+                          '#f59e0b'
+                        }
+                        showGrid={true}
+                        showLegend={false}
+                        yAxisLabel={
+                          selectedMetric === 'completion' ? 'Tasks Completed' :
+                          selectedMetric === 'mood' ? 'Average Mood' :
+                          selectedMetric === 'productivity' ? 'Score (%)' :
+                          'Tasks/Day'
+                        }
+                        xAxisLabel="Time"
+                      />
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             )}
 

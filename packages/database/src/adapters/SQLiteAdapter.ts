@@ -291,6 +291,12 @@ export class SQLiteAdapter {
 
       // Migration: Add feedback and visualization columns to AI insights and recaps
       await this.migrateAIInsightsEnhancements();
+
+      // Migration: Create analysis_summaries table for context continuity
+      await this.migrateAnalysisSummaries();
+
+      // Migration: Create insight_themes table and add theme tracking columns
+      await this.migrateInsightThemes();
     } catch (error) {
       logger.error('Failed to create database schema:', { component: 'SQLiteAdapter', operation: 'failedCreateDatabase' }, error as Error);
       throw error;
@@ -498,6 +504,178 @@ export class SQLiteAdapter {
 
     } catch (error) {
       logger.error('❌ Failed to migrate AI insights/recaps tables:', { component: 'SQLiteAdapter', operation: 'failedMigrateAiInsights' }, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Migrate analysis_summaries table for context continuity
+   * Creates the analysis_summaries table if it doesn't exist
+   */
+  private async migrateAnalysisSummaries(): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      // Check if analysis_summaries table exists
+      const tableExists = this.db.prepare(`
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='analysis_summaries'
+      `).get();
+
+      if (!tableExists) {
+        logger.info('🔄 Creating analysis_summaries table for context continuity...', {
+          component: 'SQLiteAdapter',
+          operation: 'creatingAnalysisSummariesTable'
+        });
+
+        this.db.exec(`
+          CREATE TABLE analysis_summaries (
+            id TEXT PRIMARY KEY,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            summary_text TEXT NOT NULL,
+            key_themes TEXT, -- JSON array of theme names
+            tracked_patterns TEXT, -- JSON array of pattern objects
+            user_focus_areas TEXT, -- JSON array of focus areas
+            tasks_analyzed INTEGER DEFAULT 0,
+            journals_analyzed INTEGER DEFAULT 0,
+            insights_generated INTEGER DEFAULT 0
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_analysis_summaries_created_at
+            ON analysis_summaries (created_at);
+        `);
+
+        logger.info('✅ analysis_summaries table created successfully', {
+          component: 'SQLiteAdapter',
+          operation: 'analysisSummariesTableCreated'
+        });
+      } else {
+        logger.info('✅ analysis_summaries table already exists', {
+          component: 'SQLiteAdapter',
+          operation: 'analysisSummariesTableExists'
+        });
+      }
+    } catch (error) {
+      logger.error('❌ Failed to migrate analysis_summaries table:', {
+        component: 'SQLiteAdapter',
+        operation: 'failedMigrateAnalysisSummaries'
+      }, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Migrate insight_themes table and add theme tracking columns to ai_insights
+   * For tracking recurring patterns across analyses
+   */
+  private async migrateInsightThemes(): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      // Step 1: Create insight_themes table if it doesn't exist
+      const tableExists = this.db.prepare(`
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='insight_themes'
+      `).get();
+
+      if (!tableExists) {
+        logger.info('🔄 Creating insight_themes table for pattern tracking...', {
+          component: 'SQLiteAdapter',
+          operation: 'creatingInsightThemesTable'
+        });
+
+        this.db.exec(`
+          CREATE TABLE insight_themes (
+            id TEXT PRIMARY KEY,
+            theme_name TEXT NOT NULL UNIQUE,
+            category TEXT,
+            first_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            occurrence_count INTEGER DEFAULT 1,
+            severity_trend TEXT,
+            insight_ids TEXT DEFAULT '[]'
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_insight_themes_name
+            ON insight_themes (theme_name);
+          CREATE INDEX IF NOT EXISTS idx_insight_themes_last_seen
+            ON insight_themes (last_seen);
+        `);
+
+        logger.info('✅ insight_themes table created successfully', {
+          component: 'SQLiteAdapter',
+          operation: 'insightThemesTableCreated'
+        });
+      } else {
+        logger.info('✅ insight_themes table already exists', {
+          component: 'SQLiteAdapter',
+          operation: 'insightThemesTableExists'
+        });
+      }
+
+      // Step 2: Add theme tracking columns to ai_insights table
+      const insightsTableInfo = this.db.prepare('PRAGMA table_info(ai_insights)').all() as Array<{
+        cid: number;
+        name: string;
+        type: string;
+        notnull: number;
+        dflt_value: any;
+        pk: number;
+      }>;
+
+      const insightsColumns = insightsTableInfo.map(col => col.name);
+      const columnsToAdd = [
+        { name: 'theme_id', sql: 'ALTER TABLE ai_insights ADD COLUMN theme_id TEXT;' },
+        { name: 'is_recurring', sql: 'ALTER TABLE ai_insights ADD COLUMN is_recurring INTEGER DEFAULT 0;' },
+        { name: 'occurrence_number', sql: 'ALTER TABLE ai_insights ADD COLUMN occurrence_number INTEGER DEFAULT 1;' }
+      ];
+
+      let columnsAdded = 0;
+      for (const column of columnsToAdd) {
+        if (!insightsColumns.includes(column.name)) {
+          logger.info(`🔄 Adding ${column.name} column to ai_insights table...`, {
+            component: 'SQLiteAdapter',
+            operation: `adding${column.name}Column`
+          });
+          this.db.exec(column.sql);
+          columnsAdded++;
+        }
+      }
+
+      if (columnsAdded > 0) {
+        logger.info(`✅ Added ${columnsAdded} theme tracking columns to ai_insights table`, {
+          component: 'SQLiteAdapter',
+          operation: 'addedThemeColumns'
+        });
+
+        // Create index on theme_id
+        try {
+          this.db.exec('CREATE INDEX IF NOT EXISTS idx_ai_insights_theme_id ON ai_insights (theme_id);');
+          logger.info('✅ Created index on ai_insights.theme_id', {
+            component: 'SQLiteAdapter',
+            operation: 'createdThemeIdIndex'
+          });
+        } catch (indexError) {
+          logger.debug('Index on theme_id may already exist', {
+            component: 'SQLiteAdapter',
+            operation: 'themeIdIndexExists'
+          });
+        }
+      } else {
+        logger.info('✅ ai_insights table already has all theme tracking columns', {
+          component: 'SQLiteAdapter',
+          operation: 'themeColumnsExist'
+        });
+      }
+    } catch (error) {
+      logger.error('❌ Failed to migrate insight_themes:', {
+        component: 'SQLiteAdapter',
+        operation: 'failedMigrateInsightThemes'
+      }, error as Error);
       throw error;
     }
   }

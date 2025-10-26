@@ -187,6 +187,38 @@ export declare class AIAssistantService {
         keyPrefix: string;
     };
     /**
+     * Generate an analysis summary from insights for context continuity
+     * This summary will be used in future analyses to track longitudinal patterns
+     */
+    static generateAnalysisSummary(params: {
+        insights: AIInsight[];
+        tasksAnalyzed: number;
+        journalsAnalyzed: number;
+        userProfile?: {
+            focusAreas: string[];
+            activeGoals: Array<{
+                title: string;
+                type: string;
+            }>;
+            commonTags: Array<{
+                tag: string;
+                frequency: number;
+            }>;
+        };
+    }): {
+        summary_text: string;
+        key_themes: string[];
+        tracked_patterns: Array<{
+            pattern: string;
+            confidence: number;
+            category: string;
+        }>;
+        user_focus_areas: string[];
+        tasks_analyzed: number;
+        journals_analyzed: number;
+        insights_generated: number;
+    };
+    /**
      * Apply quality scoring, filtering, deduplication, and ranking to insights
      * This is the integration point for InsightQualityService
      */

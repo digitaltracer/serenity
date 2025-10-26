@@ -15,7 +15,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.selectCompactMode = exports.WebApiPersistenceClient = exports.checkSQLiteAvailability = exports.getDatabaseStats = exports.initializeStoreData = exports.store = exports.migratePasswordHash = exports.needsPasswordMigration = exports.removePostgreSQLConfigSecure = exports.getPostgreSQLConfigSecure = exports.savePostgreSQLConfigSecure = exports.VisualizationService = exports.AIPreprocessingService = exports.EncryptedIntegrationService = exports.secureSessionManager = void 0;
+exports.selectCompactMode = exports.WebApiPersistenceClient = exports.checkSQLiteAvailability = exports.getDatabaseStats = exports.initializeStoreData = exports.store = exports.migratePasswordHash = exports.needsPasswordMigration = exports.removePostgreSQLConfigSecure = exports.getPostgreSQLConfigSecure = exports.savePostgreSQLConfigSecure = exports.ThemeTrackingService = exports.VisualizationService = exports.AIPreprocessingService = exports.EncryptedIntegrationService = exports.secureSessionManager = void 0;
 __exportStar(require("./types"), exports);
 __exportStar(require("./utils"), exports);
 __exportStar(require("./validation"), exports);
@@ -45,6 +45,8 @@ var visualizationService_1 = require("./services/visualizationService");
 Object.defineProperty(exports, "VisualizationService", { enumerable: true, get: function () { return visualizationService_1.VisualizationService; } });
 __exportStar(require("./services/actionabilityService"), exports);
 __exportStar(require("./services/feedbackService"), exports);
+var themeTrackingService_1 = require("./services/themeTrackingService");
+Object.defineProperty(exports, "ThemeTrackingService", { enumerable: true, get: function () { return themeTrackingService_1.ThemeTrackingService; } });
 // Export secure storage functions
 var secureStorage_1 = require("./utils/secureStorage");
 Object.defineProperty(exports, "savePostgreSQLConfigSecure", { enumerable: true, get: function () { return secureStorage_1.savePostgreSQLConfigSecure; } });

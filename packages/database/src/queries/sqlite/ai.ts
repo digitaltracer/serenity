@@ -1,6 +1,29 @@
 import type Database from 'better-sqlite3';
 import { logger } from '@serenity/core';
 
+export interface AnalysisSummaryRow {
+  id: string;
+  created_at: string;
+  summary_text: string;
+  key_themes: string; // JSON array
+  tracked_patterns: string; // JSON array
+  user_focus_areas: string; // JSON array
+  tasks_analyzed: number;
+  journals_analyzed: number;
+  insights_generated: number;
+}
+
+export interface InsightThemeRow {
+  id: string;
+  theme_name: string;
+  category: string;
+  first_seen: string;
+  last_seen: string;
+  occurrence_count: number;
+  severity_trend: string | null; // 'improving', 'stable', 'worsening'
+  insight_ids: string; // JSON array
+}
+
 export interface AIInsightRow {
   id: string;
   provider: 'openai' | 'gemini' | 'anthropic' | 'local';
@@ -311,5 +334,265 @@ export class SQLiteAIQueries {
 
     const stmt = this.db.prepare(sql);
     return stmt.all(...params) as AIRecapRow[];
+  }
+
+  // ===== Analysis Summaries Methods =====
+
+  /**
+   * Add an analysis summary
+   */
+  async addAnalysisSummary(summary: Omit<AnalysisSummaryRow, 'id' | 'created_at'>): Promise<string> {
+    const id = `summary_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const sql = `
+      INSERT INTO analysis_summaries (
+        id, summary_text, key_themes, tracked_patterns,
+        user_focus_areas, tasks_analyzed, journals_analyzed, insights_generated
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const stmt = this.db.prepare(sql);
+    stmt.run(
+      id,
+      summary.summary_text,
+      typeof summary.key_themes === 'string' ? summary.key_themes : JSON.stringify(summary.key_themes || []),
+      typeof summary.tracked_patterns === 'string' ? summary.tracked_patterns : JSON.stringify(summary.tracked_patterns || []),
+      typeof summary.user_focus_areas === 'string' ? summary.user_focus_areas : JSON.stringify(summary.user_focus_areas || []),
+      summary.tasks_analyzed || 0,
+      summary.journals_analyzed || 0,
+      summary.insights_generated || 0
+    );
+
+    logger.info(`✅ Created analysis summary ${id}`, {
+      component: 'ai',
+      operation: 'createdAnalysisSummary',
+      metadata: {
+        tasksAnalyzed: summary.tasks_analyzed,
+        journalsAnalyzed: summary.journals_analyzed,
+        insightsGenerated: summary.insights_generated
+      }
+    });
+
+    return id;
+  }
+
+  /**
+   * Get recent analysis summaries
+   */
+  async getRecentAnalysisSummaries(limit: number = 3): Promise<AnalysisSummaryRow[]> {
+    const sql = `
+      SELECT * FROM analysis_summaries
+      ORDER BY created_at DESC
+      LIMIT ?
+    `;
+
+    const stmt = this.db.prepare(sql);
+    return stmt.all(limit) as AnalysisSummaryRow[];
+  }
+
+  /**
+   * Get all analysis summaries
+   */
+  async getAllAnalysisSummaries(limit: number = 50): Promise<AnalysisSummaryRow[]> {
+    const sql = `
+      SELECT * FROM analysis_summaries
+      ORDER BY created_at DESC
+      LIMIT ?
+    `;
+
+    const stmt = this.db.prepare(sql);
+    return stmt.all(limit) as AnalysisSummaryRow[];
+  }
+
+  /**
+   * Get analysis summary by ID
+   */
+  async getAnalysisSummaryById(id: string): Promise<AnalysisSummaryRow | null> {
+    const sql = `SELECT * FROM analysis_summaries WHERE id = ?`;
+    const stmt = this.db.prepare(sql);
+    return (stmt.get(id) as AnalysisSummaryRow) || null;
+  }
+
+  /**
+   * Delete old analysis summaries (keep only the most recent N)
+   */
+  async deleteOldAnalysisSummaries(keepCount: number = 10): Promise<number> {
+    const sql = `
+      DELETE FROM analysis_summaries
+      WHERE id NOT IN (
+        SELECT id FROM analysis_summaries
+        ORDER BY created_at DESC
+        LIMIT ?
+      )
+    `;
+
+    const stmt = this.db.prepare(sql);
+    const result = stmt.run(keepCount);
+
+    if (result.changes > 0) {
+      logger.info(`✅ Deleted ${result.changes} old analysis summaries`, {
+        component: 'ai',
+        operation: 'deletedOldSummaries',
+        metadata: { deletedCount: result.changes, keptCount: keepCount }
+      });
+    }
+
+    return result.changes;
+  }
+
+  /**
+   * Get analysis summaries within a date range
+   */
+  async getAnalysisSummariesByDateRange(startDate: string, endDate: string): Promise<AnalysisSummaryRow[]> {
+    const sql = `
+      SELECT * FROM analysis_summaries
+      WHERE datetime(created_at) BETWEEN datetime(?) AND datetime(?)
+      ORDER BY created_at DESC
+    `;
+
+    const stmt = this.db.prepare(sql);
+    return stmt.all(startDate, endDate) as AnalysisSummaryRow[];
+  }
+
+  // ===== Insight Themes Methods =====
+
+  /**
+   * Get or create a theme
+   * Returns existing theme or creates a new one
+   */
+  async getOrCreateTheme(themeName: string, category: string): Promise<InsightThemeRow> {
+    // Try to get existing theme
+    const existingTheme = this.db.prepare('SELECT * FROM insight_themes WHERE theme_name = ?').get(themeName) as InsightThemeRow | undefined;
+
+    if (existingTheme) {
+      return existingTheme;
+    }
+
+    // Create new theme
+    const id = `theme_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const sql = `
+      INSERT INTO insight_themes (id, theme_name, category)
+      VALUES (?, ?, ?)
+    `;
+
+    this.db.prepare(sql).run(id, themeName, category);
+
+    logger.info(`✅ Created new theme: ${themeName}`, {
+      component: 'ai',
+      operation: 'createdTheme',
+      metadata: { themeId: id, themeName, category }
+    });
+
+    return this.db.prepare('SELECT * FROM insight_themes WHERE id = ?').get(id) as InsightThemeRow;
+  }
+
+  /**
+   * Track a theme occurrence (update counts and last_seen)
+   */
+  async trackThemeOccurrence(themeId: string, insightId: string, confidence: number): Promise<void> {
+    // Get current theme
+    const theme = this.db.prepare('SELECT * FROM insight_themes WHERE id = ?').get(themeId) as InsightThemeRow;
+    if (!theme) {
+      logger.warn(`⚠️ Theme ${themeId} not found`, { component: 'ai', operation: 'themeNotFound' });
+      return;
+    }
+
+    // Parse insight IDs
+    const insightIds = JSON.parse(theme.insight_ids || '[]');
+    insightIds.push(insightId);
+
+    // Calculate severity trend based on recent confidences
+    const severityTrend = await this.calculateSeverityTrend(themeId, confidence);
+
+    // Update theme
+    const sql = `
+      UPDATE insight_themes
+      SET occurrence_count = occurrence_count + 1,
+          last_seen = CURRENT_TIMESTAMP,
+          insight_ids = ?,
+          severity_trend = ?
+      WHERE id = ?
+    `;
+
+    this.db.prepare(sql).run(JSON.stringify(insightIds), severityTrend, themeId);
+
+    logger.info(`✅ Tracked theme occurrence: ${theme.theme_name} (occurrence #${theme.occurrence_count + 1})`, {
+      component: 'ai',
+      operation: 'trackedTheme',
+      metadata: {
+        themeId,
+        occurrenceCount: theme.occurrence_count + 1,
+        severityTrend
+      }
+    });
+  }
+
+  /**
+   * Calculate severity trend for a theme
+   */
+  private async calculateSeverityTrend(themeId: string, currentConfidence: number): Promise<string> {
+    // Get recent insights for this theme (last 5)
+    const theme = this.db.prepare('SELECT * FROM insight_themes WHERE id = ?').get(themeId) as InsightThemeRow;
+    if (!theme) return 'stable';
+
+    const insightIds = JSON.parse(theme.insight_ids || '[]');
+    if (insightIds.length === 0) return 'stable';
+
+    // Get last 3 insights with confidence scores
+    const recentInsightIds = insightIds.slice(-3);
+    const placeholders = recentInsightIds.map(() => '?').join(',');
+    const sql = `SELECT confidence FROM ai_insights WHERE id IN (${placeholders}) ORDER BY created_at ASC`;
+
+    const recentInsights = this.db.prepare(sql).all(...recentInsightIds) as Array<{ confidence: number }>;
+
+    if (recentInsights.length < 2) return 'stable';
+
+    // Calculate trend: compare average of older insights vs newer insights
+    const olderConfidence = recentInsights[0].confidence;
+    const newerConfidence = currentConfidence;
+
+    const change = newerConfidence - olderConfidence;
+
+    if (change > 0.1) return 'worsening'; // Higher confidence in problem = worsening
+    if (change < -0.1) return 'improving'; // Lower confidence = improving
+    return 'stable';
+  }
+
+  /**
+   * Get all themes
+   */
+  async getAllThemes(limit: number = 100): Promise<InsightThemeRow[]> {
+    const sql = `SELECT * FROM insight_themes ORDER BY last_seen DESC LIMIT ?`;
+    return this.db.prepare(sql).all(limit) as InsightThemeRow[];
+  }
+
+  /**
+   * Get themes by category
+   */
+  async getThemesByCategory(category: string): Promise<InsightThemeRow[]> {
+    const sql = `SELECT * FROM insight_themes WHERE category = ? ORDER BY last_seen DESC`;
+    return this.db.prepare(sql).all(category) as InsightThemeRow[];
+  }
+
+  /**
+   * Get recurring themes (occurred 2+ times)
+   */
+  async getRecurringThemes(): Promise<InsightThemeRow[]> {
+    const sql = `SELECT * FROM insight_themes WHERE occurrence_count >= 2 ORDER BY occurrence_count DESC, last_seen DESC`;
+    return this.db.prepare(sql).all() as InsightThemeRow[];
+  }
+
+  /**
+   * Update insight with theme information
+   */
+  async updateInsightTheme(insightId: string, themeId: string, isRecurring: boolean, occurrenceNumber: number): Promise<void> {
+    const sql = `
+      UPDATE ai_insights
+      SET theme_id = ?,
+          is_recurring = ?,
+          occurrence_number = ?
+      WHERE id = ?
+    `;
+
+    this.db.prepare(sql).run(themeId, isRecurring ? 1 : 0, occurrenceNumber, insightId);
   }
 }

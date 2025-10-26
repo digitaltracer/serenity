@@ -51,6 +51,33 @@ OUTPUT FORMAT:
                 prompt += `\n- Recent Insights Already Provided: ${context.previousInsights.map(i => i.title).join('; ')}`;
                 prompt += '\n  (Avoid repeating these insights unless new data shows significant change)';
             }
+            if (context.previousAnalyses && context.previousAnalyses.length > 0) {
+                prompt += '\n\nPREVIOUS ANALYSIS HISTORY (for longitudinal tracking):';
+                context.previousAnalyses.forEach((analysis, index) => {
+                    const daysAgo = Math.floor((Date.now() - new Date(analysis.created_at).getTime()) / (1000 * 60 * 60 * 24));
+                    prompt += `\n\nAnalysis #${index + 1} (${daysAgo} days ago):`;
+                    // Truncate summary to first 300 chars to save tokens
+                    const summary = analysis.summary_text.length > 300
+                        ? analysis.summary_text.substring(0, 300) + '...'
+                        : analysis.summary_text;
+                    prompt += `\n${summary}`;
+                    // Parse and include key themes
+                    try {
+                        const themes = JSON.parse(analysis.key_themes);
+                        if (themes && themes.length > 0) {
+                            prompt += `\nKey Themes: ${themes.join(', ')}`;
+                        }
+                    }
+                    catch (e) {
+                        // If parsing fails, skip themes
+                    }
+                });
+                prompt += '\n\nIMPORTANT: Compare current data with previous analyses. Identify:';
+                prompt += '\n- Patterns that are improving (celebrate progress!)';
+                prompt += '\n- Patterns that are worsening (provide support and actionable steps)';
+                prompt += '\n- New patterns that just emerged (highlight and explain)';
+                prompt += '\n- Persistent patterns (if appearing 3+ times, provide deeper analysis)';
+            }
             if (context.currentPriorities && context.currentPriorities.length > 0) {
                 prompt += `\n- Current Priorities: ${context.currentPriorities.join(', ')}`;
             }

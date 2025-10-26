@@ -1,0 +1,43 @@
+{
+  "entryPoints": [
+    "packages/core/src/index.ts",
+    "packages/core/src/services/aiAssistantService.ts",
+    "packages/core/src/services/themeTrackingService.ts",
+    "packages/core/src/services/aiPreprocessingService.ts",
+    "packages/core/src/services/promptEngineeringService.ts",
+    "packages/core/src/services/insightQualityService.ts",
+    "packages/core/src/services/userProfileService.ts",
+    "packages/core/src/database/DatabaseManager.ts",
+    "packages/database/src/sqlite/SQLiteService.ts",
+    "packages/database/src/adapters/SQLiteAdapter.ts"
+  ],
+  "out": "docs/api",
+  "plugin": ["typedoc-plugin-markdown"],
+  "readme": "none",
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeInternal": true,
+  "skipErrorChecking": true,
+  "includeVersion": true,
+  "sort": ["source-order"],
+  "kindSortOrder": [
+    "Class",
+    "Interface",
+    "TypeAlias",
+    "Function",
+    "Variable"
+  ],
+  "categorizeByGroup": true,
+  "defaultCategory": "Other",
+  "categoryOrder": [
+    "Services",
+    "Database",
+    "Types",
+    "*"
+  ],
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": true
+  },
+  "gitRevision": "improv/code-improvements"
+}

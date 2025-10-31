@@ -19,6 +19,7 @@ import {
   addUsedTags,
   initializeDatabaseConfig,
   initializeIntegrations,
+  initializeAISettings,
   restoreInsights,
   restoreRecaps,
   logger
@@ -39,7 +40,6 @@ const InsightsHubPage = lazy(() => import('./pages/InsightsHubPage').then(module
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
 const DatabasePage = lazy(() => import('./pages/DatabasePage').then(module => ({ default: module.DatabasePage })));
 const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage').then(module => ({ default: module.IntegrationsPage })));
-const AIAssistantPage = lazy(() => import('./pages/AIAssistantPage').then(module => ({ default: module.AIAssistantPage })));
 
 // Loading fallback component for route transitions
 function RouteLoadingFallback() {
@@ -241,6 +241,18 @@ function AppContent() {
           // Continue with app initialization
         }
         
+        setInitializationStatus('Loading AI settings...');
+
+        // Initialize AI settings and provider state
+        logger.info('Initializing AI settings and provider state', { component: 'App', operation: 'initializeApp' });
+        try {
+          await dispatch(initializeAISettings());
+          logger.info('AI settings initialized successfully', { component: 'App', operation: 'initializeApp' });
+        } catch (error) {
+          logger.error('Failed to initialize AI settings', { component: 'App', operation: 'initializeApp' }, error as Error);
+          // Continue with app initialization even if AI settings fail to load
+        }
+
         setInitializationStatus('Loading AI insights...');
 
         // Load AI insights and recaps from database
@@ -383,7 +395,6 @@ function AppContent() {
                     <Route path="/insights" element={<InsightsHubPage />} />
                     {/* Backward compatibility redirect */}
                     <Route path="/analytics" element={<InsightsHubPage />} />
-                    <Route path="/ai-assistant" element={<AIAssistantPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/database" element={<DatabasePage />} />
                     <Route path="/integrations" element={<IntegrationsPage />} />

@@ -17,11 +17,15 @@ import {
   setActiveProvider,
   setAutoAnalyze,
   setAnalysisFrequency,
+  setApiKey,
+  testApiKey,
+  selectAIUsage,
+  restoreUsage,
   type AIProvider,
 } from '@serenity/core';
-import { 
-  saveDatabaseConnection, 
-  getDatabaseConnection, 
+import {
+  saveDatabaseConnection,
+  getDatabaseConnection,
   isDatabaseConnected,
   savePrivacySettings,
   getPrivacySettings,
@@ -33,7 +37,7 @@ import {
   setMasterPassword,
   initializeAuth
 } from '@serenity/core';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, DatabaseConfigurationModal, PrivacySecurityModal, TagsManager, useToast, Toggle } from '@serenity/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, DatabaseConfigurationModal, PrivacySecurityModal, TagsManager, useToast, Toggle, AIProviderKeyInput, AIUsageSummary, AIOperationHistory, AIUsageTrendChart } from '@serenity/ui';
 import { logger } from '@serenity/core';
 import {
   Settings,
@@ -51,7 +55,8 @@ import {
   Tag,
   Sparkles,
   Brain,
-  Zap
+  Zap,
+  BarChart3
 } from 'lucide-react';
 
 
@@ -67,6 +72,7 @@ export const SettingsPage: React.FC = () => {
   const aiProviders = useSelector(selectAIProviders);
   const activeProvider = useSelector(selectActiveProvider);
   const aiConfiguration = useSelector(selectAIConfiguration);
+  const aiUsage = useSelector(selectAIUsage);
 
   // Local state for features not yet in Redux
   const [notifications, setNotifications] = React.useState(true);
@@ -74,6 +80,7 @@ export const SettingsPage: React.FC = () => {
   const [isDatabaseModalOpen, setIsDatabaseModalOpen] = React.useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = React.useState(false);
   const [isTagsManagerOpen, setIsTagsManagerOpen] = React.useState(false);
+  const [isLoadingUsage, setIsLoadingUsage] = React.useState(false);
   
   // Database connection state - lazy loaded to prevent blocking startup
   const [dbConnection, setDbConnection] = React.useState<any>(null);
@@ -137,6 +144,76 @@ export const SettingsPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
   
+  // Load AI usage data
+  const handleRefreshUsage = async () => {
+    setIsLoadingUsage(true);
+    try {
+      if (window.electronAPI?.aiAssistant?.listUsage) {
+        const result = await window.electronAPI.aiAssistant.listUsage();
+        if (result.success && Array.isArray(result.usage)) {
+          dispatch(restoreUsage(result.usage));
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to load AI usage', { component: 'SettingsPage', operation: 'handleRefreshUsage' }, error as Error);
+    } finally {
+      setIsLoadingUsage(false);
+    }
+  };
+
+  // Load usage on mount
+  React.useEffect(() => {
+    handleRefreshUsage();
+  }, []);
+
+  // AI Provider Handlers
+  const handleSaveApiKey = async (providerId: string, apiKey: string) => {
+    try {
+      await dispatch(setApiKey({ provider: providerId as 'openai' | 'gemini' | 'anthropic', apiKey })).unwrap();
+      showSuccess('API Key Saved', `Successfully saved API key for ${providerId}`);
+      return { success: true };
+    } catch (error: any) {
+      showError('Save Failed', error.message || 'Failed to save API key');
+      return { success: false, error: error.message };
+    }
+  };
+
+  const handleTestApiKey = async (providerId: string) => {
+    try {
+      await dispatch(testApiKey(providerId as 'openai' | 'gemini' | 'anthropic')).unwrap();
+      showSuccess('Connection Successful', `Successfully connected to ${providerId}`);
+      return { success: true };
+    } catch (error: any) {
+      showError('Connection Failed', error.message || 'Failed to connect to provider');
+      return { success: false, error: error.message };
+    }
+  };
+
+  const handleRemoveApiKey = async (providerId: string) => {
+    try {
+      if (window.electronAPI?.aiAssistant?.removeApiKey) {
+        const result = await window.electronAPI.aiAssistant.removeApiKey(providerId as 'openai' | 'gemini' | 'anthropic');
+        if (result.success) {
+          showSuccess('API Key Removed', `Successfully removed API key for ${providerId}`);
+          // Refresh provider state by testing (which will set hasApiKey to false if removed)
+          const providerIdx = aiProviders.findIndex(p => p.id === providerId);
+          if (providerIdx >= 0) {
+            // Force a refresh of the page or reload providers
+            window.location.reload();
+          }
+          return { success: true };
+        } else {
+          showError('Remove Failed', result.error || 'Failed to remove API key');
+          return { success: false, error: result.error };
+        }
+      }
+      return { success: false, error: 'API not available' };
+    } catch (error: any) {
+      showError('Remove Failed', error.message || 'Failed to remove API key');
+      return { success: false, error: error.message };
+    }
+  };
+
   const handleExportData = () => {
     try {
       const exportData = {
@@ -157,16 +234,16 @@ export const SettingsPage: React.FC = () => {
 
       const dataStr = JSON.stringify(exportData, null, 2);
       const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      
+
       const url = URL.createObjectURL(dataBlob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `serenity-export-${new Date().toISOString().split('T')[0]}.json`;
-      
+
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       URL.revokeObjectURL(url);
     } catch (error) {
       logger.error('Export failed:', { component: 'SettingsPage', operation: 'exportFailed:' }, error);
@@ -432,49 +509,33 @@ export const SettingsPage: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Active Provider Selection */}
-            <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20">
-              <div className="flex items-center gap-3 mb-4">
+            {/* API Key Configuration */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 mb-3">
                 <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
                   <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-900 dark:text-gray-100">Active AI Provider</h4>
+                  <h4 className="font-medium text-gray-900 dark:text-gray-100">AI Provider Configuration</h4>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Select which AI provider to use for analysis
+                    Configure API keys for AI providers. Select the active provider with the radio button.
                   </p>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                {aiProviders.map((provider) => (
-                  <button
-                    key={provider.id}
-                    onClick={() => provider.hasApiKey && dispatch(setActiveProvider(provider.id))}
-                    disabled={!provider.hasApiKey}
-                    className={`
-                      p-3 rounded-lg border transition-all text-center
-                      ${activeProvider === provider.id
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                        : provider.hasApiKey
-                          ? 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                          : 'border-gray-100 dark:border-gray-800 opacity-50 cursor-not-allowed'
-                      }
-                    `}
-                  >
-                    <div className="font-medium text-sm">{provider.name}</div>
-                    {provider.hasApiKey ? (
-                      <div className="text-xs text-green-600 dark:text-green-400 mt-1">
-                        {activeProvider === provider.id ? 'Active' : 'Ready'}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-gray-400 mt-1">No API key</div>
-                    )}
-                  </button>
-                ))}
-              </div>
+              {aiProviders.map((provider) => (
+                <AIProviderKeyInput
+                  key={provider.id}
+                  provider={provider}
+                  isActive={activeProvider === provider.id}
+                  onSave={handleSaveApiKey}
+                  onTest={handleTestApiKey}
+                  onRemove={handleRemoveApiKey}
+                  onSetActive={(providerId) => dispatch(setActiveProvider(providerId))}
+                />
+              ))}
               {!activeProvider && (
                 <div className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded">
-                  Please set up an API key for at least one provider to enable AI features
+                  Please set up an API key for at least one provider and select it as active to enable AI features
                 </div>
               )}
             </div>
@@ -569,6 +630,41 @@ export const SettingsPage: React.FC = () => {
             <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
               <p className="text-xs text-blue-700 dark:text-blue-300">
                 <strong>Privacy:</strong> Your data is sent to the selected AI provider for analysis. API keys are stored securely using system encryption.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* AI Usage & Billing */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5" />
+              AI Usage & Billing
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Track your AI token usage across providers. Each AI operation consumes tokens based on the amount of data analyzed and generated. Different providers have different pricing models.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Summary Stats */}
+            <AIUsageSummary
+              usage={aiUsage}
+              onRefresh={handleRefreshUsage}
+              isRefreshing={isLoadingUsage}
+            />
+
+            {/* Trend Charts */}
+            <AIUsageTrendChart usage={aiUsage} />
+
+            {/* Operation History */}
+            <AIOperationHistory usage={aiUsage} />
+
+            {/* Help Text */}
+            <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                <strong>About Token Usage:</strong> Prompt tokens represent the data sent to the AI (your tasks, journal entries, etc.).
+                Completion tokens represent the AI's response (insights, summaries, suggestions). Different models and providers have varying token costs.
               </p>
             </div>
           </CardContent>

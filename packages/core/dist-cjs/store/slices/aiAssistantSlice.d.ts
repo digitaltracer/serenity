@@ -102,6 +102,23 @@ export declare const testApiKey: import("@reduxjs/toolkit").AsyncThunk<{
     fulfilledMeta?: unknown;
     rejectedMeta?: unknown;
 }>;
+export declare const initializeAISettings: import("@reduxjs/toolkit").AsyncThunk<{
+    activeProvider: any;
+    providersWithKeys: any;
+    modelInfo: any;
+    autoAnalyze: any;
+    analysisFrequency: any;
+    dataTypes: any;
+}, void, {
+    state?: unknown;
+    dispatch?: import("redux").Dispatch;
+    extra?: unknown;
+    rejectValue?: unknown;
+    serializedErrorType?: unknown;
+    pendingMeta?: unknown;
+    fulfilledMeta?: unknown;
+    rejectedMeta?: unknown;
+}>;
 export declare const analyzeUserData: import("@reduxjs/toolkit").AsyncThunk<{
     insights: AIInsight[];
     processedData: any;

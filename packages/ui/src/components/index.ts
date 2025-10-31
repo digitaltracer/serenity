@@ -69,6 +69,10 @@ export * from './GoalSuggestions';
 export * from './TagsManager';
 export * from './ProjectIcon';
 export * from './VirtualizedList';
+export * from './AIProviderKeyInput';
+export * from './AIUsageSummary';
+export * from './AIOperationHistory';
+export * from './AIUsageTrendChart';
 // Charts
 export * from './charts';
 // Insights

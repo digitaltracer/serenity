@@ -237,15 +237,32 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
           const provider = action.payload?.provider || state.aiAssistant.activeProvider || 'local';
           const insights = action.payload?.insights || [];
           logger.debug('Analyze fulfilled, persisting insights', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights', metadata: { provider, insightCount: insights.length } });
-          if (Array.isArray(insights) && insights.length > 0) {
-            // Save insights - TODO: add saveInsights to IPC
-            logger.debug('Would save insights via IPC (not yet implemented)', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights' });
-          }
+
+          // Save usage to database via IPC
           const usage = action.payload?.usage;
-          if (usage) {
+          if (usage && typeof window !== 'undefined' && (window as any).electronAPI?.aiAssistant?.saveUsage) {
             logger.debug('Saving AI usage via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights', metadata: { usage } });
-            // Save usage - TODO: add saveUsage to IPC
-            logger.debug('Would save usage via IPC (not yet implemented)', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights' });
+            try {
+              const usageEntry = {
+                provider: provider as 'openai' | 'gemini' | 'anthropic',
+                operation: 'analyze' as const,
+                promptTokens: Number(usage.promptTokens || 0),
+                completionTokens: Number(usage.completionTokens || 0),
+                totalTokens: Number(usage.totalTokens || 0),
+                timestamp: new Date().toISOString(),
+              };
+              (window as any).electronAPI.aiAssistant.saveUsage(usageEntry).then((result: any) => {
+                if (result.success) {
+                  logger.info('✅ AI usage saved to database via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights' });
+                } else {
+                  logger.warn('⚠️ Failed to save AI usage via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights', metadata: { error: result.error } });
+                }
+              }).catch((err: Error) => {
+                logger.error('❌ Error saving AI usage via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights' }, err);
+              });
+            } catch (saveError) {
+              logger.error('❌ Exception while saving AI usage', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistAIInsights' }, saveError as Error);
+            }
           }
         }
       } catch (e) {
@@ -258,16 +275,67 @@ export const simplifiedPersistenceMiddleware: Middleware = (store) => (next) => 
       try {
         localStorage.setItem('serenity_ai_usage', JSON.stringify(state.aiAssistant.usage));
 
-        // Persist to database via IPC - TODO: implement saveUsage IPC method
+        // Persist to database via IPC
         const usageEntry = action.payload;
-        logger.debug('Would save recordUsage via IPC (not yet implemented)', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecordUsage', metadata: { usageEntry } });
+        if (usageEntry && typeof window !== 'undefined' && (window as any).electronAPI?.aiAssistant?.saveUsage) {
+          logger.debug('Saving recordUsage via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecordUsage', metadata: { usageEntry } });
+          (window as any).electronAPI.aiAssistant.saveUsage(usageEntry).then((result: any) => {
+            if (result.success) {
+              logger.info('✅ Record usage saved to database via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecordUsage' });
+            } else {
+              logger.warn('⚠️ Failed to save record usage via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecordUsage', metadata: { error: result.error } });
+            }
+          }).catch((err: Error) => {
+            logger.error('❌ Error saving record usage via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecordUsage' }, err);
+          });
+        }
       } catch (e) {
         logger.error('Failed to persist recordUsage to database via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecordUsage' }, e as Error);
       }
     }
-    if (action.type === 'aiAssistant/generateRecap/fulfilled' || action.type === 'aiAssistant/removeRecap') {
-      try { 
-        localStorage.setItem('serenity_ai_recaps', JSON.stringify(state.aiAssistant.recaps)); 
+
+    // Handle recap generation - save usage to database
+    if (action.type === 'aiAssistant/generateRecap/fulfilled') {
+      try {
+        localStorage.setItem('serenity_ai_recaps', JSON.stringify(state.aiAssistant.recaps));
+        localStorage.setItem('serenity_ai_usage', JSON.stringify(state.aiAssistant.usage));
+
+        // Save recap usage to database via IPC
+        const usage = action.payload?.usage;
+        const provider = action.payload?.provider || state.aiAssistant.activeProvider || 'local';
+        if (usage && typeof window !== 'undefined' && (window as any).electronAPI?.aiAssistant?.saveUsage) {
+          logger.debug('Saving recap usage via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecapUsage', metadata: { usage } });
+          try {
+            const usageEntry = {
+              provider: provider as 'openai' | 'gemini' | 'anthropic',
+              operation: 'recap' as const,
+              promptTokens: Number(usage.promptTokens || 0),
+              completionTokens: Number(usage.completionTokens || 0),
+              totalTokens: Number(usage.totalTokens || 0),
+              timestamp: new Date().toISOString(),
+            };
+            (window as any).electronAPI.aiAssistant.saveUsage(usageEntry).then((result: any) => {
+              if (result.success) {
+                logger.info('✅ Recap usage saved to database via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecapUsage' });
+              } else {
+                logger.warn('⚠️ Failed to save recap usage via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecapUsage', metadata: { error: result.error } });
+              }
+            }).catch((err: Error) => {
+              logger.error('❌ Error saving recap usage via IPC', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecapUsage' }, err);
+            });
+          } catch (saveError) {
+            logger.error('❌ Exception while saving recap usage', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecapUsage' }, saveError as Error);
+          }
+        }
+      } catch (e) {
+        logger.error('Failed to persist recap usage', { component: 'SimplifiedPersistenceMiddleware', operation: 'persistRecapUsage' }, e as Error);
+      }
+    }
+
+    // Handle recap removal - just update localStorage
+    if (action.type === 'aiAssistant/removeRecap') {
+      try {
+        localStorage.setItem('serenity_ai_recaps', JSON.stringify(state.aiAssistant.recaps));
         localStorage.setItem('serenity_ai_usage', JSON.stringify(state.aiAssistant.usage));
       } catch {}
     }

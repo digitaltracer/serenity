@@ -24,11 +24,15 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
   // Convert tasks to calendar events
   const events = useMemo(() => {
     return tasks
-      .filter(task => task.dueDate)
+      .filter(task => {
+        // Show task if it has a due date OR if it's completed and has a completedAt date
+        return task.dueDate || (task.completed && task.completedAt);
+      })
       .map(task => ({
         id: task.id,
         title: task.title,
-        start: task.dueDate,
+        // Use dueDate if available, otherwise use completedAt for completed tasks
+        start: task.dueDate || task.completedAt,
         allDay: true,
         classNames: [
           'serenity-event',

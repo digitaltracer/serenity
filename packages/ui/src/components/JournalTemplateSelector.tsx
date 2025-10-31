@@ -49,12 +49,12 @@ const JournalTemplateSelector: React.FC<JournalTemplateSelectorProps> = ({
       title="Choose a Template"
       size="lg"
     >
-      <div className="space-y-3">
+      <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
           Start your journal entry with a pre-defined template to guide your writing.
         </p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-2">
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {journalTemplates.map((template) => (
             <Card
               key={template.id}
@@ -64,27 +64,27 @@ const JournalTemplateSelector: React.FC<JournalTemplateSelectorProps> = ({
               )}
               onClick={() => handleTemplateSelect(template)}
             >
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-3">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary flex-shrink-0">
                     {templateIcons[template.id] || <BookOpen className="w-6 h-6" />}
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <CardTitle className="text-base font-semibold mb-1">
                       {template.name}
                     </CardTitle>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground line-clamp-2">
                       {template.description}
                     </p>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex flex-wrap gap-1">
+              <CardContent className="py-3">
+                <div className="flex flex-wrap gap-1.5 items-center">
                   {template.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="px-2 py-0.5 text-xs rounded-full bg-secondary text-secondary-foreground"
+                      className="px-2.5 py-1 text-xs rounded-md bg-secondary/80 text-secondary-foreground font-medium"
                     >
                       {tag}
                     </span>
@@ -95,7 +95,7 @@ const JournalTemplateSelector: React.FC<JournalTemplateSelectorProps> = ({
           ))}
         </div>
 
-        <div className="flex justify-end pt-3 border-t border-border">
+        <div className="flex justify-end pt-3 border-t border-border mt-4">
           <Button variant="secondary" onClick={onClose} className="rounded-lg">
             Cancel
           </Button>

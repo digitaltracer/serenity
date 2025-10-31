@@ -1,7 +1,7 @@
 "use strict";
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.selectAIUsage = exports.selectLastAIError = exports.selectAIErrors = exports.selectAIConfiguration = exports.selectAnalysisTracker = exports.selectAIRecaps = exports.selectAIInsights = exports.selectLastAnalysis = exports.selectAnalysisStatus = exports.selectAnalysisProgress = exports.selectIsAnalyzing = exports.selectActiveProvider = exports.selectAIProviders = exports.restoreUsage = exports.clearUsage = exports.recordUsage = exports.clearProviderModelInfo = exports.updateProvidersWithApiKeys = exports.updateProvidersWithModelInfo = exports.clearAllErrors = exports.clearAIError = exports.updateAnalysisTracker = exports.restoreRecaps = exports.removeRecap = exports.addRecap = exports.restoreInsights = exports.clearInsights = exports.removeInsight = exports.addInsight = exports.setDataTypes = exports.setAnalysisFrequency = exports.setAutoAnalyze = exports.clearActiveProvider = exports.setActiveProvider = exports.generateRecap = exports.analyzeUserData = exports.testApiKey = exports.setApiKey = void 0;
+exports.selectAIUsage = exports.selectLastAIError = exports.selectAIErrors = exports.selectAIConfiguration = exports.selectAnalysisTracker = exports.selectAIRecaps = exports.selectAIInsights = exports.selectLastAnalysis = exports.selectAnalysisStatus = exports.selectAnalysisProgress = exports.selectIsAnalyzing = exports.selectActiveProvider = exports.selectAIProviders = exports.restoreUsage = exports.clearUsage = exports.recordUsage = exports.clearProviderModelInfo = exports.updateProvidersWithApiKeys = exports.updateProvidersWithModelInfo = exports.clearAllErrors = exports.clearAIError = exports.updateAnalysisTracker = exports.restoreRecaps = exports.removeRecap = exports.addRecap = exports.restoreInsights = exports.clearInsights = exports.removeInsight = exports.addInsight = exports.setDataTypes = exports.setAnalysisFrequency = exports.setAutoAnalyze = exports.clearActiveProvider = exports.setActiveProvider = exports.generateRecap = exports.analyzeUserData = exports.initializeAISettings = exports.testApiKey = exports.setApiKey = void 0;
 const toolkit_1 = require("@reduxjs/toolkit");
 const aiAssistantService_1 = require("../../services/aiAssistantService");
 const logger_1 = require("../../utils/logger");
@@ -72,6 +72,40 @@ exports.testApiKey = (0, toolkit_1.createAsyncThunk)('aiAssistant/testApiKey', a
         }
     }
     throw new Error('AI Assistant API not available');
+});
+// Initialize AI settings and provider states from stored configuration
+exports.initializeAISettings = (0, toolkit_1.createAsyncThunk)('aiAssistant/initializeSettings', async () => {
+    if (typeof globalThis !== 'undefined' && globalThis.window?.electronAPI?.aiAssistant?.getSettings) {
+        logger_1.logger.info('[aiAssistant/initializeSettings] Loading AI settings from main process', { component: 'aiAssistantSlice', operation: 'initializeAISettings' });
+        const result = await globalThis.window.electronAPI.aiAssistant.getSettings();
+        if (result.success) {
+            logger_1.logger.info('[aiAssistant/initializeSettings] Settings loaded successfully', {
+                component: 'aiAssistantSlice',
+                operation: 'initializeAISettings',
+                metadata: {
+                    activeProvider: result.settings?.activeProvider,
+                    providersWithKeys: result.settings?.providersWithKeys
+                }
+            });
+            return {
+                activeProvider: result.settings.activeProvider,
+                providersWithKeys: result.settings.providersWithKeys || {},
+                modelInfo: result.settings.modelInfo || {},
+                autoAnalyze: result.settings.autoAnalyze ?? false,
+                analysisFrequency: result.settings.analysisFrequency || 'manual',
+                dataTypes: result.settings.dataTypes || {
+                    includeTasks: true,
+                    includeJournal: true,
+                    includeProjects: true,
+                },
+            };
+        }
+        else {
+            logger_1.logger.warn('[aiAssistant/initializeSettings] Failed to load settings', { component: 'aiAssistantSlice', operation: 'initializeAISettings', metadata: { error: result.error } });
+            throw new Error(result.error || 'Failed to load AI settings');
+        }
+    }
+    throw new Error('Electron API not available');
 });
 exports.analyzeUserData = (0, toolkit_1.createAsyncThunk)('aiAssistant/analyzeUserData', async ({ provider, dataTypes, forceReAnalyze = false, tasks, journalEntries, forceLocal = false, }, { getState }) => {
     const state = getState();
@@ -314,6 +348,39 @@ const aiAssistantSlice = (0, toolkit_1.createSlice)({
             .addCase(exports.testApiKey.rejected, (state, action) => {
             state.lastError = action.error.message;
             state.errors.push(`API Key Test: ${action.error.message}`);
+        });
+        // Initialize AI Settings
+        builder
+            .addCase(exports.initializeAISettings.fulfilled, (state, action) => {
+            // Update active provider
+            if (action.payload.activeProvider) {
+                state.activeProvider = action.payload.activeProvider;
+            }
+            // Update providers with API key status
+            Object.entries(action.payload.providersWithKeys).forEach(([providerId, hasKey]) => {
+                const provider = state.providers.find(p => p.id === providerId);
+                if (provider) {
+                    provider.hasApiKey = hasKey;
+                    if (providerId === action.payload.activeProvider) {
+                        provider.isActive = true;
+                    }
+                }
+            });
+            // Update model info
+            Object.entries(action.payload.modelInfo).forEach(([providerId, modelInfo]) => {
+                const provider = state.providers.find(p => p.id === providerId);
+                if (provider) {
+                    provider.modelInfo = modelInfo;
+                }
+            });
+            // Update configuration settings
+            state.autoAnalyze = action.payload.autoAnalyze;
+            state.analysisFrequency = action.payload.analysisFrequency;
+            state.dataTypes = action.payload.dataTypes;
+        })
+            .addCase(exports.initializeAISettings.rejected, (state, action) => {
+            logger_1.logger.warn('[aiAssistant] Failed to initialize AI settings', { component: 'aiAssistantSlice', operation: 'initializeAISettings.rejected', metadata: { error: action.error.message } });
+            // Don't set error state as this is non-critical initialization
         });
         // Analyze User Data
         builder

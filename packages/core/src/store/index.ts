@@ -21,6 +21,7 @@ export {
   // Async thunks
   setApiKey,
   testApiKey,
+  initializeAISettings,
   analyzeUserData,
   generateRecap,
   // Actions

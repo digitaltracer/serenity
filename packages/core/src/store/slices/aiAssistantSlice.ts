@@ -172,6 +172,43 @@ export const testApiKey = createAsyncThunk(
   }
 );
 
+// Initialize AI settings and provider states from stored configuration
+export const initializeAISettings = createAsyncThunk(
+  'aiAssistant/initializeSettings',
+  async () => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.electronAPI?.aiAssistant?.getSettings) {
+      logger.info('[aiAssistant/initializeSettings] Loading AI settings from main process', { component: 'aiAssistantSlice', operation: 'initializeAISettings' });
+      const result = await (globalThis as any).window.electronAPI.aiAssistant.getSettings();
+      if (result.success) {
+        logger.info('[aiAssistant/initializeSettings] Settings loaded successfully', {
+          component: 'aiAssistantSlice',
+          operation: 'initializeAISettings',
+          metadata: {
+            activeProvider: result.settings?.activeProvider,
+            providersWithKeys: result.settings?.providersWithKeys
+          }
+        });
+        return {
+          activeProvider: result.settings.activeProvider,
+          providersWithKeys: result.settings.providersWithKeys || {},
+          modelInfo: result.settings.modelInfo || {},
+          autoAnalyze: result.settings.autoAnalyze ?? false,
+          analysisFrequency: result.settings.analysisFrequency || 'manual',
+          dataTypes: result.settings.dataTypes || {
+            includeTasks: true,
+            includeJournal: true,
+            includeProjects: true,
+          },
+        };
+      } else {
+        logger.warn('[aiAssistant/initializeSettings] Failed to load settings', { component: 'aiAssistantSlice', operation: 'initializeAISettings', metadata: { error: result.error } });
+        throw new Error(result.error || 'Failed to load AI settings');
+      }
+    }
+    throw new Error('Electron API not available');
+  }
+);
+
 export const analyzeUserData = createAsyncThunk(
   'aiAssistant/analyzeUserData',
   async ({ 
@@ -467,6 +504,43 @@ const aiAssistantSlice = createSlice({
       .addCase(testApiKey.rejected, (state, action) => {
         state.lastError = action.error.message;
         state.errors.push(`API Key Test: ${action.error.message}`);
+      });
+
+    // Initialize AI Settings
+    builder
+      .addCase(initializeAISettings.fulfilled, (state, action) => {
+        // Update active provider
+        if (action.payload.activeProvider) {
+          state.activeProvider = action.payload.activeProvider;
+        }
+
+        // Update providers with API key status
+        Object.entries(action.payload.providersWithKeys).forEach(([providerId, hasKey]) => {
+          const provider = state.providers.find(p => p.id === providerId);
+          if (provider) {
+            provider.hasApiKey = hasKey as boolean;
+            if (providerId === action.payload.activeProvider) {
+              provider.isActive = true;
+            }
+          }
+        });
+
+        // Update model info
+        Object.entries(action.payload.modelInfo).forEach(([providerId, modelInfo]) => {
+          const provider = state.providers.find(p => p.id === providerId);
+          if (provider) {
+            provider.modelInfo = modelInfo as any;
+          }
+        });
+
+        // Update configuration settings
+        state.autoAnalyze = action.payload.autoAnalyze;
+        state.analysisFrequency = action.payload.analysisFrequency;
+        state.dataTypes = action.payload.dataTypes;
+      })
+      .addCase(initializeAISettings.rejected, (state, action) => {
+        logger.warn('[aiAssistant] Failed to initialize AI settings', { component: 'aiAssistantSlice', operation: 'initializeAISettings.rejected', metadata: { error: action.error.message } });
+        // Don't set error state as this is non-critical initialization
       });
 
     // Analyze User Data

@@ -100,7 +100,7 @@ class AppManager {
           `).catch(() => {});
 
           session.webRequest.onHeadersReceived((details, callback) => {
-            const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: https://api.openai.com https://oauth2.googleapis.com https://www.googleapis.com https://generativelanguage.googleapis.com https://api.anthropic.com https://api.github.com https://github.com; frame-ancestors 'none'";
+            const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ws: https://api.openai.com https://oauth2.googleapis.com https://www.googleapis.com https://generativelanguage.googleapis.com https://api.anthropic.com https://api.github.com https://github.com; frame-ancestors 'none'";
             const headers = { ...details.responseHeaders } as Record<string, string[]>;
             headers['Content-Security-Policy'] = [csp];
             callback({ responseHeaders: headers });

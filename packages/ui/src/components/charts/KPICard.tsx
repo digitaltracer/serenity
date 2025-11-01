@@ -96,7 +96,7 @@ export const KPICard: React.FC<KPICardProps> = ({
 
   return (
     <CardWrapper {...clickableProps}>
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm h-[168px] flex flex-col">
         {loading ? (
           <LoadingSkeleton />
         ) : (
@@ -125,7 +125,7 @@ export const KPICard: React.FC<KPICardProps> = ({
               {change && (
                 <div className={`flex items-center gap-1 mt-1 text-xs font-medium ${getChangeColor()}`}>
                   {getChangeIcon()}
-                  <span>{Math.abs(change.value)}%</span>
+                  <span>{Math.abs(change.value).toFixed(2)}%</span>
                   {change.period && (
                     <span className="text-gray-500 dark:text-gray-400 font-normal">
                       vs {change.period}
@@ -136,15 +136,17 @@ export const KPICard: React.FC<KPICardProps> = ({
             </div>
 
             {/* Sparkline */}
-            {sparklineData && sparklineData.length > 0 && (
-              <div className="h-10">
-                <SparklineChart
-                  data={sparklineData}
-                  color={colors.sparkline}
-                  height={40}
-                />
-              </div>
-            )}
+            <div className="flex-1 flex items-end">
+              {sparklineData && sparklineData.length > 0 && (
+                <div className="h-10 w-full">
+                  <SparklineChart
+                    data={sparklineData}
+                    color={colors.sparkline}
+                    height={40}
+                  />
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>

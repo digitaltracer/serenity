@@ -39,6 +39,11 @@ import {
   TrendChart,
   InsightCard,
   Button,
+  PriorityDistributionChart,
+  // Utils
+  calculatePriorityDistribution,
+  calculateCompletionRate,
+  calculateAverageCompletionTime,
 } from '@serenity/ui';
 import {
   // Icons
@@ -54,6 +59,8 @@ import {
   Smile,
   Zap,
   Flame,
+  CheckCircle,
+  Clock,
 } from 'lucide-react';
 
 export const InsightsHubPage: React.FC = () => {
@@ -92,8 +99,37 @@ export const InsightsHubPage: React.FC = () => {
   // Handle time range change
   const handleTimeRangeChange = (preset: '7d' | '30d' | '90d' | 'year') => {
     setSelectedTimeRange(preset);
+
+    // Calculate the time range
+    const end = new Date();
+    const start = new Date();
+
+    switch (preset) {
+      case '7d':
+        start.setDate(start.getDate() - 7);
+        break;
+      case '30d':
+        start.setDate(start.getDate() - 30);
+        break;
+      case '90d':
+        start.setDate(start.getDate() - 90);
+        break;
+      case 'year':
+        start.setFullYear(start.getFullYear() - 1);
+        break;
+    }
+
+    const timeRange = {
+      start: start.toISOString(),
+      end: end.toISOString(),
+    };
+
+    // Update Redux state
     dispatch(setTimeRangePreset(preset));
+
+    // Fetch data with explicit time range
     dispatch(fetchDashboardData({
+      timeRange,
       includeKPIs: true,
       includeInsights: true,
       includeRecaps: true,
@@ -102,7 +138,15 @@ export const InsightsHubPage: React.FC = () => {
 
   // Handle refresh
   const handleRefresh = () => {
+    // Use current time range for refresh
+    const timeRangeObj = getTimeRangeFromPreset(selectedTimeRange);
+    const timeRange = {
+      start: timeRangeObj.start.toISOString(),
+      end: timeRangeObj.end.toISOString(),
+    };
+
     dispatch(fetchDashboardData({
+      timeRange,
       includeKPIs: true,
       includeInsights: true,
       includeRecaps: true,
@@ -208,6 +252,22 @@ export const InsightsHubPage: React.FC = () => {
     );
   }, [tasks, journalEntries, selectedMetric, selectedGranularity, selectedTimeRange]);
 
+  // Calculate task analytics metrics
+  const priorityDistribution = React.useMemo(() =>
+    calculatePriorityDistribution(tasks as any),
+    [tasks]
+  );
+
+  const completionRate = React.useMemo(() => {
+    const timeRangeObj = getTimeRangeFromPreset(selectedTimeRange);
+    return calculateCompletionRate(tasks as any, timeRangeObj);
+  }, [tasks, selectedTimeRange]);
+
+  const avgCompletionTime = React.useMemo(() =>
+    calculateAverageCompletionTime(tasks as any),
+    [tasks]
+  );
+
   return (
     <div className="flex-1 h-full bg-background">
       <div className="flex-1 overflow-auto p-6">
@@ -299,7 +359,7 @@ export const InsightsHubPage: React.FC = () => {
 
           {/* KPI Cards Row */}
           {kpis && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-4 mb-8">
               <KPICard
                 title="Tasks Completed"
                 value={kpis.weeklyTasksCompleted.value}
@@ -350,14 +410,70 @@ export const InsightsHubPage: React.FC = () => {
                 icon={<Flame className="w-5 h-5" />}
                 color="orange"
               />
+
+              <KPICard
+                title="Completion Rate"
+                value={`${completionRate.rate.toFixed(1)}%`}
+                change={{
+                  value: completionRate.change,
+                  direction: completionRate.change > 0 ? 'up' : completionRate.change < 0 ? 'down' : 'neutral',
+                  period: 'vs last period',
+                }}
+                icon={<CheckCircle className="w-5 h-5" />}
+                color="green"
+              />
+
+              <KPICard
+                title="Avg Completion Time"
+                value={
+                  avgCompletionTime.averageDays < 1
+                    ? `${avgCompletionTime.averageHours.toFixed(1)}h`
+                    : `${avgCompletionTime.averageDays.toFixed(1)}d`
+                }
+                icon={<Clock className="w-5 h-5" />}
+                color="blue"
+              />
+
+              {/* Priority Distribution Card */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm h-[168px] flex flex-col">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Priority Distribution
+                  </span>
+                  <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-900/20">
+                    <BarChart3 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-center">
+                  <PriorityDistributionChart
+                    data={priorityDistribution}
+                    height={80}
+                    showLabels={false}
+                  />
+                  <div className="flex items-center justify-center gap-3 text-xs mt-1">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                      <span className="text-gray-600 dark:text-gray-400">{priorityDistribution.high.count}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                      <span className="text-gray-600 dark:text-gray-400">{priorityDistribution.medium.count}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                      <span className="text-gray-600 dark:text-gray-400">{priorityDistribution.low.count}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
           {/* Loading state for KPIs */}
           {isLoadingDashboard && !kpis && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="h-32 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-4 mb-8">
+              {[1, 2, 3, 4, 5, 6, 7].map(i => (
+                <div key={i} className="h-[168px] bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
               ))}
             </div>
           )}

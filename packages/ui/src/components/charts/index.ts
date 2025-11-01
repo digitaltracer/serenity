@@ -10,3 +10,4 @@ export * from './chartUtils';
 export { TrendChart, type TrendChartProps, type TrendChartDataPoint } from './TrendChart';
 export { KPICard, type KPICardProps } from './KPICard';
 export { SparklineChart, type SparklineChartProps } from './SparklineChart';
+export { PriorityDistributionChart, type PriorityDistributionChartProps, type PriorityDistributionData } from './PriorityDistributionChart';

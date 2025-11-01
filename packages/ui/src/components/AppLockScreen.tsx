@@ -139,13 +139,22 @@ export const AppLockScreen: React.FC<AppLockScreenProps> = ({
   const attemptsRemaining = maxAttempts - attempts;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      {/* Draggable header region for window movement */}
+      <div
+        className="h-10 w-full flex-shrink-0"
+        style={{ WebkitAppRegion: 'drag' } as any}
+      />
+
       {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-30 dark:opacity-20">
+      <div className="absolute inset-0 opacity-30 dark:opacity-20 pointer-events-none">
         <div className="absolute inset-0" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.03'%3E%3Cpath d='m36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
         }} />
       </div>
+
+      {/* Main content area */}
+      <div className="flex-1 flex items-center justify-center p-4">
 
       {/* Lock Screen Card */}
       <div className="relative w-full max-w-md">
@@ -316,6 +325,7 @@ export const AppLockScreen: React.FC<AppLockScreenProps> = ({
             Serenity Notes v2.0 • Privacy-First Productivity
           </p>
         </div>
+      </div>
       </div>
     </div>
   );

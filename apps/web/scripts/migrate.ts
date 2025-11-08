@@ -4,11 +4,15 @@
  * Runs SQL migrations from packages/database/src/schema/schema.sql
  */
 
+import { config } from 'dotenv'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import pg from 'pg'
 
 const { Pool } = pg
+
+// Load environment variables from .env.local
+config({ path: join(__dirname, '../.env.local') })
 
 async function runMigrations() {
   const databaseUrl = process.env.DATABASE_URL

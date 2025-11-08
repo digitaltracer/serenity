@@ -4,9 +4,14 @@
  * Seeds the database with sample data for development
  */
 
+import { config } from 'dotenv'
+import { join } from 'path'
 import pg from 'pg'
 
 const { Pool } = pg
+
+// Load environment variables from .env.local
+config({ path: join(__dirname, '../.env.local') })
 
 async function seedDatabase() {
   const databaseUrl = process.env.DATABASE_URL

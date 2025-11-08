@@ -36,15 +36,41 @@ async function runMigrations() {
     await pool.query('SELECT 1')
     console.log('✅ Connected to database')
 
-    // Read schema file
-    const schemaPath = join(__dirname, '../../../packages/database/src/schema/schema.sql')
-    console.log(`📄 Reading schema from: ${schemaPath}`)
+    // Check if base tables exist
+    const tablesCheck = await pool.query(`
+      SELECT COUNT(*) as count
+      FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'users'
+    `)
+    const hasBaseTables = parseInt(tablesCheck.rows[0].count) > 0
 
-    const schemaSql = readFileSync(schemaPath, 'utf-8')
+    // Run base schema if needed
+    if (!hasBaseTables) {
+      const schemaPath = join(__dirname, '../../../packages/database/src/schema/schema.sql')
+      console.log(`📄 Running base schema from: ${schemaPath}`)
+      const schemaSql = readFileSync(schemaPath, 'utf-8')
+      await pool.query(schemaSql)
+      console.log('✅ Base schema created')
+    } else {
+      console.log('ℹ️  Base schema already exists, skipping...')
+    }
 
-    // Execute schema
-    console.log('🔨 Executing schema...')
-    await pool.query(schemaSql)
+    // Run web-extensions schema
+    const webExtensionsPath = join(__dirname, '../../../packages/database/src/schema/web-extensions.sql')
+    console.log(`📄 Running web extensions from: ${webExtensionsPath}`)
+    const webExtensionsSql = readFileSync(webExtensionsPath, 'utf-8')
+
+    try {
+      await pool.query(webExtensionsSql)
+      console.log('✅ Web extensions applied')
+    } catch (err: any) {
+      // Check if error is because tables already exist
+      if (err.code === '42P07' || err.code === '42710') {
+        console.log('ℹ️  Some web extensions already exist, skipping...')
+      } else {
+        throw err
+      }
+    }
 
     console.log('✅ Migration completed successfully!')
 

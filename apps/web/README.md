@@ -4,12 +4,28 @@ A cloud-based web application for Serenity Notes, featuring full feature parity 
 
 ## 🚀 Features
 
+### ✅ Implemented (Phases 1-4)
+
 - ✅ **Multi-provider OAuth** (Google, GitHub, Microsoft)
 - ✅ **End-to-end encryption** with user password
-- ✅ **Bidirectional sync** with desktop app
-- ✅ **Full feature parity** with desktop (Tasks, Projects, Journal, Goals, AI Insights, Integrations)
-- ✅ **Self-hosted** deployment with Docker
+- ✅ **Complete REST API** for all features:
+  - Tasks API with encryption support
+  - Projects API with encryption support
+  - Journal API with encryption support
+  - Goals API
+  - Stats API
+- ✅ **Redux state management** with existing @serenity/core
+- ✅ **Protected routes** with authentication middleware
+- ✅ **Database schema** with sync metadata for desktop sync
+- ✅ **Self-hosted** deployment ready
 - ✅ **Premium-ready** infrastructure for future paid features
+
+### 🚧 Coming Soon (Future Phases)
+
+- ⏳ **Bidirectional sync** with desktop app (infrastructure in place)
+- ⏳ **AI Insights** integration
+- ⏳ **Full UI components** from @serenity/ui
+- ⏳ **Integrations** (Google Calendar, GitHub)
 
 ## 📋 Prerequisites
 

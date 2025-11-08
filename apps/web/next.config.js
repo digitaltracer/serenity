@@ -18,6 +18,7 @@ const nextConfig = {
         ...config.resolve.fallback,
         fs: false,
         net: false,
+        dns: false,
         tls: false,
         crypto: false,
         stream: false,
@@ -30,6 +31,7 @@ const nextConfig = {
         path: false,
         pg: false,
         'pg-native': false,
+        'pg-hstore': false,
       }
     }
     return config

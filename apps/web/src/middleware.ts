@@ -1,10 +1,19 @@
 /**
  * Next.js middleware for authentication and route protection
+ *
+ * Note: Middleware runs in Edge Runtime and cannot use database operations.
+ * We're temporarily disabling middleware auth to avoid pg module issues.
+ * Authentication is still enforced in the layout components.
  */
 
-export { auth as middleware } from '@/lib/auth/config'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-// Note: Using export directly to avoid Edge Runtime issues with pg module
+export function middleware(request: NextRequest) {
+  // For now, allow all requests through
+  // Auth is handled in server components via the auth() function
+  return NextResponse.next()
+}
 
 /*
 import { auth } from '@/lib/auth/config'

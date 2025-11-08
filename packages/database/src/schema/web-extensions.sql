@@ -153,14 +153,17 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER IF NOT EXISTS update_user_encryption_keys_updated_at
+DROP TRIGGER IF EXISTS update_user_encryption_keys_updated_at ON user_encryption_keys;
+CREATE TRIGGER update_user_encryption_keys_updated_at
     BEFORE UPDATE ON user_encryption_keys
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER IF NOT EXISTS update_desktop_devices_updated_at
+DROP TRIGGER IF EXISTS update_desktop_devices_updated_at ON desktop_devices;
+CREATE TRIGGER update_desktop_devices_updated_at
     BEFORE UPDATE ON desktop_devices
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER IF NOT EXISTS update_accounts_updated_at
+DROP TRIGGER IF EXISTS update_accounts_updated_at ON accounts;
+CREATE TRIGGER update_accounts_updated_at
     BEFORE UPDATE ON accounts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

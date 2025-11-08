@@ -786,9 +786,28 @@ async function validateApiKeyPermissions(provider: 'openai' | 'gemini' | 'anthro
 /**
  * Make API request to OpenAI
  */
-async function callOpenAI(apiKey: string, prompt: string): Promise<any> {
+async function callOpenAI(
+  apiKey: string,
+  prompt: string,
+  preferredModel?: string,
+  options?: {
+    temperature?: number;
+    maxTokens?: number;
+    systemPrompt?: string;
+  }
+): Promise<any> {
   try {
-    const modelName = await resolveModelForProvider('openai', 'gpt-4o-mini');
+    const modelName = preferredModel || await resolveModelForProvider('openai', 'gpt-4o-mini');
+    const temperature = options?.temperature ?? 0.7;
+    const maxTokens = options?.maxTokens ?? 4000;
+    const systemPrompt = options?.systemPrompt ?? 'You are a productivity and well-being assistant. Analyze user data and provide helpful, actionable insights in JSON format.';
+
+    logger.info(`🤖 Calling OpenAI with model: ${modelName}`, {
+      component: 'aiAssistantHandlers',
+      operation: 'callOpenAI',
+      metadata: { model: modelName, preferred: !!preferredModel, temperature, maxTokens }
+    });
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -800,15 +819,15 @@ async function callOpenAI(apiKey: string, prompt: string): Promise<any> {
         messages: [
           {
             role: 'system',
-            content: 'You are a productivity and well-being assistant. Analyze user data and provide helpful, actionable insights in JSON format.'
+            content: systemPrompt
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_tokens: 4000,
-        temperature: 0.7,
+        max_tokens: maxTokens,
+        temperature: temperature,
       }),
     });
 
@@ -822,6 +841,7 @@ async function callOpenAI(apiKey: string, prompt: string): Promise<any> {
       success: true,
       content: data.choices[0]?.message?.content || '',
       usage: data.usage,
+      rawData: data, // Include raw data for custom parsing
     };
   } catch (error) {
     logger.error('❌ OpenAI API call failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
@@ -866,16 +886,39 @@ function normalizeUsage(raw: any): { promptTokens: number; completionTokens: num
 /**
  * Make API request to Google Gemini
  */
-async function callGemini(apiKey: string, prompt: string): Promise<any> {
+async function callGemini(
+  apiKey: string,
+  prompt: string,
+  preferredModel?: string,
+  options?: {
+    temperature?: number;
+    maxTokens?: number;
+    systemPrompt?: string;
+  }
+): Promise<any> {
   try {
-    // For production calls, we'll use the stored model info or fall back to gemini-2.5-flash
-    // We don't want to detect on every call to avoid extra API requests
-    const modelInfo = getModelInfo();
-    const geminiModelInfo = modelInfo.gemini;
-    const detected = geminiModelInfo ? geminiModelInfo.model : 'gemini-2.5-flash';
-    const modelName = await resolveModelForProvider('gemini', detected);
-    
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+    // Use preferred model from credential if available, otherwise fall back to stored model info
+    let modelName = preferredModel;
+    if (!modelName) {
+      const modelInfo = getModelInfo();
+      const geminiModelInfo = modelInfo.gemini;
+      const detected = geminiModelInfo ? geminiModelInfo.model : 'gemini-2.5-flash';
+      modelName = await resolveModelForProvider('gemini', detected);
+    }
+
+    const temperature = options?.temperature ?? 0.7;
+    const maxTokens = options?.maxTokens ?? 4000;
+    const systemPrompt = options?.systemPrompt ?? 'You are a productivity and well-being assistant. Analyze user data and provide helpful, actionable insights in JSON format.';
+
+    logger.info(`🤖 Calling Gemini with model: ${modelName}`, {
+      component: 'aiAssistantHandlers',
+      operation: 'callGemini',
+      metadata: { model: modelName, preferred: !!preferredModel, temperature, maxTokens }
+    });
+
+    const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -884,12 +927,12 @@ async function callGemini(apiKey: string, prompt: string): Promise<any> {
         contents: [{
           role: 'user',
           parts: [{
-            text: `You are a productivity and well-being assistant. Analyze user data and provide helpful, actionable insights in JSON format.\n\n${prompt}`
+            text: fullPrompt
           }]
         }],
         generationConfig: {
-          maxOutputTokens: 4000,
-          temperature: 0.7,
+          maxOutputTokens: maxTokens,
+          temperature: temperature,
         },
       }),
     });
@@ -922,6 +965,7 @@ async function callGemini(apiKey: string, prompt: string): Promise<any> {
       success: true,
       content,
       usage: { promptTokens, completionTokens, totalTokens },
+      rawData: data, // Include raw data for custom parsing
     };
   } catch (error) {
     logger.error('❌ Gemini API call failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
@@ -935,9 +979,28 @@ async function callGemini(apiKey: string, prompt: string): Promise<any> {
 /**
  * Make API request to Anthropic Claude
  */
-async function callAnthropic(apiKey: string, prompt: string): Promise<any> {
+async function callAnthropic(
+  apiKey: string,
+  prompt: string,
+  preferredModel?: string,
+  options?: {
+    temperature?: number;
+    maxTokens?: number;
+    systemPrompt?: string;
+  }
+): Promise<any> {
   try {
-    const modelName = await resolveModelForProvider('anthropic', 'claude-3-5-sonnet-latest');
+    const modelName = preferredModel || await resolveModelForProvider('anthropic', 'claude-3-5-sonnet-latest');
+    const temperature = options?.temperature ?? 0.7;
+    const maxTokens = options?.maxTokens ?? 4000;
+    const systemPrompt = options?.systemPrompt ?? 'You are a productivity and well-being assistant. Analyze user data and provide helpful, actionable insights in JSON format.';
+
+    logger.info(`🤖 Calling Anthropic with model: ${modelName}`, {
+      component: 'aiAssistantHandlers',
+      operation: 'callAnthropic',
+      metadata: { model: modelName, preferred: !!preferredModel, temperature, maxTokens }
+    });
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -947,9 +1010,9 @@ async function callAnthropic(apiKey: string, prompt: string): Promise<any> {
       },
       body: JSON.stringify({
         model: modelName,
-        max_tokens: 4000,
-        temperature: 0.7,
-        system: 'You are a productivity and well-being assistant. Analyze user data and provide helpful, actionable insights in JSON format.',
+        max_tokens: maxTokens,
+        temperature: temperature,
+        system: systemPrompt,
         messages: [
           {
             role: 'user',
@@ -966,7 +1029,7 @@ async function callAnthropic(apiKey: string, prompt: string): Promise<any> {
 
     const data = await response.json() as any;
     const content = data.content?.[0]?.text || '';
-    
+
     return {
       success: true,
       content,
@@ -974,6 +1037,7 @@ async function callAnthropic(apiKey: string, prompt: string): Promise<any> {
         input_tokens: 0,
         output_tokens: 0,
       },
+      rawData: data, // Include raw data for custom parsing
     };
   } catch (error) {
     logger.error('❌ Anthropic API call failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
@@ -1014,6 +1078,394 @@ async function makeAIApiCall(provider: 'openai' | 'gemini' | 'anthropic', prompt
       };
   }
 }
+
+/**
+ * Make AI API call with automatic failover across all credentials
+ * Tries credentials in priority order, automatically switching providers if needed
+ */
+async function makeAIApiCallWithFailover(prompt: string): Promise<any> {
+  const { AICredentialService } = await import('@serenity/core');
+  const { sqliteService } = await import('@serenity/database');
+  const { getDecryptedApiKey } = await import('./aiCredentialHandlers');
+
+  try {
+    // Get all enabled credentials sorted by priority
+    await sqliteService.initialize();
+    const allCredentials = await sqliteService.ai!.listCredentials(true);
+
+    // Filter by availability (respecting cooldowns)
+    const { AICredentialService: CredService } = await import('@serenity/core');
+    const credentials = allCredentials.map(row => ({
+      id: row.id,
+      provider: row.provider as any,
+      name: row.name,
+      modelPreference: row.model_preference || undefined,
+      enabled: row.enabled === 1,
+      priority: row.priority,
+      lastUsedAt: row.last_used_at || undefined,
+      totalRequests: row.total_requests,
+      totalTokens: row.total_tokens,
+      successCount: row.success_count,
+      errorCount: row.error_count,
+      lastError: row.last_error || undefined,
+      lastErrorAt: row.last_error_at || undefined,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+
+    const availableCredentials = CredService.getAvailableCredentials(credentials);
+
+    if (availableCredentials.length === 0) {
+      logger.error('❌ No available credentials (all disabled or in cooldown)', {
+        component: 'aiAssistantHandlers',
+        operation: 'failoverNoCredentials'
+      });
+      return {
+        success: false,
+        error: 'No available API credentials. Please add at least one API key in Settings.',
+      };
+    }
+
+    logger.info(`🔄 Attempting failover across ${availableCredentials.length} available credentials`, {
+      component: 'aiAssistantHandlers',
+      operation: 'failoverStart',
+      metadata: {
+        credentialsCount: availableCredentials.length,
+        providers: availableCredentials.map(c => `${c.provider}/${c.name}`).join(', ')
+      }
+    });
+
+    let lastError: string | undefined;
+
+    // Try each credential in order
+    for (const credential of availableCredentials) {
+      try {
+        logger.info(`🔑 Trying credential: ${credential.provider}/${credential.name} (priority: ${credential.priority})`, {
+          component: 'aiAssistantHandlers',
+          operation: 'tryingCredential',
+          metadata: {
+            credentialId: credential.id,
+            provider: credential.provider,
+            name: credential.name,
+            successRate: credential.totalRequests > 0
+              ? ((credential.successCount / credential.totalRequests) * 100).toFixed(1) + '%'
+              : 'N/A'
+          }
+        });
+
+        // Get decrypted API key
+        const apiKey = await getDecryptedApiKey(credential.id);
+        if (!apiKey) {
+          logger.warn(`⚠️ Could not decrypt API key for credential ${credential.id}, skipping`, {
+            component: 'aiAssistantHandlers',
+            operation: 'decryptionFailed'
+          });
+          continue;
+        }
+
+        // Make API call with preferred model
+        let result: any;
+        switch (credential.provider) {
+          case 'openai':
+            result = await callOpenAI(apiKey, prompt, credential.modelPreference);
+            break;
+          case 'gemini':
+            result = await callGemini(apiKey, prompt, credential.modelPreference);
+            break;
+          case 'anthropic':
+            result = await callAnthropic(apiKey, prompt, credential.modelPreference);
+            break;
+          default:
+            logger.warn(`⚠️ Unknown provider: ${credential.provider}, skipping`, {
+              component: 'aiAssistantHandlers',
+              operation: 'unknownProvider'
+            });
+            continue;
+        }
+
+        // Check if call succeeded
+        if (result.success) {
+          logger.info(`✅ API call succeeded with ${credential.provider}/${credential.name}`, {
+            component: 'aiAssistantHandlers',
+            operation: 'credentialSuccess',
+            metadata: {
+              credentialId: credential.id,
+              provider: credential.provider,
+              tokensUsed: result.usage?.totalTokens || 0
+            }
+          });
+
+          // Record success
+          AICredentialService.recordSuccess(credential.id);
+          await sqliteService.ai!.recordCredentialSuccess(
+            credential.id,
+            result.usage?.totalTokens || 0
+          );
+
+          // Add credential info to result
+          return {
+            ...result,
+            credentialId: credential.id,
+            credentialName: credential.name,
+            provider: credential.provider
+          };
+        } else {
+          // API call failed, record error and try next
+          const errorMessage = result.error || 'Unknown error';
+          lastError = errorMessage;
+          logger.warn(`❌ API call failed with ${credential.provider}/${credential.name}: ${errorMessage}`, {
+            component: 'aiAssistantHandlers',
+            operation: 'credentialFailed'
+          });
+
+          AICredentialService.recordError(credential.id, errorMessage);
+          await sqliteService.ai!.recordCredentialError(credential.id, errorMessage);
+
+          // Continue to next credential
+          continue;
+        }
+      } catch (error: any) {
+        const errorMessage = error.message || 'Exception during API call';
+        lastError = errorMessage;
+        logger.error(`❌ Exception with ${credential.provider}/${credential.name}: ${errorMessage}`, {
+          component: 'aiAssistantHandlers',
+          operation: 'credentialException'
+        }, error);
+
+        AICredentialService.recordError(credential.id, errorMessage);
+        await sqliteService.ai!.recordCredentialError(credential.id, errorMessage);
+
+        // Continue to next credential
+        continue;
+      }
+    }
+
+    // All credentials failed
+    logger.error('❌ All credentials failed', {
+      component: 'aiAssistantHandlers',
+      operation: 'allCredentialsFailed',
+      metadata: {
+        attemptedCredentials: availableCredentials.length,
+        lastError
+      }
+    });
+
+    return {
+      success: false,
+      error: `All ${availableCredentials.length} API credentials failed. Last error: ${lastError}`,
+    };
+  } catch (error: any) {
+    logger.error('❌ Failover system error:', {
+      component: 'aiAssistantHandlers',
+      operation: 'failoverSystemError'
+    }, error);
+
+    return {
+      success: false,
+      error: `Failover system error: ${error.message}`,
+    };
+  }
+}
+
+/**
+ * Make AI API call with failover support and custom options (for Quick Add and other specialized uses)
+ */
+async function makeAIApiCallWithFailoverCustom(
+  prompt: string,
+  options?: {
+    temperature?: number;
+    maxTokens?: number;
+    systemPrompt?: string;
+  }
+): Promise<any> {
+  const { AICredentialService } = await import('@serenity/core');
+  const { sqliteService } = await import('@serenity/database');
+  const { getDecryptedApiKey } = await import('./aiCredentialHandlers');
+
+  try {
+    // Get all enabled credentials sorted by priority
+    await sqliteService.initialize();
+    const allCredentials = await sqliteService.ai!.listCredentials(true);
+
+    // Filter by availability (respecting cooldowns)
+    const { AICredentialService: CredService } = await import('@serenity/core');
+    const credentials = allCredentials.map(row => ({
+      id: row.id,
+      provider: row.provider as any,
+      name: row.name,
+      modelPreference: row.model_preference || undefined,
+      enabled: row.enabled === 1,
+      priority: row.priority,
+      lastUsedAt: row.last_used_at || undefined,
+      totalRequests: row.total_requests,
+      totalTokens: row.total_tokens,
+      successCount: row.success_count,
+      errorCount: row.error_count,
+      lastError: row.last_error || undefined,
+      lastErrorAt: row.last_error_at || undefined,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+
+    const availableCredentials = CredService.getAvailableCredentials(credentials);
+
+    if (availableCredentials.length === 0) {
+      logger.error('❌ No available credentials (all disabled or in cooldown)', {
+        component: 'aiAssistantHandlers',
+        operation: 'failoverNoCredentials'
+      });
+      return {
+        success: false,
+        error: 'No available API credentials. Please add at least one API key in Settings.',
+      };
+    }
+
+    logger.info(`🔄 Attempting failover across ${availableCredentials.length} available credentials`, {
+      component: 'aiAssistantHandlers',
+      operation: 'failoverStart',
+      metadata: {
+        credentialsCount: availableCredentials.length,
+        providers: availableCredentials.map(c => `${c.provider}/${c.name}`).join(', ')
+      }
+    });
+
+    let lastError: string | undefined;
+
+    // Try each credential in order
+    for (const credential of availableCredentials) {
+      try {
+        logger.info(`🔑 Trying credential: ${credential.provider}/${credential.name} (priority: ${credential.priority})`, {
+          component: 'aiAssistantHandlers',
+          operation: 'tryingCredential',
+          metadata: {
+            credentialId: credential.id,
+            provider: credential.provider,
+            name: credential.name,
+            successRate: credential.totalRequests > 0
+              ? ((credential.successCount / credential.totalRequests) * 100).toFixed(1) + '%'
+              : 'N/A'
+          }
+        });
+
+        // Get decrypted API key
+        const apiKey = await getDecryptedApiKey(credential.id);
+        if (!apiKey) {
+          logger.warn(`⚠️ Could not decrypt API key for credential ${credential.id}, skipping`, {
+            component: 'aiAssistantHandlers',
+            operation: 'decryptionFailed'
+          });
+          continue;
+        }
+
+        // Make API call with preferred model and custom options
+        let result: any;
+        switch (credential.provider) {
+          case 'openai':
+            result = await callOpenAI(apiKey, prompt, credential.modelPreference, options);
+            break;
+          case 'gemini':
+            result = await callGemini(apiKey, prompt, credential.modelPreference, options);
+            break;
+          case 'anthropic':
+            result = await callAnthropic(apiKey, prompt, credential.modelPreference, options);
+            break;
+          default:
+            logger.warn(`⚠️ Unknown provider: ${credential.provider}, skipping`, {
+              component: 'aiAssistantHandlers',
+              operation: 'unknownProvider'
+            });
+            continue;
+        }
+
+        // Check if call succeeded
+        if (result.success) {
+          logger.info(`✅ API call succeeded with ${credential.provider}/${credential.name}`, {
+            component: 'aiAssistantHandlers',
+            operation: 'credentialSuccess',
+            metadata: {
+              credentialId: credential.id,
+              provider: credential.provider,
+              tokensUsed: result.usage?.totalTokens || result.usage?.total_tokens || 0
+            }
+          });
+
+          // Record success
+          AICredentialService.recordSuccess(credential.id);
+          const totalTokens = result.usage?.totalTokens || result.usage?.total_tokens || 0;
+          await sqliteService.ai!.recordCredentialSuccess(
+            credential.id,
+            totalTokens
+          );
+
+          // Add credential info to result
+          return {
+            ...result,
+            credentialId: credential.id,
+            credentialName: credential.name,
+            provider: credential.provider
+          };
+        } else {
+          // API call failed, record error and try next
+          const errorMessage = result.error || 'Unknown error';
+          lastError = errorMessage;
+          logger.warn(`❌ API call failed with ${credential.provider}/${credential.name}: ${errorMessage}`, {
+            component: 'aiAssistantHandlers',
+            operation: 'credentialFailed'
+          });
+
+          AICredentialService.recordError(credential.id, errorMessage);
+          await sqliteService.ai!.recordCredentialError(credential.id, errorMessage);
+
+          // Continue to next credential
+          continue;
+        }
+      } catch (error: any) {
+        const errorMessage = error.message || 'Exception during API call';
+        lastError = errorMessage;
+        logger.error(`❌ Exception with ${credential.provider}/${credential.name}: ${errorMessage}`, {
+          component: 'aiAssistantHandlers',
+          operation: 'credentialException'
+        }, error);
+
+        AICredentialService.recordError(credential.id, errorMessage);
+        await sqliteService.ai!.recordCredentialError(credential.id, errorMessage);
+
+        // Continue to next credential
+        continue;
+      }
+    }
+
+    // All credentials failed
+    logger.error('❌ All credentials failed', {
+      component: 'aiAssistantHandlers',
+      operation: 'allCredentialsFailed',
+      metadata: {
+        attemptedCredentials: availableCredentials.length,
+        lastError
+      }
+    });
+
+    return {
+      success: false,
+      error: `All ${availableCredentials.length} API credentials failed. Last error: ${lastError}`,
+    };
+  } catch (error: any) {
+    logger.error('❌ Failover system error:', {
+      component: 'aiAssistantHandlers',
+      operation: 'failoverSystemError'
+    }, error);
+
+    return {
+      success: false,
+      error: `Failover system error: ${error.message}`,
+    };
+  }
+}
+
+/**
+ * Export the failover function for use by other handlers (e.g., summaryHandlers)
+ */
+export { makeAIApiCallWithFailover };
 
 /**
  * Register AI Assistant IPC handlers
@@ -1632,24 +2084,25 @@ export function registerAIAssistantHandlers(): void {
         }
       });
 
-      // Step 5: Make AI API call (single batched call instead of multiple)
-      logger.info(`🤖 Step 5: Calling ${options.provider} API...`, {
+      // Step 5: Make AI API call with automatic failover
+      logger.info(`🤖 Step 5: Calling AI API with failover support...`, {
         component: 'Aiassistanthandlers',
         operation: 'api-call-start',
         metadata: {
-          provider: options.provider,
           promptLength: enhancedPrompt.length,
           estimatedTokens: Math.ceil(enhancedPrompt.length / 4)
         }
       });
 
-      const result = await makeAIApiCall(options.provider, enhancedPrompt);
+      const result = await makeAIApiCallWithFailover(enhancedPrompt);
 
-      logger.info(`✅ ${options.provider} API call completed`, {
+      logger.info(`✅ AI API call completed`, {
         component: 'Aiassistanthandlers',
         operation: 'api-call-complete',
         metadata: {
           success: result.success,
+          provider: result.provider || 'unknown',
+          credentialName: result.credentialName || 'unknown',
           hasContent: !!result.content,
           contentLength: result.content?.length || 0
         }
@@ -1666,7 +2119,8 @@ export function registerAIAssistantHandlers(): void {
           component: 'Aiassistanthandlers',
           operation: 'response-raw',
           metadata: {
-            provider: options.provider,
+            provider: result.provider || 'unknown',
+            credentialName: result.credentialName || 'unknown',
             responseLength: result.content.length,
             responsePreview: result.content.substring(0, 500) + (result.content.length > 500 ? '...' : ''),
             fullResponse: result.content
@@ -1690,9 +2144,9 @@ export function registerAIAssistantHandlers(): void {
           }
         });
 
-        // Set correct source provider
+        // Set correct source provider (from the actual provider that succeeded)
         rawInsights.forEach(insight => {
-          insight.source = options.provider;
+          insight.source = result.provider || options.provider;
         });
 
         const u = normalizeUsage(result.usage);
@@ -2207,7 +2661,7 @@ export function registerAIAssistantHandlers(): void {
   });
 
   // Persist usage from renderer
-  ipcMain.handle('ai-assistant:save-usage', async (_event, payload: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; operation: 'analyze' | 'recap' | 'quickadd'; promptTokens: number; completionTokens: number; totalTokens: number; timestamp?: string }) => {
+  ipcMain.handle('ai-assistant:save-usage', async (_event, payload: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; operation: 'analyze' | 'recap' | 'quickadd' | 'summary'; promptTokens: number; completionTokens: number; totalTokens: number; timestamp?: string }) => {
     try {
       const { sqliteService } = await import('@serenity/database');
       await sqliteService.initialize();
@@ -2294,20 +2748,19 @@ export function registerAIAssistantHandlers(): void {
   ipcMain.handle('ai-assistant:quick-add', async (_event, payload: { text: string; provider?: 'openai' | 'gemini' | 'anthropic'; debug?: boolean }) => {
     const text = (payload?.text || '').trim();
     if (!text) return { success: false, error: 'Empty input' };
+
     try {
-      const settings = await getCurrentAISettings();
-      const provider = payload?.provider || settings.activeProvider || 'openai';
-      const keys = getApiKeys();
-      const apiKey = (keys as any)[provider];
       const debug = !!payload?.debug;
 
-      logger.info(`🤖 [QuickAdd] Using provider: ${provider}, hasKey: ${!!apiKey}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-
-      if (!apiKey) return { success: false, error: `Missing API key for ${provider}`, debug: { stage: 'no_api_key', provider } } as any;
+      logger.info(`🤖 [QuickAdd] Starting Quick Add for text: "${text.slice(0, 50)}..."`, {
+        component: 'aiAssistantHandlers',
+        operation: 'quickAdd'
+      });
 
       // Get current date for prompt context
       const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
 
+      // Build the instruction prompt for JSON extraction
       const instruction = `You are an intelligent assistant for an application called "Serenity Notes". Your job is to analyze the user's input and convert it into a structured JSON object. Do not respond with conversational text, only the JSON object.
 
 The current date is: **${currentDate}**.
@@ -2383,411 +2836,206 @@ The JSON object must have two top-level keys:
 **User Input:** ${text}
 **Your Output:**`;
 
-      logger.info(`🎯 [QuickAdd] Prompt being sent to ${provider}:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-      logger.info('---START PROMPT---', { component: 'Aiassistanthandlers', operation: 'execute' });
-      logger.info(instruction, { component: 'Aiassistanthandlers', operation: 'execute' });
-      logger.info('---END PROMPT---', { component: 'Aiassistanthandlers', operation: 'execute' });
+      logger.info(`🎯 [QuickAdd] Calling AI with custom parameters (temperature: 0.2, maxTokens: 1000)`, {
+        component: 'aiAssistantHandlers',
+        operation: 'quickAdd'
+      });
 
-      if (provider === 'openai') {
-        const model = await resolveModelForProvider('openai', 'gpt-4o-mini');
-        if (debug) console.log('[QuickAdd][openai] model=', model);
-        const r = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: instruction },
-              { role: 'user', content: text }
-            ],
-            temperature: 0.2,
-            max_tokens: 1000,
-          }),
+      // Call AI with multi-credential failover and custom options for JSON extraction
+      const result = await makeAIApiCallWithFailoverCustom(instruction, {
+        temperature: 0.2, // Lower temperature for more deterministic JSON output
+        maxTokens: 1000,
+        systemPrompt: '' // Instruction already contains the system context
+      });
+
+      if (!result.success) {
+        logger.error(`❌ [QuickAdd] AI call failed: ${result.error}`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd'
         });
-        if (!r.ok) return { success: false, error: `Provider error ${r.status}` };
-        const data: any = await r.json();
-
-        logger.info(`📥 [QuickAdd][${provider}] COMPLETE API RESPONSE:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('---START FULL RESPONSE---', { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(JSON.stringify(data, null, 2), { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('---END FULL RESPONSE---', { component: 'Aiassistanthandlers', operation: 'execute' });
-
-        const content = data?.choices?.[0]?.message?.content || '';
-        logger.info(`📥 [QuickAdd][${provider}] EXTRACTED CONTENT:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('---START CONTENT---', { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(content, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('---END CONTENT---', { component: 'Aiassistanthandlers', operation: 'execute' });
-
-        logger.info(`📥 [QuickAdd][${provider}] RESPONSE ANALYSIS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- data exists: ${!!data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- data.choices exists: ${!!data?.choices}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- data.choices is array: ${Array.isArray(data?.choices)}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- data.choices length: ${data?.choices?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- first choice exists: ${!!data?.choices?.[0]}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- message exists: ${!!data?.choices?.[0]?.message}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- content exists: ${!!data?.choices?.[0]?.message?.content}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- content type: ${typeof content}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- content length: ${content?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-
-        logger.info(`🔍 [QuickAdd][${provider}] STARTING JSON PARSING:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- Raw content to parse: ${JSON.stringify(content)}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- Trimmed content: ${JSON.stringify(content.trim())}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-
-        let parsed: any = null;
-        let parseMethod = '';
-
-        try {
-          logger.info(`🔍 [QuickAdd][${provider}] Attempting direct JSON.parse...`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          parsed = JSON.parse(content.trim());
-          parseMethod = 'direct';
-          logger.info(`✅ [QuickAdd][${provider}] Direct JSON.parse succeeded`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        } catch (directError) {
-          logger.info(`❌ [QuickAdd][${provider}] Direct JSON.parse failed:`, {  component: 'Aiassistanthandlers', operation: 'catch' , metadata: { value: directError } });
-
-          // Try to extract from markdown code blocks first
-          logger.info(`🔍 [QuickAdd][${provider}] Attempting markdown extraction...`, { component: 'Aiassistanthandlers', operation: 'catch' });
-          const markdownMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-
-          if (markdownMatch && markdownMatch[1]) {
-            logger.info(`🔍 [QuickAdd][${provider}] Found markdown-wrapped content: ${JSON.stringify(markdownMatch[1])}`, { component: 'Aiassistanthandlers', operation: 'if' });
-            try {
-              parsed = JSON.parse(markdownMatch[1].trim());
-              parseMethod = 'markdown';
-              logger.info(`✅ [QuickAdd][${provider}] Markdown JSON.parse succeeded`, { component: 'Aiassistanthandlers', operation: 'if' });
-            } catch (markdownError) {
-              logger.error(`❌ [QuickAdd][${provider}] Markdown JSON.parse failed:`, { component: 'Aiassistanthandlers', operation: 'catch' }, markdownError as Error);
-            }
-          }
-
-          // Fallback to regex extraction if markdown didn't work
-          if (!parsed) {
-            logger.info(`🔍 [QuickAdd][${provider}] Attempting regex extraction...`, { component: 'Aiassistanthandlers', operation: 'if' });
-            const m = content.match(/\{[\s\S]*\}/);
-            logger.info(`🔍 [QuickAdd][${provider}] Regex match result: ${m ? 'found' : 'not found'}`, { component: 'Aiassistanthandlers', operation: 'if' });
-
-            if (m) {
-              logger.info(`🔍 [QuickAdd][${provider}] Extracted JSON string: ${JSON.stringify(m[0])}`, { component: 'Aiassistanthandlers', operation: 'if' });
-              try {
-                parsed = JSON.parse(m[0]);
-                parseMethod = 'regex';
-                logger.info(`✅ [QuickAdd][${provider}] Regex JSON.parse succeeded`, { component: 'Aiassistanthandlers', operation: 'if' });
-              } catch (regexError) {
-                logger.error(`❌ [QuickAdd][${provider}] Regex JSON.parse failed:`, { component: 'Aiassistanthandlers', operation: 'catch' }, regexError as Error);
-              }
-            }
-          }
-        }
-
-        logger.info(`🔍 [QuickAdd][${provider}] PARSING RESULTS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('- Parse method used:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: parseMethod } });
-        logger.info(`- Parsed result exists: ${!!parsed}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- Parsed result type: ${typeof parsed}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('- Parsed result:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: parsed } });
-
-        if (!parsed) {
-          logger.error(`❌ [QuickAdd][${provider}] No parsed result - both direct and regex parsing failed`, { component: 'Aiassistanthandlers', operation: 'if' });
-          return { success: false, error: 'Failed to parse JSON response', debug: { provider, model, contentSample: content?.slice?.(0, 1000) } } as any;
-        }
-
-        logger.info(`🔍 [QuickAdd][${provider}] VALIDATION CHECKS:`, { component: 'Aiassistanthandlers', operation: 'if' });
-        logger.info(`- parsed.intent exists: ${!!parsed.intent}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- parsed.intent value: ${parsed.intent}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- parsed.data exists: ${!!parsed.data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('- parsed.data value:', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { value: parsed.data } });
-
-        if (!parsed.intent || !parsed.data) {
-          logger.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, { component: 'Aiassistanthandlers', operation: 'if', metadata: { parsed } });
-          return { success: false, error: 'Malformed LLM response structure', debug: { provider, model, contentSample: content?.slice?.(0, 1000), parsed } } as any;
-        }
-
-        logger.info(`✅ [QuickAdd][${provider}] Successfully parsed and validated:`, {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: parsed } });
-
-        // Convert new format to old format for backwards compatibility
-        const result = {
-          kind: parsed.intent === 'CREATE_TASK' ? 'task' : 'journal',
-          title: parsed.data.title || null,
-          description: parsed.data.content || null,
-          tags: parsed.data.tags || [],
-          priority: parsed.data.priority || null,
-          dueDate: parsed.data.dueDate || null,
-          project: parsed.data.project || null
+        return {
+          success: false,
+          error: result.error,
+          debug: debug ? { error: result.error } : undefined
         };
-
-        logger.info(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: result } });
-
-        // Record token usage (map to 'analyze' channel for now)
-        try {
-          logger.info(`💾 [QuickAdd][${provider}] USAGE TRACKING ANALYSIS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- data exists: ${!!data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- data.usage exists: ${!!data?.usage}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info('- data.usage value:', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { value: data?.usage } });
-          logger.info(`- data.usage type: ${typeof data?.usage}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-
-          const u = normalizeUsage(data?.usage);
-          logger.info(`💾 [QuickAdd][${provider}] NORMALIZED USAGE:`, {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: u } });
-          logger.info(`- promptTokens: ${u.promptTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- completionTokens: ${u.completionTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- totalTokens: ${u.totalTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- totalTokens > 0: ${u.totalTokens > 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-
-          if (u.totalTokens > 0) {
-            const usageEntry = {
-              provider: 'openai' as const,
-              operation: 'quickadd' as const,
-              promptTokens: u.promptTokens,
-              completionTokens: u.completionTokens,
-              totalTokens: u.totalTokens,
-              timestamp: new Date().toISOString(),
-            };
-            logger.info(`💾 [QuickAdd][${provider}] Saving usage entry with deduplication:`, {  component: 'Aiassistanthandlers', operation: 'save' , metadata: { value: usageEntry } });
-
-            const { sqliteService } = await import('@serenity/database');
-            await sqliteService.initialize();
-            await sqliteService.addAIUsage([usageEntry]);
-            logger.info(`✅ [QuickAdd][${provider}] Usage saved to database`, { component: 'Aiassistanthandlers', operation: 'save' });
-          } else {
-            logger.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`, { component: 'Aiassistanthandlers', operation: 'save' });
-          }
-        } catch (e) {
-          logger.error(`⚠️ [QuickAdd][${provider}] Failed to save quick-add usage:`, { component: 'Aiassistanthandlers', operation: 'catch' }, e as Error);
-        }
-
-        return { success: true, data: result, debug: debug ? { provider, model, contentSample: content?.slice?.(0, 500) } : undefined } as any;
-      } else if (provider === 'gemini') {
-        const modelInfo = getModelInfo();
-        const defaultModel = (modelInfo?.gemini?.model) || 'gemini-2.5-flash';
-        const model = await resolveModelForProvider('gemini', defaultModel);
-        if (debug) console.log('[QuickAdd][gemini] model=', model);
-
-        logger.info(`📡 [QuickAdd][${provider}] Making API call to Gemini...`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`📡 [QuickAdd][${provider}] URL: https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`📡 [QuickAdd][${provider}] API key available: ${!!apiKey}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-
-        let r: Response;
-        try {
-          r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ role: 'user', parts: [{ text: `${instruction}\n\n${text}` }]}],
-              generationConfig: { temperature: 0.2, maxOutputTokens: 1000 }
-            }),
-          });
-
-          logger.info(`📡 [QuickAdd][${provider}] API response status: ${r.status} ${r.statusText}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-
-          if (!r.ok) {
-            const errorText = await r.text().catch(() => 'Failed to read error response');
-            logger.error(`❌ [QuickAdd][${provider}] API error response: ${errorText}`, { component: 'Aiassistanthandlers', operation: 'if' });
-            return { success: false, error: `Provider error ${r.status}: ${errorText}` };
-          }
-        } catch (fetchError) {
-          logger.error(`❌ [QuickAdd][${provider}] Fetch error:`, { component: 'Aiassistanthandlers', operation: 'catch' }, fetchError as Error);
-          return { success: false, error: `Network error: ${fetchError instanceof Error ? fetchError.message : 'Unknown fetch error'}` };
-        }
-
-        const data: any = await r.json();
-
-        logger.info(`📥 [QuickAdd][${provider}] COMPLETE API RESPONSE:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('---START FULL RESPONSE---', { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(JSON.stringify(data, null, 2), { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('---END FULL RESPONSE---', { component: 'Aiassistanthandlers', operation: 'execute' });
-
-        const parts = data?.candidates?.[0]?.content?.parts || [];
-        const content = (Array.isArray(parts) ? parts.map((p: any) => p?.text).filter(Boolean) : []).join('\n');
-
-        logger.info(`📥 [QuickAdd][${provider}] EXTRACTED CONTENT:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('---START CONTENT---', { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(content, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('---END CONTENT---', { component: 'Aiassistanthandlers', operation: 'execute' });
-
-        logger.info(`📥 [QuickAdd][${provider}] RESPONSE ANALYSIS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- data exists: ${!!data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- data.candidates exists: ${!!data?.candidates}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- data.candidates is array: ${Array.isArray(data?.candidates)}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- data.candidates length: ${data?.candidates?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- first candidate exists: ${!!data?.candidates?.[0]}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- candidate.content exists: ${!!data?.candidates?.[0]?.content}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- candidate.content.parts exists: ${!!data?.candidates?.[0]?.content?.parts}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- parts is array: ${Array.isArray(parts)}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- parts length: ${parts?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- content type: ${typeof content}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- content length: ${content?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-
-        let parsed: any = null;
-        try {
-          parsed = JSON.parse(content.trim());
-        } catch {
-          const m = content?.match?.(/\{[\s\S]*\}/);
-          if (m) {
-            try {
-              parsed = JSON.parse(m[0]);
-              logger.info(`🔧 [QuickAdd][${provider}] Extracted JSON from response`, { component: 'Aiassistanthandlers', operation: 'if' });
-            } catch {
-              logger.error(`❌ [QuickAdd][${provider}] Failed to parse extracted JSON`, { component: 'Aiassistanthandlers', operation: 'catch' });
-            }
-          }
-        }
-
-        if (!parsed || !parsed.intent || !parsed.data) {
-          logger.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, { component: 'Aiassistanthandlers', operation: 'if', metadata: { parsed } });
-          return { success: false, error: 'Malformed LLM response', debug: { provider, model, contentSample: content?.slice?.(0, 1000) } } as any;
-        }
-
-        logger.info(`✅ [QuickAdd][${provider}] Successfully parsed:`, {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: parsed } });
-
-        // Convert new format to old format for backwards compatibility
-        const result = {
-          kind: parsed.intent === 'CREATE_TASK' ? 'task' : 'journal',
-          title: parsed.data.title || null,
-          description: parsed.data.content || null,
-          tags: parsed.data.tags || [],
-          priority: parsed.data.priority || null,
-          dueDate: parsed.data.dueDate || null,
-          project: parsed.data.project || null
-        };
-
-        logger.info(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: result } });
-        try {
-          logger.info(`💾 [QuickAdd][${provider}] USAGE TRACKING ANALYSIS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- data exists: ${!!data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- data.usageMetadata exists: ${!!data?.usageMetadata}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info('- data.usageMetadata value:', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { value: data?.usageMetadata } });
-
-          const um = data?.usageMetadata || {};
-          const promptTokens = Number(um.promptTokenCount || 0);
-          const completionTokens = Number(um.candidatesTokenCount || 0);
-          const totalTokens = Number(um.totalTokenCount || (promptTokens + completionTokens));
-
-          logger.info(`💾 [QuickAdd][${provider}] EXTRACTED USAGE VALUES:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- promptTokens: ${promptTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- completionTokens: ${completionTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- totalTokens: ${totalTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- totalTokens > 0: ${totalTokens > 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-
-          if (totalTokens > 0) {
-            const usageEntry = { provider: 'gemini' as const, operation: 'quickadd' as const, promptTokens, completionTokens, totalTokens, timestamp: new Date().toISOString() };
-            logger.info(`💾 [QuickAdd][${provider}] Saving usage entry with deduplication:`, {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: usageEntry } });
-
-            const { sqliteService } = await import('@serenity/database');
-            await sqliteService.initialize();
-            await sqliteService.addAIUsage([usageEntry]);
-            logger.info(`✅ [QuickAdd][${provider}] Usage saved to database`, { component: 'Aiassistanthandlers', operation: 'save' });
-          } else {
-            logger.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`, { component: 'Aiassistanthandlers', operation: 'save' });
-          }
-        } catch (e) {
-          logger.error(`⚠️ [QuickAdd][${provider}] Failed to save quick-add usage:`, { component: 'Aiassistanthandlers', operation: 'catch' }, e as Error);
-        }
-        return { success: true, data: result, debug: debug ? { provider, model, contentSample: content?.slice?.(0, 500) } : undefined } as any;
-      } else if (provider === 'anthropic') {
-        const model = await resolveModelForProvider('anthropic', 'claude-3-5-sonnet-latest');
-        if (debug) console.log('[QuickAdd][anthropic] model=', model);
-        const r = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({
-            model,
-            max_tokens: 1000,
-            temperature: 0.2,
-            system: instruction,
-            messages: [{ role: 'user', content: text }],
-          }),
-        });
-        if (!r.ok) return { success: false, error: `Provider error ${r.status}` };
-        const data: any = await r.json();
-
-        logger.info(`📥 [QuickAdd][${provider}] COMPLETE API RESPONSE:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('---START FULL RESPONSE---', { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(JSON.stringify(data, null, 2), { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('---END FULL RESPONSE---', { component: 'Aiassistanthandlers', operation: 'execute' });
-
-        const content = data?.content?.[0]?.text || '';
-
-        logger.info(`📥 [QuickAdd][${provider}] EXTRACTED CONTENT:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('---START CONTENT---', { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(content, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info('---END CONTENT---', { component: 'Aiassistanthandlers', operation: 'execute' });
-
-        logger.info(`📥 [QuickAdd][${provider}] RESPONSE ANALYSIS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- data exists: ${!!data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- data.content exists: ${!!data?.content}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- data.content is array: ${Array.isArray(data?.content)}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- data.content length: ${data?.content?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- first content exists: ${!!data?.content?.[0]}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- content.text exists: ${!!data?.content?.[0]?.text}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- content type: ${typeof content}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-        logger.info(`- content length: ${content?.length || 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-
-        let parsed: any = null;
-        try {
-          parsed = JSON.parse(content.trim());
-        } catch {
-          const m = content?.match?.(/\{[\s\S]*\}/);
-          if (m) {
-            try {
-              parsed = JSON.parse(m[0]);
-              logger.info(`🔧 [QuickAdd][${provider}] Extracted JSON from response`, { component: 'Aiassistanthandlers', operation: 'if' });
-            } catch {
-              logger.error(`❌ [QuickAdd][${provider}] Failed to parse extracted JSON`, { component: 'Aiassistanthandlers', operation: 'catch' });
-            }
-          }
-        }
-
-        if (!parsed || !parsed.intent || !parsed.data) {
-          logger.error(`❌ [QuickAdd][${provider}] Invalid response structure. Expected: {intent, data}, got:`, { component: 'Aiassistanthandlers', operation: 'if', metadata: { parsed } });
-          return { success: false, error: 'Malformed LLM response', debug: { provider, model, contentSample: content?.slice?.(0, 1000) } } as any;
-        }
-
-        logger.info(`✅ [QuickAdd][${provider}] Successfully parsed:`, {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: parsed } });
-
-        // Convert new format to old format for backwards compatibility
-        const result = {
-          kind: parsed.intent === 'CREATE_TASK' ? 'task' : 'journal',
-          title: parsed.data.title || null,
-          description: parsed.data.content || null,
-          tags: parsed.data.tags || [],
-          priority: parsed.data.priority || null,
-          dueDate: parsed.data.dueDate || null,
-          project: parsed.data.project || null
-        };
-
-        logger.info(`🔄 [QuickAdd][${provider}] Converted to legacy format:`, {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: result } });
-        try {
-          logger.info(`💾 [QuickAdd][${provider}] USAGE TRACKING ANALYSIS:`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- data exists: ${!!data}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- data.usage exists: ${!!data?.usage}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info('- data.usage value:', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { value: data?.usage } });
-          logger.info(`- data.usage type: ${typeof data?.usage}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-
-          const u = normalizeUsage(data?.usage);
-          logger.info(`💾 [QuickAdd][${provider}] NORMALIZED USAGE:`, {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: u } });
-          logger.info(`- promptTokens: ${u.promptTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- completionTokens: ${u.completionTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- totalTokens: ${u.totalTokens}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-          logger.info(`- totalTokens > 0: ${u.totalTokens > 0}`, { component: 'Aiassistanthandlers', operation: 'execute' });
-
-          if (u.totalTokens > 0) {
-            const usageEntry = { provider: 'anthropic' as const, operation: 'quickadd' as const, promptTokens: u.promptTokens, completionTokens: u.completionTokens, totalTokens: u.totalTokens, timestamp: new Date().toISOString() };
-            logger.info(`💾 [QuickAdd][${provider}] Saving usage entry with deduplication:`, {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: usageEntry } });
-
-            const { sqliteService } = await import('@serenity/database');
-            await sqliteService.initialize();
-            await sqliteService.addAIUsage([usageEntry]);
-            logger.info(`✅ [QuickAdd][${provider}] Usage saved to database`, { component: 'Aiassistanthandlers', operation: 'save' });
-          } else {
-            logger.warn(`⚠️ [QuickAdd][${provider}] Skipping usage save - totalTokens is 0`, { component: 'Aiassistanthandlers', operation: 'save' });
-          }
-        } catch (e) {
-          logger.error(`⚠️ [QuickAdd][${provider}] Failed to save quick-add usage:`, { component: 'Aiassistanthandlers', operation: 'catch' }, e as Error);
-        }
-        return { success: true, data: result, debug: debug ? { provider, model, contentSample: content?.slice?.(0, 500) } : undefined } as any;
       }
 
-      return { success: false, error: `Provider ${provider} not supported for quick-add`, debug: { stage: 'unsupported_provider', provider } } as any;
-    } catch (e) {
-      logger.error('[QuickAdd] error:', { component: 'Aiassistanthandlers', operation: 'catch', metadata: { e } });
-      return { success: false, error: (e as Error)?.message || 'LLM error' } as any;
+      const content = result.content || '';
+      logger.info(`📥 [QuickAdd] Received response (${content.length} chars)`, {
+        component: 'aiAssistantHandlers',
+        operation: 'quickAdd'
+      });
+
+      // Parse JSON response with fallback mechanisms
+      let parsed: any = null;
+      let parseMethod = '';
+
+      try {
+        // Try direct JSON parse
+        logger.info(`🔍 [QuickAdd] Attempting direct JSON.parse...`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd'
+        });
+        parsed = JSON.parse(content.trim());
+        parseMethod = 'direct';
+        logger.info(`✅ [QuickAdd] Direct JSON.parse succeeded`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd'
+        });
+      } catch (directError) {
+        logger.info(`❌ [QuickAdd] Direct JSON.parse failed, trying markdown extraction...`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd'
+        });
+
+        // Try to extract from markdown code blocks
+        const markdownMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (markdownMatch && markdownMatch[1]) {
+          try {
+            parsed = JSON.parse(markdownMatch[1].trim());
+            parseMethod = 'markdown';
+            logger.info(`✅ [QuickAdd] Markdown JSON.parse succeeded`, {
+              component: 'aiAssistantHandlers',
+              operation: 'quickAdd'
+            });
+          } catch (markdownError) {
+            logger.warn(`❌ [QuickAdd] Markdown JSON.parse failed`, {
+              component: 'aiAssistantHandlers',
+              operation: 'quickAdd'
+            });
+          }
+        }
+
+        // Fallback to regex extraction
+        if (!parsed) {
+          logger.info(`🔍 [QuickAdd] Attempting regex extraction...`, {
+            component: 'aiAssistantHandlers',
+            operation: 'quickAdd'
+          });
+          const m = content.match(/\{[\s\S]*\}/);
+          if (m) {
+            try {
+              parsed = JSON.parse(m[0]);
+              parseMethod = 'regex';
+              logger.info(`✅ [QuickAdd] Regex JSON.parse succeeded`, {
+                component: 'aiAssistantHandlers',
+                operation: 'quickAdd'
+              });
+            } catch (regexError) {
+              logger.error(`❌ [QuickAdd] Regex JSON.parse failed`, {
+                component: 'aiAssistantHandlers',
+                operation: 'quickAdd'
+              });
+            }
+          }
+        }
+      }
+
+      // Validate parsed structure
+      if (!parsed) {
+        logger.error(`❌ [QuickAdd] Failed to parse JSON response (all methods failed)`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd'
+        });
+        return {
+          success: false,
+          error: 'Failed to parse JSON response from AI',
+          debug: debug ? { contentSample: content?.slice?.(0, 500) } : undefined
+        };
+      }
+
+      if (!parsed.intent || !parsed.data) {
+        logger.error(`❌ [QuickAdd] Invalid response structure. Expected {intent, data}, got:`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd',
+          metadata: { parsed }
+        });
+        return {
+          success: false,
+          error: 'Malformed AI response structure',
+          debug: debug ? { parsed, contentSample: content?.slice?.(0, 500) } : undefined
+        };
+      }
+
+      logger.info(`✅ [QuickAdd] Successfully parsed (method: ${parseMethod}):`, {
+        component: 'aiAssistantHandlers',
+        operation: 'quickAdd',
+        metadata: { parsed }
+      });
+
+      // Convert to legacy format for backwards compatibility
+      const legacyResult = {
+        kind: parsed.intent === 'CREATE_TASK' ? 'task' : 'journal',
+        title: parsed.data.title || null,
+        description: parsed.data.content || null,
+        tags: parsed.data.tags || [],
+        priority: parsed.data.priority || null,
+        dueDate: parsed.data.dueDate || null,
+        project: parsed.data.project || null
+      };
+
+      logger.info(`🔄 [QuickAdd] Converted to legacy format:`, {
+        component: 'aiAssistantHandlers',
+        operation: 'quickAdd',
+        metadata: { legacyResult }
+      });
+
+      // Record usage tokens (already handled by makeAIApiCallWithFailoverCustom, but also record for quickadd operation)
+      try {
+        const usage = result.usage || result.rawData?.usage || {};
+        const normalized = normalizeUsage(usage);
+
+        if (normalized.totalTokens > 0) {
+          const usageEntry = {
+            provider: result.provider as 'openai' | 'gemini' | 'anthropic',
+            operation: 'quickadd' as const,
+            promptTokens: normalized.promptTokens,
+            completionTokens: normalized.completionTokens,
+            totalTokens: normalized.totalTokens,
+            timestamp: new Date().toISOString(),
+          };
+
+          logger.info(`💾 [QuickAdd] Recording usage:`, {
+            component: 'aiAssistantHandlers',
+            operation: 'quickAdd',
+            metadata: { usageEntry }
+          });
+
+          const { sqliteService } = await import('@serenity/database');
+          await sqliteService.initialize();
+          await sqliteService.addAIUsage([usageEntry]);
+
+          logger.info(`✅ [QuickAdd] Usage saved to database`, {
+            component: 'aiAssistantHandlers',
+            operation: 'quickAdd'
+          });
+        }
+      } catch (usageError) {
+        logger.error(`⚠️ [QuickAdd] Failed to save usage:`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd'
+        }, usageError as Error);
+      }
+
+      return {
+        success: true,
+        data: legacyResult,
+        debug: debug ? {
+          provider: result.provider,
+          credentialName: result.credentialName,
+          parseMethod,
+          contentSample: content?.slice?.(0, 500)
+        } : undefined
+      };
+    } catch (error) {
+      logger.error('[QuickAdd] Unexpected error:', {
+        component: 'aiAssistantHandlers',
+        operation: 'quickAdd'
+      }, error as Error);
+      return {
+        success: false,
+        error: (error as Error)?.message || 'Unexpected error during Quick Add'
+      };
     }
   });
 

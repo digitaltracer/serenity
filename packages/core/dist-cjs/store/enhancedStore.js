@@ -61,6 +61,7 @@ const integrationsSlice_1 = __importDefault(require("./slices/integrationsSlice"
 const aiAssistantSlice_1 = __importDefault(require("./slices/aiAssistantSlice"));
 const aiAssistantSlice_2 = require("./slices/aiAssistantSlice");
 const insightsSlice_1 = __importDefault(require("./slices/insightsSlice"));
+const summariesSlice_1 = __importDefault(require("./slices/summariesSlice"));
 const simplifiedPersistenceMiddleware_1 = require("./middleware/simplifiedPersistenceMiddleware");
 const logger_1 = require("../utils/logger");
 /**
@@ -85,6 +86,7 @@ function createEnhancedStore() {
             integrations: integrationsSlice_1.default,
             aiAssistant: aiAssistantSlice_1.default,
             insights: insightsSlice_1.default,
+            summaries: summariesSlice_1.default,
         },
         middleware: (getDefaultMiddleware) => getDefaultMiddleware({
             serializableCheck: {

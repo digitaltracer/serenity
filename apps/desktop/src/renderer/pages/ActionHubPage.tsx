@@ -349,7 +349,7 @@ export const ActionHubPage: React.FC = () => {
       )}>
         {/* Tabs */}
         <div className={cn(
-          'flex space-x-1 bg-gradient-to-br from-gray-100 to-gray-200/30 dark:from-gray-800 dark:to-gray-900/60 backdrop-blur-sm border border-gray-200/60 dark:border-gray-700/40 p-1.5 rounded-xl w-fit shadow-sm shadow-gray-200/30 dark:shadow-black/20',
+          'flex space-x-1 bg-card/50 backdrop-blur-sm border border-border/50 p-1.5 rounded-lg w-fit',
           {
             'mb-6': !compactMode,
             'mb-4': compactMode,
@@ -357,30 +357,30 @@ export const ActionHubPage: React.FC = () => {
         )}>
           <button
             onClick={() => setActiveTab('tasks')}
-            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'tasks'
-                ? 'bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-700 dark:to-gray-800 text-gray-900 dark:text-white shadow-md shadow-gray-200/40 dark:shadow-black/40 ring-1 ring-gray-100/50 dark:ring-gray-600/30'
-                : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50/50 dark:hover:bg-gray-700/30'
+                ? 'bg-card border border-border text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
             }`}
           >
             Tasks
           </button>
           <button
             onClick={() => setActiveTab('projects')}
-            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'projects'
-                ? 'bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-700 dark:to-gray-800 text-gray-900 dark:text-white shadow-md shadow-gray-200/40 dark:shadow-black/40 ring-1 ring-gray-100/50 dark:ring-gray-600/30'
-                : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50/50 dark:hover:bg-gray-700/30'
+                ? 'bg-card border border-border text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
             }`}
           >
             Projects
           </button>
           <button
             onClick={() => setActiveTab('calendar')}
-            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 flex items-center gap-2 ${
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${
               activeTab === 'calendar'
-                ? 'bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-700 dark:to-gray-800 text-gray-900 dark:text-white shadow-md shadow-gray-200/40 dark:shadow-black/40 ring-1 ring-gray-100/50 dark:ring-gray-600/30'
-                : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50/50 dark:hover:bg-gray-700/30'
+                ? 'bg-card border border-border text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
             }`}
           >
             <CalendarDays className="w-4 h-4" />
@@ -510,8 +510,8 @@ export const ActionHubPage: React.FC = () => {
                 
                 {/* Add Task Placeholder - Right Side */}
                 <div className="flex-1">
-                  <div 
-                    className="border border-dashed border-gray-300/80 dark:border-gray-600/60 rounded-xl p-8 text-center cursor-pointer bg-gradient-to-br from-gray-50/50 to-white/80 dark:from-gray-800/40 dark:to-gray-900/30 backdrop-blur-sm shadow-sm shadow-gray-200/30 dark:shadow-black/20 ring-1 ring-gray-100/40 dark:ring-gray-800/30 transition-all duration-300 ease-out hover:border-blue-300/80 dark:hover:border-blue-500/60 hover:from-blue-50/40 hover:to-blue-25/60 dark:hover:from-blue-900/20 dark:hover:to-blue-800/10 hover:shadow-md hover:shadow-blue-200/40 dark:hover:shadow-blue-900/30 hover:-translate-y-0.5 hover:scale-[1.01] transform-gpu"
+                  <div
+                    className="border border-dashed border-border/50 rounded-lg p-8 text-center cursor-pointer bg-card/50 backdrop-blur-sm transition-all hover:bg-card hover:border-border hover:shadow-lg"
                     onClick={() => {
                       setShowCreateForm(true);
                       // Scroll to the form after a short delay to ensure it's rendered
@@ -523,15 +523,15 @@ export const ActionHubPage: React.FC = () => {
                       }, 100);
                     }}
                   >
-                    <Plus className="w-5 h-5 text-gray-500 dark:text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600 dark:text-gray-400 text-base font-medium">Add new task...</p>
+                    <Plus className="w-5 h-5 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-muted-foreground text-base font-medium">Add new task...</p>
                   </div>
                 </div>
               </div>
             ) : (
               /* Full Width Create Form */
               <div className="mb-6" ref={createFormRef}>
-                <div className="bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-800/80 dark:to-gray-900/60 border border-gray-200/60 dark:border-gray-700/40 rounded-2xl p-6 shadow-lg shadow-gray-200/40 dark:shadow-black/25 ring-1 ring-gray-100/80 dark:ring-gray-800/60 backdrop-blur-sm">
+                <div className="bg-card border border-border rounded-lg p-6 shadow-lg">
                   <div className="space-y-5">
                       <Input
                         label="Task title"

@@ -22,6 +22,16 @@ import {
   selectAIUsage,
   restoreUsage,
   type AIProvider,
+  // Credential management
+  selectCredentials,
+  selectIsLoadingCredentials,
+  fetchCredentials,
+  addCredential,
+  updateCredential,
+  deleteCredential,
+  testCredential as testCredentialThunk,
+  reorderCredentials,
+  type AIProviderCredentialInput,
 } from '@serenity/core';
 import {
   saveDatabaseConnection,
@@ -37,7 +47,7 @@ import {
   setMasterPassword,
   initializeAuth
 } from '@serenity/core';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, DatabaseConfigurationModal, PrivacySecurityModal, TagsManager, useToast, Toggle, AIProviderKeyInput, AIUsageSummary, AIOperationHistory, AIUsageTrendChart } from '@serenity/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, DatabaseConfigurationModal, PrivacySecurityModal, TagsManager, useToast, Toggle, AIProviderKeyInput, AIUsageSummary, AIOperationHistory, AIUsageTrendChart, AIProviderCredentialManager } from '@serenity/ui';
 import { logger } from '@serenity/core';
 import {
   Settings,
@@ -56,7 +66,8 @@ import {
   Sparkles,
   Brain,
   Zap,
-  BarChart3
+  BarChart3,
+  RefreshCw
 } from 'lucide-react';
 
 
@@ -73,6 +84,8 @@ export const SettingsPage: React.FC = () => {
   const activeProvider = useSelector(selectActiveProvider);
   const aiConfiguration = useSelector(selectAIConfiguration);
   const aiUsage = useSelector(selectAIUsage);
+  const credentials = useSelector(selectCredentials);
+  const isLoadingCredentials = useSelector(selectIsLoadingCredentials);
 
   // Local state for features not yet in Redux
   const [notifications, setNotifications] = React.useState(true);
@@ -80,8 +93,11 @@ export const SettingsPage: React.FC = () => {
   const [isDatabaseModalOpen, setIsDatabaseModalOpen] = React.useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = React.useState(false);
   const [isTagsManagerOpen, setIsTagsManagerOpen] = React.useState(false);
-  const [isLoadingUsage, setIsLoadingUsage] = React.useState(false);
-  
+  const [isAddingCredential, setIsAddingCredential] = React.useState(false);
+  const [editingCredentialId, setEditingCredentialId] = React.useState<string | null>(null);
+  const [isRefreshingUsage, setIsRefreshingUsage] = React.useState(false);
+
+
   // Database connection state - lazy loaded to prevent blocking startup
   const [dbConnection, setDbConnection] = React.useState<any>(null);
   const [dbConnected, setDbConnected] = React.useState(false);
@@ -143,28 +159,48 @@ export const SettingsPage: React.FC = () => {
     const timer = setTimeout(loadSettings, 200);
     return () => clearTimeout(timer);
   }, []);
-  
-  // Load AI usage data
-  const handleRefreshUsage = async () => {
-    setIsLoadingUsage(true);
+
+  // Load AI usage data function (reusable)
+  const loadUsage = React.useCallback(async () => {
+    setIsRefreshingUsage(true);
     try {
       if (window.electronAPI?.aiAssistant?.listUsage) {
         const result = await window.electronAPI.aiAssistant.listUsage();
         if (result.success && Array.isArray(result.usage)) {
           dispatch(restoreUsage(result.usage));
+          logger.info('✅ Refreshed AI usage data', {
+            component: 'SettingsPage',
+            operation: 'refreshUsage',
+            count: result.usage.length
+          });
         }
       }
     } catch (error) {
-      logger.error('Failed to load AI usage', { component: 'SettingsPage', operation: 'handleRefreshUsage' }, error as Error);
+      logger.error('Failed to load AI usage', { component: 'SettingsPage', operation: 'loadUsage' }, error as Error);
+      showError('Refresh Failed', 'Failed to refresh AI usage data');
     } finally {
-      setIsLoadingUsage(false);
+      setIsRefreshingUsage(false);
     }
-  };
+  }, [dispatch, showError]);
 
-  // Load usage on mount
+  // Load AI usage data on mount
   React.useEffect(() => {
-    handleRefreshUsage();
-  }, []);
+    loadUsage();
+  }, [loadUsage]);
+
+  // Auto-refresh usage data every 30 seconds when on Settings page
+  React.useEffect(() => {
+    const intervalId = setInterval(() => {
+      loadUsage();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [loadUsage]);
+
+  // Load credentials on mount
+  React.useEffect(() => {
+    dispatch(fetchCredentials());
+  }, [dispatch]);
 
   // AI Provider Handlers
   const handleSaveApiKey = async (providerId: string, apiKey: string) => {
@@ -211,6 +247,81 @@ export const SettingsPage: React.FC = () => {
     } catch (error: any) {
       showError('Remove Failed', error.message || 'Failed to remove API key');
       return { success: false, error: error.message };
+    }
+  };
+
+  // Credential Management Handlers
+  const handleTestCredential = async (provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => {
+    try {
+      const result = await (window as any).api?.['ai-credentials:test-new']?.(provider, apiKey);
+      return result || { valid: false, error: 'Test not available' };
+    } catch (error: any) {
+      return { valid: false, error: error.message };
+    }
+  };
+
+  const handleAddCredential = async (credentialData: AIProviderCredentialInput) => {
+    try {
+      await dispatch(addCredential(credentialData)).unwrap();
+      showSuccess('Credential Added', `Successfully added ${credentialData.provider} credential`);
+      setIsAddingCredential(false);
+    } catch (error: any) {
+      showError('Add Failed', error.message || 'Failed to add credential');
+      throw error;
+    }
+  };
+
+  const handleEditCredential = (credential: any) => {
+    setEditingCredentialId(credential.id);
+  };
+
+  const handleSaveEditCredential = async (id: string, updates: { name?: string; modelPreference?: string; enabled?: boolean }) => {
+    try {
+      await dispatch(updateCredential({ id, updates })).unwrap();
+      showSuccess('Credential Updated', 'Successfully updated credential');
+      setEditingCredentialId(null);
+    } catch (error: any) {
+      showError('Update Failed', error.message || 'Failed to update credential');
+      throw error;
+    }
+  };
+
+  const handleDeleteCredential = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this credential?')) {
+      return;
+    }
+
+    try {
+      await dispatch(deleteCredential(id)).unwrap();
+      showSuccess('Credential Deleted', 'Successfully deleted credential');
+    } catch (error: any) {
+      showError('Delete Failed', error.message || 'Failed to delete credential');
+    }
+  };
+
+  const handleToggleCredentialEnabled = async (id: string, enabled: boolean) => {
+    try {
+      await dispatch(updateCredential({ id, updates: { enabled } })).unwrap();
+      showSuccess(
+        enabled ? 'Credential Enabled' : 'Credential Disabled',
+        enabled ? 'Credential is now active' : 'Credential has been disabled'
+      );
+    } catch (error: any) {
+      showError('Update Failed', error.message || 'Failed to update credential');
+    }
+  };
+
+  const handleReorderCredentials = async (reorderedCredentials: any[]) => {
+    const priorities = reorderedCredentials.map((cred, idx) => ({
+      id: cred.id,
+      priority: idx,
+    }));
+
+    try {
+      await dispatch(reorderCredentials(priorities)).unwrap();
+      showSuccess('Order Updated', 'Credential priority order updated');
+    } catch (error: any) {
+      showError('Reorder Failed', error.message || 'Failed to update credential order');
     }
   };
 
@@ -358,12 +469,14 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* Header */}
-      <div className="mb-8">
+    <div className="flex-1 h-full bg-background">
+      <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-200/50 dark:border-blue-700/30">
-            <Settings className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <div className="p-3 rounded-lg bg-primary/5 border border-border/50">
+            <Settings className="w-6 h-6 text-primary" />
           </div>
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
@@ -403,12 +516,11 @@ export const SettingsPage: React.FC = () => {
                       key={theme.value}
                       onClick={() => dispatch(setTheme(theme.value as 'light' | 'dark' | 'system'))}
                       className={`
-                        relative p-4 rounded-xl border transition-all duration-300 ease-out transform
-                        ${isSelected 
-                          ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-purple-50/30 dark:from-blue-900/30 dark:to-purple-900/20 dark:border-blue-600 shadow-lg shadow-blue-500/20 scale-105' 
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 hover:scale-102'
+                        relative p-4 rounded-lg border transition-all group focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2
+                        ${isSelected
+                          ? 'border-primary bg-primary/5 shadow-lg'
+                          : 'border-border hover:border-primary/50 hover:bg-card/50'
                         }
-                        group focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900
                       `}
                     >
                       <div className="flex flex-col items-center gap-2">
@@ -509,36 +621,23 @@ export const SettingsPage: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* API Key Configuration */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                  <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900 dark:text-gray-100">AI Provider Configuration</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Configure API keys for AI providers. Select the active provider with the radio button.
-                  </p>
-                </div>
-              </div>
-              {aiProviders.map((provider) => (
-                <AIProviderKeyInput
-                  key={provider.id}
-                  provider={provider}
-                  isActive={activeProvider === provider.id}
-                  onSave={handleSaveApiKey}
-                  onTest={handleTestApiKey}
-                  onRemove={handleRemoveApiKey}
-                  onSetActive={(providerId) => dispatch(setActiveProvider(providerId))}
-                />
-              ))}
-              {!activeProvider && (
-                <div className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded">
-                  Please set up an API key for at least one provider and select it as active to enable AI features
-                </div>
-              )}
-            </div>
+            {/* Credential Management */}
+            <AIProviderCredentialManager
+              credentials={credentials}
+              isLoading={isLoadingCredentials}
+              editingCredentialId={editingCredentialId}
+              isAdding={isAddingCredential}
+              onStartAdd={() => setIsAddingCredential(true)}
+              onEdit={handleEditCredential}
+              onDelete={handleDeleteCredential}
+              onToggleEnabled={handleToggleCredentialEnabled}
+              onReorder={handleReorderCredentials}
+              onSaveEdit={handleSaveEditCredential}
+              onCancelEdit={() => setEditingCredentialId(null)}
+              onSaveAdd={handleAddCredential}
+              onCancelAdd={() => setIsAddingCredential(false)}
+              onTestApiKey={handleTestCredential}
+            />
 
             {/* Auto-Analyze Setting */}
             <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20">
@@ -638,21 +737,32 @@ export const SettingsPage: React.FC = () => {
         {/* AI Usage & Billing */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5" />
-              AI Usage & Billing
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-2">
-              Track your AI token usage across providers. Each AI operation consumes tokens based on the amount of data analyzed and generated. Different providers have different pricing models.
-            </p>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5" />
+                  AI Usage & Billing
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Track your AI token usage across providers. Each AI operation consumes tokens based on the amount of data analyzed and generated. Different providers have different pricing models.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadUsage}
+                disabled={isRefreshingUsage}
+                className="ml-4 flex items-center gap-2"
+                title="Refresh usage data"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshingUsage ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Summary Stats */}
-            <AIUsageSummary
-              usage={aiUsage}
-              onRefresh={handleRefreshUsage}
-              isRefreshing={isLoadingUsage}
-            />
+            <AIUsageSummary usage={aiUsage} />
 
             {/* Trend Charts */}
             <AIUsageTrendChart usage={aiUsage} />
@@ -849,6 +959,8 @@ export const SettingsPage: React.FC = () => {
         isOpen={isTagsManagerOpen}
         onClose={() => setIsTagsManagerOpen(false)}
       />
+        </div>
+      </div>
     </div>
   );
 };

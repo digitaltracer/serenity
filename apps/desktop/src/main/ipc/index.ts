@@ -10,8 +10,10 @@ import { registerJournalHandlers } from './journalHandlers';
 import { registerIntegrationHandlers } from './integrationHandlers';
 import { registerAuthHandlers } from './authHandlers';
 import { registerAIAssistantHandlers } from './aiAssistantHandlers';
+import { registerAICredentialHandlers } from './aiCredentialHandlers';
 import { registerGoalHandlers } from './goalsHandlers';
 import { registerInsightsHandlers } from './insightsHandlers';
+import { registerSummaryHandlers } from './summaryHandlers';
 import { logger } from '@serenity/core';
 
 /**
@@ -28,8 +30,10 @@ export function registerAllIpcHandlers(): void {
   registerIntegrationHandlers();
   registerAuthHandlers();
   registerAIAssistantHandlers();
+  registerAICredentialHandlers();
   registerGoalHandlers();
   registerInsightsHandlers();
+  registerSummaryHandlers();
 
   logger.info('✅ All IPC handlers registered successfully', { component: 'index', operation: 'allIpcHandlers' });
 }

@@ -146,7 +146,7 @@ export const InsightCard: React.FC<InsightCardProps> = ({
 
   return (
     <div
-      className={`bg-white dark:bg-gray-800 rounded-lg border ${config.border} shadow-sm hover:shadow-md transition-all duration-200 ${
+      className={`bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-all duration-200 ${
         insight.dismissed ? 'opacity-60' : ''
       }`}
     >

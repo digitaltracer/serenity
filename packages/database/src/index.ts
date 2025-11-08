@@ -9,6 +9,7 @@ export * from './queries/sqlite/tasks';
 export * from './queries/sqlite/projects';
 export * from './queries/sqlite/journal';
 export * from './queries/sqlite/goals';
+export * from './queries/sqlite/ai';
 
 // Postgres-based database system (server)
 export * from './adapters/PostgresAdapter';

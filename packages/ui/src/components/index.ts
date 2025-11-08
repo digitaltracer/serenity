@@ -73,6 +73,7 @@ export * from './AIProviderKeyInput';
 export * from './AIUsageSummary';
 export * from './AIOperationHistory';
 export * from './AIUsageTrendChart';
+export * from './AIProviderCredentialManager';
 // Charts
 export * from './charts';
 // Insights

@@ -52,9 +52,9 @@ const colorClasses = {
 
 const LoadingSkeleton: React.FC = () => (
   <div className="animate-pulse space-y-3">
-    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
-    <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
-    <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded" />
+    <div className="h-4 bg-muted rounded w-1/2" />
+    <div className="h-8 bg-muted rounded w-3/4" />
+    <div className="h-10 bg-muted rounded" />
   </div>
 );
 
@@ -96,14 +96,14 @@ export const KPICard: React.FC<KPICardProps> = ({
 
   return (
     <CardWrapper {...clickableProps}>
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm h-[168px] flex flex-col">
+      <div className="bg-card rounded-lg border border-border p-4 shadow-sm h-[168px] flex flex-col">
         {loading ? (
           <LoadingSkeleton />
         ) : (
           <>
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              <span className="text-sm font-medium text-muted-foreground">
                 {title}
               </span>
               {icon && (
@@ -117,7 +117,7 @@ export const KPICard: React.FC<KPICardProps> = ({
 
             {/* Value */}
             <div className="mb-3">
-              <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              <div className="text-2xl font-bold text-foreground">
                 {value}
               </div>
 
@@ -127,7 +127,7 @@ export const KPICard: React.FC<KPICardProps> = ({
                   {getChangeIcon()}
                   <span>{Math.abs(change.value).toFixed(2)}%</span>
                   {change.period && (
-                    <span className="text-gray-500 dark:text-gray-400 font-normal">
+                    <span className="text-muted-foreground font-normal">
                       vs {change.period}
                     </span>
                   )}

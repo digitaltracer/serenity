@@ -143,6 +143,35 @@ declare global {
       onMenuAction: (callback: (event: MenuEventType, data?: MenuEventData) => void) => void;
       removeMenuListeners: () => void;
     };
+    // Summary API
+    api?: {
+      summary: {
+        generate: (params: { startDate: string; endDate: string; types: ('tasks' | 'journal')[] }) => Promise<{
+          success: boolean;
+          summary?: any;
+          error?: string;
+        }>;
+        getAll: () => Promise<{
+          success: boolean;
+          summaries?: any[];
+          error?: string;
+        }>;
+        getById: (id: string) => Promise<{
+          success: boolean;
+          summary?: any;
+          error?: string;
+        }>;
+        delete: (id: string) => Promise<{
+          success: boolean;
+          error?: string;
+        }>;
+        export: (id: string, format: string) => Promise<{
+          success: boolean;
+          path?: string;
+          error?: string;
+        }>;
+      };
+    };
   }
 }
 

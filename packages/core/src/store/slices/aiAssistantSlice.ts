@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { AIAssistantService } from '../../services/aiAssistantService';
+import { AIProviderCredential, AIProviderCredentialInput } from '../../services/aiCredentialService';
 import { Task, JournalEntry } from '../../types';
 import { logger } from '../../utils/logger';
 
@@ -58,7 +59,7 @@ export interface AIUsageEntry {
   id: string;
   timestamp: string;
   provider: 'openai' | 'gemini' | 'anthropic';
-  operation: 'analyze' | 'recap';
+  operation: 'analyze' | 'recap' | 'quickadd' | 'summary';
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
@@ -69,20 +70,25 @@ export interface AIAssistantState {
   // Provider management
   providers: AIProvider[];
   activeProvider?: 'openai' | 'gemini' | 'anthropic';
-  
+
+  // Credential management (new multi-key system)
+  credentials: AIProviderCredential[];
+  isLoadingCredentials: boolean;
+  credentialError?: string;
+
   // Analysis state
   isAnalyzing: boolean;
   analysisProgress: number; // 0-100
   analysisStatus: string;
   lastAnalysis?: string;
-  
+
   // Insights and recommendations
   insights: AIInsight[];
   recaps: AIRecap[];
-  
+
   // Analysis tracking to prevent duplicates
   analysisTracker: AnalysisTracker;
-  
+
   // Configuration
   autoAnalyze: boolean;
   analysisFrequency: 'daily' | 'weekly' | 'manual';
@@ -91,7 +97,7 @@ export interface AIAssistantState {
     includeJournal: boolean;
     includeProjects: boolean;
   };
-  
+
   // Error handling
   lastError?: string;
   errors: string[];
@@ -114,6 +120,8 @@ const initialState: AIAssistantState = {
     { id: 'gemini', name: 'Google Gemini', hasApiKey: false, isActive: false },
     { id: 'anthropic', name: 'Anthropic Claude', hasApiKey: false, isActive: false },
   ],
+  credentials: [],
+  isLoadingCredentials: false,
   isAnalyzing: false,
   analysisProgress: 0,
   analysisStatus: 'Ready',
@@ -303,13 +311,13 @@ export const analyzeUserData = createAsyncThunk(
 
 export const generateRecap = createAsyncThunk(
   'aiAssistant/generateRecap',
-  async ({ 
-    provider, 
-    type, 
+  async ({
+    provider,
+    type,
     period,
     tasks,
     journalEntries,
-  }: { 
+  }: {
     provider: 'openai' | 'gemini' | 'anthropic';
     type: 'weekly' | 'monthly';
     period: { start: string; end: string };
@@ -324,7 +332,7 @@ export const generateRecap = createAsyncThunk(
         tasks,
         journalEntries,
       });
-      
+
       if (result.success) {
         return { recap: result.recap, usage: result.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 }, provider, operation: 'recap' as const };
       } else {
@@ -332,6 +340,105 @@ export const generateRecap = createAsyncThunk(
       }
     }
     throw new Error('AI Assistant API not available');
+  }
+);
+
+// Credential management async thunks
+export const fetchCredentials = createAsyncThunk(
+  'aiAssistant/fetchCredentials',
+  async (enabledOnly: boolean = false) => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.api?.['ai-credentials:list']) {
+      const result = await (globalThis as any).window.api['ai-credentials:list'](enabledOnly);
+      if (result.success) {
+        return result.credentials;
+      } else {
+        throw new Error(result.error || 'Failed to fetch credentials');
+      }
+    }
+    throw new Error('Credential API not available');
+  }
+);
+
+export const addCredential = createAsyncThunk(
+  'aiAssistant/addCredential',
+  async (input: AIProviderCredentialInput) => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.api?.['ai-credentials:add']) {
+      const result = await (globalThis as any).window.api['ai-credentials:add'](input);
+      if (result.success) {
+        return result.credential;
+      } else {
+        throw new Error(result.error || 'Failed to add credential');
+      }
+    }
+    throw new Error('Credential API not available');
+  }
+);
+
+export const updateCredential = createAsyncThunk(
+  'aiAssistant/updateCredential',
+  async ({ id, updates }: {
+    id: string;
+    updates: {
+      name?: string;
+      modelPreference?: string;
+      enabled?: boolean;
+      priority?: number;
+    }
+  }) => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.api?.['ai-credentials:update']) {
+      const result = await (globalThis as any).window.api['ai-credentials:update'](id, updates);
+      if (result.success) {
+        return { id, updates };
+      } else {
+        throw new Error(result.error || 'Failed to update credential');
+      }
+    }
+    throw new Error('Credential API not available');
+  }
+);
+
+export const deleteCredential = createAsyncThunk(
+  'aiAssistant/deleteCredential',
+  async (id: string) => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.api?.['ai-credentials:delete']) {
+      const result = await (globalThis as any).window.api['ai-credentials:delete'](id);
+      if (result.success) {
+        return id;
+      } else {
+        throw new Error(result.error || 'Failed to delete credential');
+      }
+    }
+    throw new Error('Credential API not available');
+  }
+);
+
+export const testCredential = createAsyncThunk(
+  'aiAssistant/testCredential',
+  async (id: string) => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.api?.['ai-credentials:test']) {
+      const result = await (globalThis as any).window.api['ai-credentials:test'](id);
+      if (result.success) {
+        return { id, modelInfo: result.modelInfo };
+      } else {
+        throw new Error(result.error || 'API key test failed');
+      }
+    }
+    throw new Error('Credential API not available');
+  }
+);
+
+export const reorderCredentials = createAsyncThunk(
+  'aiAssistant/reorderCredentials',
+  async (priorities: Array<{ id: string; priority: number }>) => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.api?.['ai-credentials:reorder']) {
+      const result = await (globalThis as any).window.api['ai-credentials:reorder'](priorities);
+      if (result.success) {
+        return priorities;
+      } else {
+        throw new Error(result.error || 'Failed to reorder credentials');
+      }
+    }
+    throw new Error('Credential API not available');
   }
 );
 
@@ -620,7 +727,7 @@ const aiAssistantSlice = createSlice({
             totalTokens: Number(u.totalTokens || 0),
           });
         }
-        
+
         // Keep only last 20 recaps
         if (state.recaps.length > 20) {
           state.recaps = state.recaps.slice(0, 20);
@@ -631,6 +738,79 @@ const aiAssistantSlice = createSlice({
         state.analysisStatus = 'Recap generation failed';
         state.lastError = action.error.message;
         state.errors.push(`Recap Generation: ${action.error.message}`);
+      });
+
+    // Fetch Credentials
+    builder
+      .addCase(fetchCredentials.pending, (state) => {
+        state.isLoadingCredentials = true;
+        state.credentialError = undefined;
+      })
+      .addCase(fetchCredentials.fulfilled, (state, action) => {
+        state.isLoadingCredentials = false;
+        state.credentials = action.payload;
+      })
+      .addCase(fetchCredentials.rejected, (state, action) => {
+        state.isLoadingCredentials = false;
+        state.credentialError = action.error.message;
+      });
+
+    // Add Credential
+    builder
+      .addCase(addCredential.pending, (state) => {
+        state.credentialError = undefined;
+      })
+      .addCase(addCredential.fulfilled, (state, action) => {
+        state.credentials.push(action.payload);
+        // Sort by priority
+        state.credentials.sort((a, b) => a.priority - b.priority);
+      })
+      .addCase(addCredential.rejected, (state, action) => {
+        state.credentialError = action.error.message;
+      });
+
+    // Update Credential
+    builder
+      .addCase(updateCredential.fulfilled, (state, action) => {
+        const index = state.credentials.findIndex(c => c.id === action.payload.id);
+        if (index !== -1) {
+          state.credentials[index] = { ...state.credentials[index], ...action.payload.updates };
+        }
+      })
+      .addCase(updateCredential.rejected, (state, action) => {
+        state.credentialError = action.error.message;
+      });
+
+    // Delete Credential
+    builder
+      .addCase(deleteCredential.fulfilled, (state, action) => {
+        state.credentials = state.credentials.filter(c => c.id !== action.payload);
+      })
+      .addCase(deleteCredential.rejected, (state, action) => {
+        state.credentialError = action.error.message;
+      });
+
+    // Test Credential
+    builder
+      .addCase(testCredential.rejected, (state, action) => {
+        state.credentialError = action.error.message;
+      });
+
+    // Reorder Credentials
+    builder
+      .addCase(reorderCredentials.fulfilled, (state, action) => {
+        // Update priorities
+        action.payload.forEach(({ id, priority }) => {
+          const credential = state.credentials.find(c => c.id === id);
+          if (credential) {
+            credential.priority = priority;
+          }
+        });
+        // Sort by priority
+        state.credentials.sort((a, b) => a.priority - b.priority);
+      })
+      .addCase(reorderCredentials.rejected, (state, action) => {
+        state.credentialError = action.error.message;
       });
   },
 });
@@ -677,5 +857,15 @@ export const selectAIConfiguration = (state: { aiAssistant: AIAssistantState }) 
 export const selectAIErrors = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.errors;
 export const selectLastAIError = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.lastError;
 export const selectAIUsage = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.usage;
+
+// Credential selectors
+export const selectCredentials = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.credentials;
+export const selectIsLoadingCredentials = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.isLoadingCredentials;
+export const selectCredentialError = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.credentialError;
+export const selectEnabledCredentials = (state: { aiAssistant: AIAssistantState }) =>
+  state.aiAssistant.credentials.filter(c => c.enabled);
+export const selectCredentialsByProvider = (provider: 'openai' | 'gemini' | 'anthropic') =>
+  (state: { aiAssistant: AIAssistantState }) =>
+    state.aiAssistant.credentials.filter(c => c.provider === provider);
 
 export default aiAssistantSlice.reducer;

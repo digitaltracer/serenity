@@ -20,22 +20,39 @@ const Modal: React.FC<ModalProps> = ({
   className,
   size = 'md',
 }) => {
+  console.log('🎭 ==========================================');
+  console.log('🎭 [Modal] COMPONENT RENDER');
+  console.log('🎭 [Modal] isOpen:', isOpen);
+  console.log('🎭 [Modal] title:', title);
+  console.log('🎭 [Modal] size:', size);
+  console.log('🎭 ==========================================');
+
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
+    console.log('🎬 [Modal] useEffect triggered - isOpen:', isOpen);
+
     if (isOpen) {
+      console.log('🎬 [Modal] Opening modal...');
       setIsVisible(true);
       // Prevent body scrolling
       document.body.style.overflow = 'hidden';
       // Trigger animation after mount
-      setTimeout(() => setIsAnimating(true), 10);
+      setTimeout(() => {
+        console.log('🎬 [Modal] Starting animation...');
+        setIsAnimating(true);
+      }, 10);
     } else {
+      console.log('🎬 [Modal] Closing modal...');
       setIsAnimating(false);
       // Restore body scrolling
       document.body.style.overflow = 'unset';
       // Wait for animation to complete before hiding
-      setTimeout(() => setIsVisible(false), 200);
+      setTimeout(() => {
+        console.log('🎬 [Modal] Hiding modal...');
+        setIsVisible(false);
+      }, 200);
     }
 
     // Cleanup function to restore scrolling if component unmounts
@@ -65,7 +82,17 @@ const Modal: React.FC<ModalProps> = ({
     }
   };
 
-  if (!isVisible) return null;
+  if (!isVisible) {
+    console.log('🚫 [Modal] EARLY RETURN - isVisible is false');
+    console.log('🚫 [Modal] isOpen:', isOpen);
+    console.log('🚫 [Modal] isVisible:', isVisible);
+    console.log('🚫 [Modal] Modal will NOT render');
+    return null;
+  }
+
+  console.log('✅ [Modal] RENDERING MODAL');
+  console.log('✅ [Modal] isVisible:', isVisible);
+  console.log('✅ [Modal] isAnimating:', isAnimating);
 
   const sizeClasses = {
     sm: 'max-w-sm',

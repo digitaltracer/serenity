@@ -1,7 +1,7 @@
 "use strict";
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.selectAIUsage = exports.selectLastAIError = exports.selectAIErrors = exports.selectAIConfiguration = exports.selectAnalysisTracker = exports.selectAIRecaps = exports.selectAIInsights = exports.selectLastAnalysis = exports.selectAnalysisStatus = exports.selectAnalysisProgress = exports.selectIsAnalyzing = exports.selectActiveProvider = exports.selectAIProviders = exports.restoreUsage = exports.clearUsage = exports.recordUsage = exports.clearProviderModelInfo = exports.updateProvidersWithApiKeys = exports.updateProvidersWithModelInfo = exports.clearAllErrors = exports.clearAIError = exports.updateAnalysisTracker = exports.restoreRecaps = exports.removeRecap = exports.addRecap = exports.restoreInsights = exports.clearInsights = exports.removeInsight = exports.addInsight = exports.setDataTypes = exports.setAnalysisFrequency = exports.setAutoAnalyze = exports.clearActiveProvider = exports.setActiveProvider = exports.generateRecap = exports.analyzeUserData = exports.initializeAISettings = exports.testApiKey = exports.setApiKey = void 0;
+exports.selectCredentialsByProvider = exports.selectEnabledCredentials = exports.selectCredentialError = exports.selectIsLoadingCredentials = exports.selectCredentials = exports.selectAIUsage = exports.selectLastAIError = exports.selectAIErrors = exports.selectAIConfiguration = exports.selectAnalysisTracker = exports.selectAIRecaps = exports.selectAIInsights = exports.selectLastAnalysis = exports.selectAnalysisStatus = exports.selectAnalysisProgress = exports.selectIsAnalyzing = exports.selectActiveProvider = exports.selectAIProviders = exports.restoreUsage = exports.clearUsage = exports.recordUsage = exports.clearProviderModelInfo = exports.updateProvidersWithApiKeys = exports.updateProvidersWithModelInfo = exports.clearAllErrors = exports.clearAIError = exports.updateAnalysisTracker = exports.restoreRecaps = exports.removeRecap = exports.addRecap = exports.restoreInsights = exports.clearInsights = exports.removeInsight = exports.addInsight = exports.setDataTypes = exports.setAnalysisFrequency = exports.setAutoAnalyze = exports.clearActiveProvider = exports.setActiveProvider = exports.reorderCredentials = exports.testCredential = exports.deleteCredential = exports.updateCredential = exports.addCredential = exports.fetchCredentials = exports.generateRecap = exports.analyzeUserData = exports.initializeAISettings = exports.testApiKey = exports.setApiKey = void 0;
 const toolkit_1 = require("@reduxjs/toolkit");
 const aiAssistantService_1 = require("../../services/aiAssistantService");
 const logger_1 = require("../../utils/logger");
@@ -22,6 +22,8 @@ const initialState = {
         { id: 'gemini', name: 'Google Gemini', hasApiKey: false, isActive: false },
         { id: 'anthropic', name: 'Anthropic Claude', hasApiKey: false, isActive: false },
     ],
+    credentials: [],
+    isLoadingCredentials: false,
     isAnalyzing: false,
     analysisProgress: 0,
     analysisStatus: 'Ready',
@@ -193,6 +195,79 @@ exports.generateRecap = (0, toolkit_1.createAsyncThunk)('aiAssistant/generateRec
         }
     }
     throw new Error('AI Assistant API not available');
+});
+// Credential management async thunks
+exports.fetchCredentials = (0, toolkit_1.createAsyncThunk)('aiAssistant/fetchCredentials', async (enabledOnly = false) => {
+    if (typeof globalThis !== 'undefined' && globalThis.window?.api?.['ai-credentials:list']) {
+        const result = await globalThis.window.api['ai-credentials:list'](enabledOnly);
+        if (result.success) {
+            return result.credentials;
+        }
+        else {
+            throw new Error(result.error || 'Failed to fetch credentials');
+        }
+    }
+    throw new Error('Credential API not available');
+});
+exports.addCredential = (0, toolkit_1.createAsyncThunk)('aiAssistant/addCredential', async (input) => {
+    if (typeof globalThis !== 'undefined' && globalThis.window?.api?.['ai-credentials:add']) {
+        const result = await globalThis.window.api['ai-credentials:add'](input);
+        if (result.success) {
+            return result.credential;
+        }
+        else {
+            throw new Error(result.error || 'Failed to add credential');
+        }
+    }
+    throw new Error('Credential API not available');
+});
+exports.updateCredential = (0, toolkit_1.createAsyncThunk)('aiAssistant/updateCredential', async ({ id, updates }) => {
+    if (typeof globalThis !== 'undefined' && globalThis.window?.api?.['ai-credentials:update']) {
+        const result = await globalThis.window.api['ai-credentials:update'](id, updates);
+        if (result.success) {
+            return { id, updates };
+        }
+        else {
+            throw new Error(result.error || 'Failed to update credential');
+        }
+    }
+    throw new Error('Credential API not available');
+});
+exports.deleteCredential = (0, toolkit_1.createAsyncThunk)('aiAssistant/deleteCredential', async (id) => {
+    if (typeof globalThis !== 'undefined' && globalThis.window?.api?.['ai-credentials:delete']) {
+        const result = await globalThis.window.api['ai-credentials:delete'](id);
+        if (result.success) {
+            return id;
+        }
+        else {
+            throw new Error(result.error || 'Failed to delete credential');
+        }
+    }
+    throw new Error('Credential API not available');
+});
+exports.testCredential = (0, toolkit_1.createAsyncThunk)('aiAssistant/testCredential', async (id) => {
+    if (typeof globalThis !== 'undefined' && globalThis.window?.api?.['ai-credentials:test']) {
+        const result = await globalThis.window.api['ai-credentials:test'](id);
+        if (result.success) {
+            return { id, modelInfo: result.modelInfo };
+        }
+        else {
+            throw new Error(result.error || 'API key test failed');
+        }
+    }
+    throw new Error('Credential API not available');
+});
+exports.reorderCredentials = (0, toolkit_1.createAsyncThunk)('aiAssistant/reorderCredentials', async (priorities) => {
+    if (typeof globalThis !== 'undefined' && globalThis.window?.api?.['ai-credentials:reorder']) {
+        const result = await globalThis.window.api['ai-credentials:reorder'](priorities);
+        if (result.success) {
+            return priorities;
+        }
+        else {
+            throw new Error(result.error || 'Failed to reorder credentials');
+        }
+    }
+    throw new Error('Credential API not available');
 });
 const aiAssistantSlice = (0, toolkit_1.createSlice)({
     name: 'aiAssistant',
@@ -466,6 +541,73 @@ const aiAssistantSlice = (0, toolkit_1.createSlice)({
             state.lastError = action.error.message;
             state.errors.push(`Recap Generation: ${action.error.message}`);
         });
+        // Fetch Credentials
+        builder
+            .addCase(exports.fetchCredentials.pending, (state) => {
+            state.isLoadingCredentials = true;
+            state.credentialError = undefined;
+        })
+            .addCase(exports.fetchCredentials.fulfilled, (state, action) => {
+            state.isLoadingCredentials = false;
+            state.credentials = action.payload;
+        })
+            .addCase(exports.fetchCredentials.rejected, (state, action) => {
+            state.isLoadingCredentials = false;
+            state.credentialError = action.error.message;
+        });
+        // Add Credential
+        builder
+            .addCase(exports.addCredential.pending, (state) => {
+            state.credentialError = undefined;
+        })
+            .addCase(exports.addCredential.fulfilled, (state, action) => {
+            state.credentials.push(action.payload);
+            // Sort by priority
+            state.credentials.sort((a, b) => a.priority - b.priority);
+        })
+            .addCase(exports.addCredential.rejected, (state, action) => {
+            state.credentialError = action.error.message;
+        });
+        // Update Credential
+        builder
+            .addCase(exports.updateCredential.fulfilled, (state, action) => {
+            const index = state.credentials.findIndex(c => c.id === action.payload.id);
+            if (index !== -1) {
+                state.credentials[index] = { ...state.credentials[index], ...action.payload.updates };
+            }
+        })
+            .addCase(exports.updateCredential.rejected, (state, action) => {
+            state.credentialError = action.error.message;
+        });
+        // Delete Credential
+        builder
+            .addCase(exports.deleteCredential.fulfilled, (state, action) => {
+            state.credentials = state.credentials.filter(c => c.id !== action.payload);
+        })
+            .addCase(exports.deleteCredential.rejected, (state, action) => {
+            state.credentialError = action.error.message;
+        });
+        // Test Credential
+        builder
+            .addCase(exports.testCredential.rejected, (state, action) => {
+            state.credentialError = action.error.message;
+        });
+        // Reorder Credentials
+        builder
+            .addCase(exports.reorderCredentials.fulfilled, (state, action) => {
+            // Update priorities
+            action.payload.forEach(({ id, priority }) => {
+                const credential = state.credentials.find(c => c.id === id);
+                if (credential) {
+                    credential.priority = priority;
+                }
+            });
+            // Sort by priority
+            state.credentials.sort((a, b) => a.priority - b.priority);
+        })
+            .addCase(exports.reorderCredentials.rejected, (state, action) => {
+            state.credentialError = action.error.message;
+        });
     },
 });
 _a = aiAssistantSlice.actions, exports.setActiveProvider = _a.setActiveProvider, exports.clearActiveProvider = _a.clearActiveProvider, exports.setAutoAnalyze = _a.setAutoAnalyze, exports.setAnalysisFrequency = _a.setAnalysisFrequency, exports.setDataTypes = _a.setDataTypes, exports.addInsight = _a.addInsight, exports.removeInsight = _a.removeInsight, exports.clearInsights = _a.clearInsights, exports.restoreInsights = _a.restoreInsights, exports.addRecap = _a.addRecap, exports.removeRecap = _a.removeRecap, exports.restoreRecaps = _a.restoreRecaps, exports.updateAnalysisTracker = _a.updateAnalysisTracker, exports.clearAIError = _a.clearAIError, exports.clearAllErrors = _a.clearAllErrors, exports.updateProvidersWithModelInfo = _a.updateProvidersWithModelInfo, exports.updateProvidersWithApiKeys = _a.updateProvidersWithApiKeys, exports.clearProviderModelInfo = _a.clearProviderModelInfo, exports.recordUsage = _a.recordUsage, exports.clearUsage = _a.clearUsage, exports.restoreUsage = _a.restoreUsage;
@@ -500,4 +642,15 @@ const selectLastAIError = (state) => state.aiAssistant.lastError;
 exports.selectLastAIError = selectLastAIError;
 const selectAIUsage = (state) => state.aiAssistant.usage;
 exports.selectAIUsage = selectAIUsage;
+// Credential selectors
+const selectCredentials = (state) => state.aiAssistant.credentials;
+exports.selectCredentials = selectCredentials;
+const selectIsLoadingCredentials = (state) => state.aiAssistant.isLoadingCredentials;
+exports.selectIsLoadingCredentials = selectIsLoadingCredentials;
+const selectCredentialError = (state) => state.aiAssistant.credentialError;
+exports.selectCredentialError = selectCredentialError;
+const selectEnabledCredentials = (state) => state.aiAssistant.credentials.filter(c => c.enabled);
+exports.selectEnabledCredentials = selectEnabledCredentials;
+const selectCredentialsByProvider = (provider) => (state) => state.aiAssistant.credentials.filter(c => c.provider === provider);
+exports.selectCredentialsByProvider = selectCredentialsByProvider;
 exports.default = aiAssistantSlice.reducer;

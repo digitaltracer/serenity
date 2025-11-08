@@ -191,7 +191,7 @@ export const GoalsPage: React.FC = () => {
   const activeFiltersCount = getActiveFiltersCount();
 
   return (
-    <div className="flex-1 h-full bg-gray-50 dark:bg-gray-900">
+    <div className="flex-1 h-full bg-background">
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-7xl mx-auto">
           {/* Header */}

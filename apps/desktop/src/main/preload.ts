@@ -237,6 +237,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 });
 
+// Expose window.api for summary operations and credential management
+contextBridge.exposeInMainWorld('api', {
+  summary: {
+    generate: (params: { startDate: string; endDate: string; types: ('tasks' | 'journal')[] }) => ipcRenderer.invoke('summary:generate', params),
+    getAll: () => ipcRenderer.invoke('summary:getAll'),
+    getById: (id: string) => ipcRenderer.invoke('summary:getById', id),
+    delete: (id: string) => ipcRenderer.invoke('summary:delete', id),
+    export: (id: string, format: string) => ipcRenderer.invoke('summary:export', id, format),
+  },
+  'ai-credentials:list': (enabledOnly: boolean = false) => ipcRenderer.invoke('ai-credentials:list', enabledOnly),
+  'ai-credentials:add': (input: any) => ipcRenderer.invoke('ai-credentials:add', input),
+  'ai-credentials:update': (id: string, updates: any) => ipcRenderer.invoke('ai-credentials:update', id, updates),
+  'ai-credentials:delete': (id: string) => ipcRenderer.invoke('ai-credentials:delete', id),
+  'ai-credentials:test': (id: string) => ipcRenderer.invoke('ai-credentials:test', id),
+  'ai-credentials:test-new': (provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => ipcRenderer.invoke('ai-credentials:test-new', provider, apiKey),
+  'ai-credentials:reorder': (priorities: Array<{ id: string; priority: number }>) => ipcRenderer.invoke('ai-credentials:reorder', priorities),
+});
+
 // Type definitions for the exposed API
 export interface ElectronAPI {
   database: {

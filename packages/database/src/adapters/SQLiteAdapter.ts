@@ -257,7 +257,7 @@ export class SQLiteAdapter {
         id TEXT PRIMARY KEY,
         timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         provider TEXT NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic')),
-        operation TEXT NOT NULL CHECK (operation IN ('analyze', 'recap', 'quickadd')),
+        operation TEXT NOT NULL CHECK (operation IN ('analyze', 'recap', 'quickadd', 'summary')),
         prompt_tokens INTEGER DEFAULT 0,
         completion_tokens INTEGER DEFAULT 0,
         total_tokens INTEGER DEFAULT 0
@@ -297,6 +297,12 @@ export class SQLiteAdapter {
 
       // Migration: Create insight_themes table and add theme tracking columns
       await this.migrateInsightThemes();
+
+      // Migration: Create summaries table for date-range based summaries
+      await this.migrateSummaries();
+
+      // Migration: Create ai_provider_credentials table for multi-key support
+      await this.migrateAIProviderCredentials();
     } catch (error) {
       logger.error('Failed to create database schema:', { component: 'SQLiteAdapter', operation: 'failedCreateDatabase' }, error as Error);
       throw error;
@@ -338,7 +344,7 @@ export class SQLiteAdapter {
               id TEXT PRIMARY KEY,
               timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
               provider TEXT NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic')),
-              operation TEXT NOT NULL CHECK (operation IN ('analyze', 'recap', 'quickadd')),
+              operation TEXT NOT NULL CHECK (operation IN ('analyze', 'recap', 'quickadd', 'summary')),
               prompt_tokens INTEGER DEFAULT 0,
               completion_tokens INTEGER DEFAULT 0,
               total_tokens INTEGER DEFAULT 0
@@ -675,6 +681,150 @@ export class SQLiteAdapter {
       logger.error('❌ Failed to migrate insight_themes:', {
         component: 'SQLiteAdapter',
         operation: 'failedMigrateInsightThemes'
+      }, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Migrate summaries table for date-range based AI summaries
+   * Creates the summaries table if it doesn't exist
+   */
+  private async migrateSummaries(): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      // Check if summaries table exists
+      const tableExists = this.db.prepare(`
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='summaries'
+      `).get();
+
+      if (!tableExists) {
+        logger.info('🔄 Creating summaries table for AI-generated summaries...', {
+          component: 'SQLiteAdapter',
+          operation: 'creatingSummariesTable'
+        });
+
+        this.db.exec(`
+          CREATE TABLE summaries (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            summary_type TEXT NOT NULL CHECK(summary_type IN ('tasks', 'journal', 'combined')),
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL,
+            generated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            word_count INTEGER,
+            metadata TEXT DEFAULT '{}',
+            provider TEXT NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic', 'local')),
+            prompt_tokens INTEGER DEFAULT 0,
+            completion_tokens INTEGER DEFAULT 0,
+            total_tokens INTEGER DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_summaries_type ON summaries(summary_type);
+          CREATE INDEX IF NOT EXISTS idx_summaries_date_range ON summaries(start_date, end_date);
+          CREATE INDEX IF NOT EXISTS idx_summaries_generated ON summaries(generated_at DESC);
+        `);
+
+        logger.info('✅ summaries table created successfully', {
+          component: 'SQLiteAdapter',
+          operation: 'summariesTableCreated'
+        });
+      } else {
+        logger.info('✅ summaries table already exists', {
+          component: 'SQLiteAdapter',
+          operation: 'summariesTableExists'
+        });
+      }
+    } catch (error) {
+      logger.error('❌ Failed to migrate summaries table:', {
+        component: 'SQLiteAdapter',
+        operation: 'failedMigrateSummaries'
+      }, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Migrate ai_provider_credentials table for multiple API keys per provider
+   * Supports automatic failover, usage tracking, and credential management
+   */
+  private async migrateAIProviderCredentials(): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      // Check if ai_provider_credentials table exists
+      const tableExists = this.db.prepare(`
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='ai_provider_credentials'
+      `).get();
+
+      if (!tableExists) {
+        logger.info('🔄 Creating ai_provider_credentials table for multi-key support...', {
+          component: 'SQLiteAdapter',
+          operation: 'creatingAIProviderCredentialsTable'
+        });
+
+        this.db.exec(`
+          CREATE TABLE ai_provider_credentials (
+            id TEXT PRIMARY KEY,
+            provider TEXT NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic')),
+            name TEXT NOT NULL,
+            api_key_encrypted TEXT NOT NULL,
+            model_preference TEXT,
+            enabled INTEGER DEFAULT 1,
+            priority INTEGER DEFAULT 0,
+
+            -- Metadata
+            metadata TEXT DEFAULT '{}',
+
+            -- Usage tracking
+            last_used_at TEXT,
+            total_requests INTEGER DEFAULT 0,
+            total_tokens INTEGER DEFAULT 0,
+            success_count INTEGER DEFAULT 0,
+            error_count INTEGER DEFAULT 0,
+            last_error TEXT,
+            last_error_at TEXT,
+
+            -- Timestamps
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+
+            -- Constraints
+            UNIQUE(provider, name)
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_ai_credentials_provider
+            ON ai_provider_credentials(provider);
+          CREATE INDEX IF NOT EXISTS idx_ai_credentials_enabled
+            ON ai_provider_credentials(enabled);
+          CREATE INDEX IF NOT EXISTS idx_ai_credentials_priority
+            ON ai_provider_credentials(priority);
+        `);
+
+        logger.info('✅ ai_provider_credentials table created successfully', {
+          component: 'SQLiteAdapter',
+          operation: 'aiProviderCredentialsTableCreated'
+        });
+      } else {
+        logger.info('✅ ai_provider_credentials table already exists', {
+          component: 'SQLiteAdapter',
+          operation: 'aiProviderCredentialsTableExists'
+        });
+      }
+    } catch (error) {
+      logger.error('❌ Failed to migrate ai_provider_credentials table:', {
+        component: 'SQLiteAdapter',
+        operation: 'failedMigrateAIProviderCredentials'
       }, error as Error);
       throw error;
     }

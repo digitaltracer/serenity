@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { cn } from '../utils/cn';
-import { Brain, TrendingUp, Activity, RefreshCw } from 'lucide-react';
-import { Button } from './Button';
+import { Brain, TrendingUp, Activity } from 'lucide-react';
 
 interface AIUsageEntry {
   id: string;
@@ -15,8 +14,6 @@ interface AIUsageEntry {
 
 export interface AIUsageSummaryProps {
   usage: AIUsageEntry[];
-  onRefresh?: () => void;
-  isRefreshing?: boolean;
 }
 
 interface ProviderStats {
@@ -30,8 +27,6 @@ interface ProviderStats {
 
 export const AIUsageSummary: React.FC<AIUsageSummaryProps> = ({
   usage,
-  onRefresh,
-  isRefreshing = false,
 }) => {
   const providerStats = useMemo(() => {
     const stats: Record<string, ProviderStats> = {
@@ -109,21 +104,9 @@ export const AIUsageSummary: React.FC<AIUsageSummaryProps> = ({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Activity className="w-5 h-5 text-muted-foreground" />
-          <h3 className="font-medium text-foreground">Usage Summary</h3>
-        </div>
-        {onRefresh && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={cn('w-4 h-4', { 'animate-spin': isRefreshing })} />
-          </Button>
-        )}
+      <div className="flex items-center gap-2">
+        <Activity className="w-5 h-5 text-muted-foreground" />
+        <h3 className="font-medium text-foreground">Usage Summary</h3>
       </div>
 
       {/* Provider Cards */}

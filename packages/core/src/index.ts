@@ -16,6 +16,7 @@ export * from './services/integrationSyncService';
 export { EncryptedIntegrationService } from './services/encryptedIntegrationService';
 // biometricAuthService is only used dynamically to avoid bundle conflicts
 export * from './services/aiAssistantService';
+export { AICredentialService, type AIProviderCredential, type AIProviderCredentialInput } from './services/aiCredentialService';
 // Re-export preprocessing service but avoid duplicate exports
 export { AIPreprocessingService, PreprocessingConfig } from './services/aiPreprocessingService';
 export * from './services/promptEngineeringService';
@@ -26,6 +27,7 @@ export { VisualizationService } from './services/visualizationService';
 export * from './services/actionabilityService';
 export * from './services/feedbackService';
 export { ThemeTrackingService } from './services/themeTrackingService';
+export { AISummarizationService } from './services/aiSummarizationService';
 // Export secure storage functions
 export { 
   savePostgreSQLConfigSecure,

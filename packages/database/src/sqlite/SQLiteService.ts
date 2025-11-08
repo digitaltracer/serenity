@@ -18,7 +18,7 @@ export class SQLiteService {
   private projects: SQLiteProjectQueries | null = null;
   private journal: SQLiteJournalQueries | null = null;
   private goals: SQLiteGoalQueries | null = null;
-  private ai: SQLiteAIQueries | null = null;
+  public ai: SQLiteAIQueries | null = null;
   private initialized = false;
 
   constructor(adapter?: SQLiteAdapter) {
@@ -223,7 +223,7 @@ export class SQLiteService {
     return this.ai!.listRecaps(limit);
   }
 
-  async addAIUsage(entries: Array<{ timestamp?: string; provider: 'openai' | 'gemini' | 'anthropic'; operation: 'analyze' | 'recap' | 'quickadd'; promptTokens: number; completionTokens: number; totalTokens: number }>): Promise<void> {
+  async addAIUsage(entries: Array<{ timestamp?: string; provider: 'openai' | 'gemini' | 'anthropic'; operation: 'analyze' | 'recap' | 'quickadd' | 'summary'; promptTokens: number; completionTokens: number; totalTokens: number }>): Promise<void> {
     this.ensureInitialized();
     return this.ai!.addUsage(entries);
   }
@@ -640,6 +640,69 @@ export class SQLiteService {
     ]);
 
     return { tasks, projects, journalEntries, goals };
+  }
+
+  // ===== SUMMARY OPERATIONS =====
+
+  /**
+   * Create a new summary
+   */
+  async createSummary(summary: {
+    id: string;
+    title: string;
+    content: string;
+    summaryType: 'tasks' | 'journal' | 'combined';
+    startDate: string;
+    endDate: string;
+    wordCount: number;
+    metadata: string;
+    provider: 'openai' | 'gemini' | 'anthropic' | 'local';
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  }): Promise<void> {
+    this.ensureInitialized();
+    return this.ai!.createSummary(summary);
+  }
+
+  /**
+   * Get all summaries
+   */
+  async getAllSummaries(): Promise<any[]> {
+    this.ensureInitialized();
+    return this.ai!.getAllSummaries();
+  }
+
+  /**
+   * Get summary by ID
+   */
+  async getSummaryById(id: string): Promise<any | null> {
+    this.ensureInitialized();
+    return this.ai!.getSummaryById(id);
+  }
+
+  /**
+   * Delete a summary
+   */
+  async deleteSummary(id: string): Promise<boolean> {
+    this.ensureInitialized();
+    return this.ai!.deleteSummary(id);
+  }
+
+  /**
+   * Get summaries by type
+   */
+  async getSummariesByType(type: 'tasks' | 'journal' | 'combined'): Promise<any[]> {
+    this.ensureInitialized();
+    return this.ai!.getSummariesByType(type);
+  }
+
+  /**
+   * Get summaries by date range
+   */
+  async getSummariesByDateRange(startDate: string, endDate: string): Promise<any[]> {
+    this.ensureInitialized();
+    return this.ai!.getSummariesByDateRange(startDate, endDate);
   }
 
   /**

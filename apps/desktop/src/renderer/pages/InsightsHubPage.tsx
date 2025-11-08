@@ -435,9 +435,9 @@ export const InsightsHubPage: React.FC = () => {
               />
 
               {/* Priority Distribution Card */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm h-[168px] flex flex-col">
+              <div className="bg-card rounded-lg border border-border p-4 shadow-sm h-[168px] flex flex-col">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  <span className="text-sm font-medium text-muted-foreground">
                     Priority Distribution
                   </span>
                   <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-900/20">
@@ -453,15 +453,15 @@ export const InsightsHubPage: React.FC = () => {
                   <div className="flex items-center justify-center gap-3 text-xs mt-1">
                     <div className="flex items-center gap-1">
                       <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                      <span className="text-gray-600 dark:text-gray-400">{priorityDistribution.high.count}</span>
+                      <span className="text-muted-foreground">{priorityDistribution.high.count}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                      <span className="text-gray-600 dark:text-gray-400">{priorityDistribution.medium.count}</span>
+                      <span className="text-muted-foreground">{priorityDistribution.medium.count}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                      <span className="text-gray-600 dark:text-gray-400">{priorityDistribution.low.count}</span>
+                      <span className="text-muted-foreground">{priorityDistribution.low.count}</span>
                     </div>
                   </div>
                 </div>

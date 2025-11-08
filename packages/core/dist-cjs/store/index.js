@@ -17,8 +17,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.markInsightHelpful = exports.rateInsight = exports.dismissInsight = exports.fetchInsights = exports.fetchDashboardData = exports.aiAssistantReducer = exports.selectAIUsage = exports.selectLastAIError = exports.selectAIErrors = exports.selectAIConfiguration = exports.selectAnalysisTracker = exports.selectAIRecaps = exports.selectAIInsights = exports.selectLastAnalysis = exports.selectAnalysisStatus = exports.selectAnalysisProgress = exports.selectIsAnalyzing = exports.selectActiveProvider = exports.selectAIProviders = exports.restoreUsage = exports.clearUsage = exports.recordUsage = exports.clearProviderModelInfo = exports.updateProvidersWithApiKeys = exports.updateProvidersWithModelInfo = exports.clearAllErrors = exports.clearAIError = exports.updateAnalysisTracker = exports.restoreRecaps = exports.removeRecap = exports.addRecap = exports.restoreInsights = exports.clearInsights = exports.removeInsight = exports.addInsight = exports.setDataTypes = exports.setAnalysisFrequency = exports.setAutoAnalyze = exports.clearActiveProvider = exports.setActiveProvider = exports.generateRecap = exports.analyzeUserData = exports.initializeAISettings = exports.testApiKey = exports.setApiKey = exports.initializeIntegrations = exports.initializeDatabaseConfig = exports.initializeSQLitePersistence = exports.initializeStoreData = exports.store = void 0;
-exports.insightsReducer = exports.selectRecapsByType = exports.selectFavoritedRecaps = exports.selectInsightsByCategory = exports.selectNonDismissedInsights = exports.selectLastInsightsError = exports.selectInsightsErrors = exports.selectLastRefresh = exports.selectIsLoadingKPIs = exports.selectIsLoadingRecaps = exports.selectIsLoadingInsights = exports.selectIsLoadingDashboard = exports.selectRecapsFilters = exports.selectInsightsFilters = exports.selectTimeRange = exports.selectRecaps = exports.selectInsights = exports.selectKPIs = exports.restoreKPIs = exports.clearKPIs = exports.setRecapsFilters = exports.setInsightsFilters = exports.setTimeRangePreset = exports.setTimeRange = exports.fetchKPIMetrics = exports.markRecapViewed = exports.toggleRecapFavorite = exports.fetchRecaps = exports.addInsightNote = void 0;
+exports.selectAIUsage = exports.selectLastAIError = exports.selectAIErrors = exports.selectAIConfiguration = exports.selectAnalysisTracker = exports.selectAIRecaps = exports.selectAIInsights = exports.selectLastAnalysis = exports.selectAnalysisStatus = exports.selectAnalysisProgress = exports.selectIsAnalyzing = exports.selectActiveProvider = exports.selectAIProviders = exports.restoreUsage = exports.clearUsage = exports.recordUsage = exports.clearProviderModelInfo = exports.updateProvidersWithApiKeys = exports.updateProvidersWithModelInfo = exports.clearAllErrors = exports.clearAIError = exports.updateAnalysisTracker = exports.restoreRecaps = exports.removeRecap = exports.addRecap = exports.restoreInsights = exports.clearInsights = exports.removeInsight = exports.addInsight = exports.setDataTypes = exports.setAnalysisFrequency = exports.setAutoAnalyze = exports.clearActiveProvider = exports.setActiveProvider = exports.reorderCredentials = exports.testCredential = exports.deleteCredential = exports.updateCredential = exports.addCredential = exports.fetchCredentials = exports.generateRecap = exports.analyzeUserData = exports.initializeAISettings = exports.testApiKey = exports.setApiKey = exports.initializeIntegrations = exports.initializeDatabaseConfig = exports.initializeSQLitePersistence = exports.initializeStoreData = exports.store = void 0;
+exports.selectSummariesGenerating = exports.selectSummariesLoading = exports.selectSummaries = exports.clearError = exports.setGenerationProgress = exports.setFilter = exports.exportSummary = exports.deleteSummary = exports.fetchSummaries = exports.generateSummary = exports.insightsReducer = exports.selectRecapsByType = exports.selectFavoritedRecaps = exports.selectInsightsByCategory = exports.selectNonDismissedInsights = exports.selectLastInsightsError = exports.selectInsightsErrors = exports.selectLastRefresh = exports.selectIsLoadingKPIs = exports.selectIsLoadingRecaps = exports.selectIsLoadingInsights = exports.selectIsLoadingDashboard = exports.selectRecapsFilters = exports.selectInsightsFilters = exports.selectTimeRange = exports.selectRecaps = exports.selectInsights = exports.selectKPIs = exports.restoreKPIs = exports.clearKPIs = exports.setRecapsFilters = exports.setInsightsFilters = exports.setTimeRangePreset = exports.setTimeRange = exports.fetchKPIMetrics = exports.markRecapViewed = exports.toggleRecapFavorite = exports.fetchRecaps = exports.addInsightNote = exports.markInsightHelpful = exports.rateInsight = exports.dismissInsight = exports.fetchInsights = exports.fetchDashboardData = exports.aiAssistantReducer = exports.selectCredentialsByProvider = exports.selectEnabledCredentials = exports.selectCredentialError = exports.selectIsLoadingCredentials = exports.selectCredentials = void 0;
+exports.summariesReducer = exports.selectFilteredSummaries = exports.selectGenerationProgress = exports.selectSummariesFilters = exports.selectSummariesError = void 0;
 // Use enhanced store with proper persistence - export through store.ts for consistency
 var store_1 = require("./store");
 Object.defineProperty(exports, "store", { enumerable: true, get: function () { return store_1.store; } });
@@ -48,6 +49,13 @@ Object.defineProperty(exports, "testApiKey", { enumerable: true, get: function (
 Object.defineProperty(exports, "initializeAISettings", { enumerable: true, get: function () { return aiAssistantSlice_1.initializeAISettings; } });
 Object.defineProperty(exports, "analyzeUserData", { enumerable: true, get: function () { return aiAssistantSlice_1.analyzeUserData; } });
 Object.defineProperty(exports, "generateRecap", { enumerable: true, get: function () { return aiAssistantSlice_1.generateRecap; } });
+// Credential management thunks
+Object.defineProperty(exports, "fetchCredentials", { enumerable: true, get: function () { return aiAssistantSlice_1.fetchCredentials; } });
+Object.defineProperty(exports, "addCredential", { enumerable: true, get: function () { return aiAssistantSlice_1.addCredential; } });
+Object.defineProperty(exports, "updateCredential", { enumerable: true, get: function () { return aiAssistantSlice_1.updateCredential; } });
+Object.defineProperty(exports, "deleteCredential", { enumerable: true, get: function () { return aiAssistantSlice_1.deleteCredential; } });
+Object.defineProperty(exports, "testCredential", { enumerable: true, get: function () { return aiAssistantSlice_1.testCredential; } });
+Object.defineProperty(exports, "reorderCredentials", { enumerable: true, get: function () { return aiAssistantSlice_1.reorderCredentials; } });
 // Actions
 Object.defineProperty(exports, "setActiveProvider", { enumerable: true, get: function () { return aiAssistantSlice_1.setActiveProvider; } });
 Object.defineProperty(exports, "clearActiveProvider", { enumerable: true, get: function () { return aiAssistantSlice_1.clearActiveProvider; } });
@@ -84,6 +92,12 @@ Object.defineProperty(exports, "selectAIConfiguration", { enumerable: true, get:
 Object.defineProperty(exports, "selectAIErrors", { enumerable: true, get: function () { return aiAssistantSlice_1.selectAIErrors; } });
 Object.defineProperty(exports, "selectLastAIError", { enumerable: true, get: function () { return aiAssistantSlice_1.selectLastAIError; } });
 Object.defineProperty(exports, "selectAIUsage", { enumerable: true, get: function () { return aiAssistantSlice_1.selectAIUsage; } });
+// Credential selectors
+Object.defineProperty(exports, "selectCredentials", { enumerable: true, get: function () { return aiAssistantSlice_1.selectCredentials; } });
+Object.defineProperty(exports, "selectIsLoadingCredentials", { enumerable: true, get: function () { return aiAssistantSlice_1.selectIsLoadingCredentials; } });
+Object.defineProperty(exports, "selectCredentialError", { enumerable: true, get: function () { return aiAssistantSlice_1.selectCredentialError; } });
+Object.defineProperty(exports, "selectEnabledCredentials", { enumerable: true, get: function () { return aiAssistantSlice_1.selectEnabledCredentials; } });
+Object.defineProperty(exports, "selectCredentialsByProvider", { enumerable: true, get: function () { return aiAssistantSlice_1.selectCredentialsByProvider; } });
 var aiAssistantSlice_2 = require("./slices/aiAssistantSlice");
 Object.defineProperty(exports, "aiAssistantReducer", { enumerable: true, get: function () { return __importDefault(aiAssistantSlice_2).default; } });
 var insightsSlice_1 = require("./slices/insightsSlice");
@@ -126,4 +140,24 @@ Object.defineProperty(exports, "selectRecapsByType", { enumerable: true, get: fu
 var insightsSlice_2 = require("./slices/insightsSlice");
 Object.defineProperty(exports, "insightsReducer", { enumerable: true, get: function () { return __importDefault(insightsSlice_2).default; } });
 __exportStar(require("./slices/goalsSlice"), exports);
+var summariesSlice_1 = require("./slices/summariesSlice");
+// Async thunks
+Object.defineProperty(exports, "generateSummary", { enumerable: true, get: function () { return summariesSlice_1.generateSummary; } });
+Object.defineProperty(exports, "fetchSummaries", { enumerable: true, get: function () { return summariesSlice_1.fetchSummaries; } });
+Object.defineProperty(exports, "deleteSummary", { enumerable: true, get: function () { return summariesSlice_1.deleteSummary; } });
+Object.defineProperty(exports, "exportSummary", { enumerable: true, get: function () { return summariesSlice_1.exportSummary; } });
+// Actions
+Object.defineProperty(exports, "setFilter", { enumerable: true, get: function () { return summariesSlice_1.setFilter; } });
+Object.defineProperty(exports, "setGenerationProgress", { enumerable: true, get: function () { return summariesSlice_1.setGenerationProgress; } });
+Object.defineProperty(exports, "clearError", { enumerable: true, get: function () { return summariesSlice_1.clearError; } });
+// Selectors
+Object.defineProperty(exports, "selectSummaries", { enumerable: true, get: function () { return summariesSlice_1.selectSummaries; } });
+Object.defineProperty(exports, "selectSummariesLoading", { enumerable: true, get: function () { return summariesSlice_1.selectSummariesLoading; } });
+Object.defineProperty(exports, "selectSummariesGenerating", { enumerable: true, get: function () { return summariesSlice_1.selectSummariesGenerating; } });
+Object.defineProperty(exports, "selectSummariesError", { enumerable: true, get: function () { return summariesSlice_1.selectSummariesError; } });
+Object.defineProperty(exports, "selectSummariesFilters", { enumerable: true, get: function () { return summariesSlice_1.selectSummariesFilters; } });
+Object.defineProperty(exports, "selectGenerationProgress", { enumerable: true, get: function () { return summariesSlice_1.selectGenerationProgress; } });
+Object.defineProperty(exports, "selectFilteredSummaries", { enumerable: true, get: function () { return summariesSlice_1.selectFilteredSummaries; } });
+var summariesSlice_2 = require("./slices/summariesSlice");
+Object.defineProperty(exports, "summariesReducer", { enumerable: true, get: function () { return __importDefault(summariesSlice_2).default; } });
 __exportStar(require("./slices/sampleData"), exports);

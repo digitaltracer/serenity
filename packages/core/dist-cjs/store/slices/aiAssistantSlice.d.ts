@@ -1,3 +1,4 @@
+import { AIProviderCredential, AIProviderCredentialInput } from '../../services/aiCredentialService';
 export interface AIProvider {
     id: 'openai' | 'gemini' | 'anthropic';
     name: string;
@@ -49,7 +50,7 @@ export interface AIUsageEntry {
     id: string;
     timestamp: string;
     provider: 'openai' | 'gemini' | 'anthropic';
-    operation: 'analyze' | 'recap';
+    operation: 'analyze' | 'recap' | 'quickadd' | 'summary';
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
@@ -58,6 +59,9 @@ export interface AIUsageEntry {
 export interface AIAssistantState {
     providers: AIProvider[];
     activeProvider?: 'openai' | 'gemini' | 'anthropic';
+    credentials: AIProviderCredential[];
+    isLoadingCredentials: boolean;
+    credentialError?: string;
     isAnalyzing: boolean;
     analysisProgress: number;
     analysisStatus: string;
@@ -166,6 +170,91 @@ export declare const generateRecap: import("@reduxjs/toolkit").AsyncThunk<{
     fulfilledMeta?: unknown;
     rejectedMeta?: unknown;
 }>;
+export declare const fetchCredentials: import("@reduxjs/toolkit").AsyncThunk<any, boolean, {
+    state?: unknown;
+    dispatch?: import("redux").Dispatch;
+    extra?: unknown;
+    rejectValue?: unknown;
+    serializedErrorType?: unknown;
+    pendingMeta?: unknown;
+    fulfilledMeta?: unknown;
+    rejectedMeta?: unknown;
+}>;
+export declare const addCredential: import("@reduxjs/toolkit").AsyncThunk<any, AIProviderCredentialInput, {
+    state?: unknown;
+    dispatch?: import("redux").Dispatch;
+    extra?: unknown;
+    rejectValue?: unknown;
+    serializedErrorType?: unknown;
+    pendingMeta?: unknown;
+    fulfilledMeta?: unknown;
+    rejectedMeta?: unknown;
+}>;
+export declare const updateCredential: import("@reduxjs/toolkit").AsyncThunk<{
+    id: string;
+    updates: {
+        name?: string;
+        modelPreference?: string;
+        enabled?: boolean;
+        priority?: number;
+    };
+}, {
+    id: string;
+    updates: {
+        name?: string;
+        modelPreference?: string;
+        enabled?: boolean;
+        priority?: number;
+    };
+}, {
+    state?: unknown;
+    dispatch?: import("redux").Dispatch;
+    extra?: unknown;
+    rejectValue?: unknown;
+    serializedErrorType?: unknown;
+    pendingMeta?: unknown;
+    fulfilledMeta?: unknown;
+    rejectedMeta?: unknown;
+}>;
+export declare const deleteCredential: import("@reduxjs/toolkit").AsyncThunk<string, string, {
+    state?: unknown;
+    dispatch?: import("redux").Dispatch;
+    extra?: unknown;
+    rejectValue?: unknown;
+    serializedErrorType?: unknown;
+    pendingMeta?: unknown;
+    fulfilledMeta?: unknown;
+    rejectedMeta?: unknown;
+}>;
+export declare const testCredential: import("@reduxjs/toolkit").AsyncThunk<{
+    id: string;
+    modelInfo: any;
+}, string, {
+    state?: unknown;
+    dispatch?: import("redux").Dispatch;
+    extra?: unknown;
+    rejectValue?: unknown;
+    serializedErrorType?: unknown;
+    pendingMeta?: unknown;
+    fulfilledMeta?: unknown;
+    rejectedMeta?: unknown;
+}>;
+export declare const reorderCredentials: import("@reduxjs/toolkit").AsyncThunk<{
+    id: string;
+    priority: number;
+}[], {
+    id: string;
+    priority: number;
+}[], {
+    state?: unknown;
+    dispatch?: import("redux").Dispatch;
+    extra?: unknown;
+    rejectValue?: unknown;
+    serializedErrorType?: unknown;
+    pendingMeta?: unknown;
+    fulfilledMeta?: unknown;
+    rejectedMeta?: unknown;
+}>;
 export declare const setActiveProvider: import("@reduxjs/toolkit").ActionCreatorWithPayload<"openai" | "gemini" | "anthropic", "aiAssistant/setActiveProvider">, clearActiveProvider: import("@reduxjs/toolkit").ActionCreatorWithoutPayload<"aiAssistant/clearActiveProvider">, setAutoAnalyze: import("@reduxjs/toolkit").ActionCreatorWithPayload<boolean, "aiAssistant/setAutoAnalyze">, setAnalysisFrequency: import("@reduxjs/toolkit").ActionCreatorWithPayload<"daily" | "weekly" | "manual", "aiAssistant/setAnalysisFrequency">, setDataTypes: import("@reduxjs/toolkit").ActionCreatorWithPayload<Partial<{
     includeTasks: boolean;
     includeJournal: boolean;
@@ -225,5 +314,20 @@ export declare const selectLastAIError: (state: {
 export declare const selectAIUsage: (state: {
     aiAssistant: AIAssistantState;
 }) => AIUsageEntry[];
+export declare const selectCredentials: (state: {
+    aiAssistant: AIAssistantState;
+}) => AIProviderCredential[];
+export declare const selectIsLoadingCredentials: (state: {
+    aiAssistant: AIAssistantState;
+}) => boolean;
+export declare const selectCredentialError: (state: {
+    aiAssistant: AIAssistantState;
+}) => string | undefined;
+export declare const selectEnabledCredentials: (state: {
+    aiAssistant: AIAssistantState;
+}) => AIProviderCredential[];
+export declare const selectCredentialsByProvider: (provider: "openai" | "gemini" | "anthropic") => (state: {
+    aiAssistant: AIAssistantState;
+}) => AIProviderCredential[];
 declare const _default: import("redux").Reducer<AIAssistantState>;
 export default _default;

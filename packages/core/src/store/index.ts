@@ -24,6 +24,13 @@ export {
   initializeAISettings,
   analyzeUserData,
   generateRecap,
+  // Credential management thunks
+  fetchCredentials,
+  addCredential,
+  updateCredential,
+  deleteCredential,
+  testCredential,
+  reorderCredentials,
   // Actions
   setActiveProvider,
   clearActiveProvider,
@@ -60,6 +67,12 @@ export {
   selectAIErrors,
   selectLastAIError,
   selectAIUsage,
+  // Credential selectors
+  selectCredentials,
+  selectIsLoadingCredentials,
+  selectCredentialError,
+  selectEnabledCredentials,
+  selectCredentialsByProvider,
 } from './slices/aiAssistantSlice';
 export { default as aiAssistantReducer } from './slices/aiAssistantSlice';
 // Export insights slice
@@ -112,4 +125,26 @@ export {
 } from './slices/insightsSlice';
 export { default as insightsReducer } from './slices/insightsSlice';
 export * from './slices/goalsSlice';
+// Export summaries slice
+export type { Summary, SummariesState } from './slices/summariesSlice';
+export {
+  // Async thunks
+  generateSummary,
+  fetchSummaries,
+  deleteSummary,
+  exportSummary,
+  // Actions
+  setFilter,
+  setGenerationProgress,
+  clearError,
+  // Selectors
+  selectSummaries,
+  selectSummariesLoading,
+  selectSummariesGenerating,
+  selectSummariesError,
+  selectSummariesFilters,
+  selectGenerationProgress,
+  selectFilteredSummaries,
+} from './slices/summariesSlice';
+export { default as summariesReducer } from './slices/summariesSlice';
 export * from './slices/sampleData';

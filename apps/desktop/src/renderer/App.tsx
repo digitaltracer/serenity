@@ -40,6 +40,7 @@ const InsightsHubPage = lazy(() => import('./pages/InsightsHubPage').then(module
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
 const DatabasePage = lazy(() => import('./pages/DatabasePage').then(module => ({ default: module.DatabasePage })));
 const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage').then(module => ({ default: module.IntegrationsPage })));
+const SummaryPage = lazy(() => import('./pages/SummaryPage'));
 
 // Loading fallback component for route transitions
 function RouteLoadingFallback() {
@@ -395,6 +396,7 @@ function AppContent() {
                     <Route path="/insights" element={<InsightsHubPage />} />
                     {/* Backward compatibility redirect */}
                     <Route path="/analytics" element={<InsightsHubPage />} />
+                    <Route path="/summary" element={<SummaryPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/database" element={<DatabasePage />} />
                     <Route path="/integrations" element={<IntegrationsPage />} />

@@ -385,12 +385,14 @@ export const IntegrationsPage: React.FC = () => {
   });
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* Header */}
-      <div className="mb-8">
+    <div className="flex-1 h-full bg-background">
+      <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-200/50 dark:border-blue-700/30">
-            <ExternalLink className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <div className="p-3 rounded-lg bg-primary/5 border border-border/50">
+            <ExternalLink className="w-6 h-6 text-primary" />
           </div>
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
@@ -494,7 +496,7 @@ export const IntegrationsPage: React.FC = () => {
         <CardContent>
           <div className="space-y-4">
             {/* Sync Action */}
-            <div className="bg-gradient-to-r from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-800/20 rounded-xl p-6 border border-green-200/50 dark:border-green-700/30">
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-6 border border-green-200/50 dark:border-green-700/30">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-green-900 dark:text-green-100 mb-1">
@@ -580,7 +582,7 @@ export const IntegrationsPage: React.FC = () => {
         {googleCalendar.connected ? (
           <div className="space-y-6">
             {/* Connection Status */}
-            <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-6 border border-blue-200/50 dark:border-blue-700/30">
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6 border border-blue-200/50 dark:border-blue-700/30">
               <div className="flex items-start justify-between">
                 <div className="flex-1 space-y-3">
                   <div className="flex items-center gap-2">
@@ -734,7 +736,8 @@ export const IntegrationsPage: React.FC = () => {
         {github.connected ? (
           <div className="space-y-6">
             {/* Connection Status */}
-            <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 rounded-xl p-6 border border-gray-200/50 dark:border-gray-600/30">
+            <Card>
+              <CardContent className="py-6">
               <div className="flex items-start justify-between">
                 <div className="flex-1 space-y-3">
                   <div className="flex items-center gap-2">
@@ -776,8 +779,9 @@ export const IntegrationsPage: React.FC = () => {
                   </Button>
                 </div>
               </div>
-            </div>
-            
+              </CardContent>
+            </Card>
+
             {/* Token Management */}
             {github.tokens && github.tokens.length > 0 && (
               <div className="space-y-4">
@@ -1057,6 +1061,8 @@ export const IntegrationsPage: React.FC = () => {
           hideFromTaskbar: false,
         }}
       />
+        </div>
+      </div>
     </div>
   );
 };

@@ -46,6 +46,26 @@ export interface AIInsightRow {
   actionability_suggestions: string; // JSON array
 }
 
+export interface AIProviderCredentialRow {
+  id: string;
+  provider: 'openai' | 'gemini' | 'anthropic';
+  name: string;
+  api_key_encrypted: string;
+  model_preference: string | null;
+  enabled: number;
+  priority: number;
+  metadata: string; // JSON
+  last_used_at: string | null;
+  total_requests: number;
+  total_tokens: number;
+  success_count: number;
+  error_count: number;
+  last_error: string | null;
+  last_error_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AIRecapRow {
   id: string;
   provider: 'openai' | 'gemini' | 'anthropic' | 'local';
@@ -128,7 +148,7 @@ export class SQLiteAIQueries {
   }
 
   // ===== Usage =====
-  async addUsage(entries: Array<{ timestamp?: string; provider: 'openai' | 'gemini' | 'anthropic'; operation: 'analyze' | 'recap' | 'quickadd'; promptTokens: number; completionTokens: number; totalTokens: number }>): Promise<void> {
+  async addUsage(entries: Array<{ timestamp?: string; provider: 'openai' | 'gemini' | 'anthropic'; operation: 'analyze' | 'recap' | 'quickadd' | 'summary'; promptTokens: number; completionTokens: number; totalTokens: number }>): Promise<void> {
     if (!entries || entries.length === 0) return;
 
     // Deduplication: check for recent duplicate entries (within 5 seconds)
@@ -594,5 +614,295 @@ export class SQLiteAIQueries {
     `;
 
     this.db.prepare(sql).run(themeId, isRecurring ? 1 : 0, occurrenceNumber, insightId);
+  }
+
+  // ===== Summary Methods =====
+
+  /**
+   * Create a new summary
+   */
+  async createSummary(summary: {
+    id: string;
+    title: string;
+    content: string;
+    summaryType: 'tasks' | 'journal' | 'combined';
+    startDate: string;
+    endDate: string;
+    wordCount: number;
+    metadata: string;
+    provider: 'openai' | 'gemini' | 'anthropic' | 'local';
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  }): Promise<void> {
+    const sql = `
+      INSERT INTO summaries (
+        id, title, content, summary_type, start_date, end_date,
+        word_count, metadata, provider, prompt_tokens, completion_tokens, total_tokens
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    this.db.prepare(sql).run(
+      summary.id,
+      summary.title,
+      summary.content,
+      summary.summaryType,
+      summary.startDate,
+      summary.endDate,
+      summary.wordCount,
+      summary.metadata,
+      summary.provider,
+      summary.promptTokens,
+      summary.completionTokens,
+      summary.totalTokens
+    );
+
+    logger.info(`✅ Created summary: ${summary.title}`, {
+      component: 'ai',
+      operation: 'createdSummary',
+      metadata: { summaryId: summary.id, type: summary.summaryType }
+    });
+  }
+
+  /**
+   * Get all summaries
+   */
+  async getAllSummaries(): Promise<any[]> {
+    const sql = `SELECT * FROM summaries ORDER BY generated_at DESC`;
+    return this.db.prepare(sql).all();
+  }
+
+  /**
+   * Get summary by ID
+   */
+  async getSummaryById(id: string): Promise<any | null> {
+    const sql = `SELECT * FROM summaries WHERE id = ?`;
+    return this.db.prepare(sql).get(id) || null;
+  }
+
+  /**
+   * Delete a summary
+   */
+  async deleteSummary(id: string): Promise<boolean> {
+    const sql = `DELETE FROM summaries WHERE id = ?`;
+    const result = this.db.prepare(sql).run(id);
+    return result.changes > 0;
+  }
+
+  /**
+   * Get summaries by type
+   */
+  async getSummariesByType(type: 'tasks' | 'journal' | 'combined'): Promise<any[]> {
+    const sql = `SELECT * FROM summaries WHERE summary_type = ? ORDER BY generated_at DESC`;
+    return this.db.prepare(sql).all(type);
+  }
+
+  /**
+   * Get summaries by date range
+   */
+  async getSummariesByDateRange(startDate: string, endDate: string): Promise<any[]> {
+    const sql = `
+      SELECT * FROM summaries
+      WHERE start_date >= ? AND end_date <= ?
+      ORDER BY generated_at DESC
+    `;
+    return this.db.prepare(sql).all(startDate, endDate);
+  }
+
+  // ===== AI Provider Credentials Methods =====
+
+  /**
+   * List all AI provider credentials, sorted by priority
+   */
+  async listCredentials(enabledOnly: boolean = false): Promise<AIProviderCredentialRow[]> {
+    const sql = enabledOnly
+      ? `SELECT * FROM ai_provider_credentials WHERE enabled = 1 ORDER BY priority ASC`
+      : `SELECT * FROM ai_provider_credentials ORDER BY priority ASC`;
+    return this.db.prepare(sql).all() as AIProviderCredentialRow[];
+  }
+
+  /**
+   * Get credentials by provider, sorted by priority
+   */
+  async getCredentialsByProvider(
+    provider: string,
+    enabledOnly: boolean = true
+  ): Promise<AIProviderCredentialRow[]> {
+    const sql = enabledOnly
+      ? `SELECT * FROM ai_provider_credentials WHERE provider = ? AND enabled = 1 ORDER BY priority ASC`
+      : `SELECT * FROM ai_provider_credentials WHERE provider = ? ORDER BY priority ASC`;
+    return this.db.prepare(sql).all(provider) as AIProviderCredentialRow[];
+  }
+
+  /**
+   * Get a single credential by ID
+   */
+  async getCredentialById(id: string): Promise<AIProviderCredentialRow | null> {
+    const sql = `SELECT * FROM ai_provider_credentials WHERE id = ?`;
+    return (this.db.prepare(sql).get(id) as AIProviderCredentialRow) || null;
+  }
+
+  /**
+   * Create a new credential
+   */
+  async createCredential(data: {
+    id: string;
+    provider: string;
+    name: string;
+    apiKeyEncrypted: string;
+    modelPreference?: string | null;
+    priority?: number;
+    metadata?: Record<string, any>;
+  }): Promise<void> {
+    const now = new Date().toISOString();
+    const sql = `
+      INSERT INTO ai_provider_credentials (
+        id, provider, name, api_key_encrypted, model_preference,
+        enabled, priority, metadata, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+    `;
+    this.db.prepare(sql).run(
+      data.id,
+      data.provider,
+      data.name,
+      data.apiKeyEncrypted,
+      data.modelPreference || null,
+      data.priority || 0,
+      JSON.stringify(data.metadata || {}),
+      now,
+      now
+    );
+    logger.info(`✅ Created AI credential: ${data.provider}/${data.name}`, {
+      component: 'SQLiteAIQueries',
+      operation: 'createCredential'
+    });
+  }
+
+  /**
+   * Update a credential
+   */
+  async updateCredential(
+    id: string,
+    updates: {
+      name?: string;
+      modelPreference?: string | null;
+      enabled?: boolean;
+      priority?: number;
+      metadata?: Record<string, any>;
+    }
+  ): Promise<void> {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.name !== undefined) {
+      fields.push('name = ?');
+      values.push(updates.name);
+    }
+    if (updates.modelPreference !== undefined) {
+      fields.push('model_preference = ?');
+      values.push(updates.modelPreference);
+    }
+    if (updates.enabled !== undefined) {
+      fields.push('enabled = ?');
+      values.push(updates.enabled ? 1 : 0);
+    }
+    if (updates.priority !== undefined) {
+      fields.push('priority = ?');
+      values.push(updates.priority);
+    }
+    if (updates.metadata !== undefined) {
+      fields.push('metadata = ?');
+      values.push(JSON.stringify(updates.metadata));
+    }
+
+    if (fields.length === 0) return;
+
+    fields.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    values.push(id);
+
+    const sql = `UPDATE ai_provider_credentials SET ${fields.join(', ')} WHERE id = ?`;
+    const result = this.db.prepare(sql).run(...values);
+
+    if (result.changes > 0) {
+      logger.info(`✅ Updated AI credential: ${id}`, {
+        component: 'SQLiteAIQueries',
+        operation: 'updateCredential'
+      });
+    }
+  }
+
+  /**
+   * Delete a credential
+   */
+  async deleteCredential(id: string): Promise<boolean> {
+    const sql = `DELETE FROM ai_provider_credentials WHERE id = ?`;
+    const result = this.db.prepare(sql).run(id);
+
+    if (result.changes > 0) {
+      logger.info(`✅ Deleted AI credential: ${id}`, {
+        component: 'SQLiteAIQueries',
+        operation: 'deleteCredential'
+      });
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Record successful API call for a credential
+   */
+  async recordCredentialSuccess(id: string, tokensUsed: number): Promise<void> {
+    const now = new Date().toISOString();
+    const sql = `
+      UPDATE ai_provider_credentials
+      SET
+        last_used_at = ?,
+        total_requests = total_requests + 1,
+        total_tokens = total_tokens + ?,
+        success_count = success_count + 1,
+        updated_at = ?
+      WHERE id = ?
+    `;
+    this.db.prepare(sql).run(now, tokensUsed, now, id);
+  }
+
+  /**
+   * Record failed API call for a credential
+   */
+  async recordCredentialError(id: string, error: string): Promise<void> {
+    const now = new Date().toISOString();
+    const sql = `
+      UPDATE ai_provider_credentials
+      SET
+        total_requests = total_requests + 1,
+        error_count = error_count + 1,
+        last_error = ?,
+        last_error_at = ?,
+        updated_at = ?
+      WHERE id = ?
+    `;
+    this.db.prepare(sql).run(error, now, now, id);
+  }
+
+  /**
+   * Bulk update priorities (for drag-and-drop reordering)
+   */
+  async updateCredentialPriorities(priorities: Array<{ id: string; priority: number }>): Promise<void> {
+    const updateMany = this.db.transaction(() => {
+      const sql = `UPDATE ai_provider_credentials SET priority = ?, updated_at = ? WHERE id = ?`;
+      const stmt = this.db.prepare(sql);
+      const now = new Date().toISOString();
+
+      for (const item of priorities) {
+        stmt.run(item.priority, now, item.id);
+      }
+    });
+
+    updateMany();
+    logger.info(`✅ Updated ${priorities.length} credential priorities`, {
+      component: 'SQLiteAIQueries',
+      operation: 'updateCredentialPriorities'
+    });
   }
 }

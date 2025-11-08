@@ -13,7 +13,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { addTask, addEntry, parseQuickInput, selectActiveProjects, selectAllEntries, logger } from '@serenity/core';
 import { RootState } from '@serenity/core';
-import { CheckSquare, BookOpen, FolderOpen, BarChart3, Lightbulb, Loader2 } from 'lucide-react';
+import { CheckSquare, BookOpen, FolderOpen, BarChart3, Lightbulb, Loader2, Sparkles } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -136,6 +136,12 @@ export const HomePage: React.FC = () => {
       description: 'Organize related tasks into projects with visual progress tracking.',
       icon: FolderOpen,
       route: '/actionhub',
+    },
+    {
+      title: 'AI Summaries',
+      description: 'Generate AI-powered summaries of your tasks and journal entries by date range.',
+      icon: Sparkles,
+      route: '/summary',
     },
     {
       title: 'Insights Hub',
@@ -321,10 +327,9 @@ export const HomePage: React.FC = () => {
                   return (
                     <Card
                       key={feature.title}
-                      className="group relative overflow-hidden border border-border/60 bg-card/80 backdrop-blur transition-all duration-300 cursor-pointer hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_20px_45px_rgba(15,23,42,0.45)]"
+                      className="group relative overflow-hidden border border-border/60 bg-card/80 backdrop-blur transition-all duration-300 cursor-pointer hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
                       onClick={() => navigate(feature.route)}
                     >
-                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br from-primary/5 via-transparent to-transparent" />
                       <CardHeader className="relative z-10 space-y-4">
                         <div className="flex items-center gap-4">
                           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/5 text-primary transition-colors duration-300 group-hover:bg-primary/10">
@@ -344,7 +349,6 @@ export const HomePage: React.FC = () => {
               {!hasExistingData && (
                 <div className="flex justify-center">
                   <Card className="relative overflow-hidden border border-border/60 bg-card/80 backdrop-blur">
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-30" />
                     <CardContent className="relative z-10 flex flex-col items-center gap-6 py-10 px-10 text-center">
                       <h2 className="text-2xl font-semibold text-foreground">
                         Ready to get started?

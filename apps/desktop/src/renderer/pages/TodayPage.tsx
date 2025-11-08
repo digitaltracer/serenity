@@ -91,9 +91,11 @@ export const TodayPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-6 md:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
-      {/* Header */}
-      <div>
+    <div className="flex-1 h-full bg-background">
+      <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-5xl mx-auto space-y-6 md:space-y-8">
+          {/* Header */}
+          <div>
         <div className="flex items-center gap-3 mb-1">
           <Calendar className="w-6 h-6 text-gray-300 dark:text-gray-400" />
           <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-gray-100">Today</h1>
@@ -175,7 +177,7 @@ export const TodayPage: React.FC = () => {
             editingTask === task.id ? (
               /* Edit Form */
               <div key={task.id} className="mb-6">
-                <div className="bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-800/80 dark:to-gray-900/60 border border-gray-200/60 dark:border-gray-700/40 rounded-xl p-6 shadow-lg shadow-gray-200/40 dark:shadow-black/25 ring-1 ring-gray-100/80 dark:ring-gray-800/60 backdrop-blur-sm">
+                <div className="bg-card border border-border rounded-lg p-6 shadow-lg">
                   <div className="space-y-4">
                     <Input
                       placeholder="Task title"
@@ -295,6 +297,8 @@ export const TodayPage: React.FC = () => {
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 };

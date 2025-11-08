@@ -15,7 +15,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.selectCompactMode = exports.WebApiPersistenceClient = exports.checkSQLiteAvailability = exports.getDatabaseStats = exports.initializeStoreData = exports.store = exports.migratePasswordHash = exports.needsPasswordMigration = exports.removePostgreSQLConfigSecure = exports.getPostgreSQLConfigSecure = exports.savePostgreSQLConfigSecure = exports.ThemeTrackingService = exports.VisualizationService = exports.AIPreprocessingService = exports.EncryptedIntegrationService = exports.secureSessionManager = void 0;
+exports.selectCompactMode = exports.WebApiPersistenceClient = exports.checkSQLiteAvailability = exports.getDatabaseStats = exports.initializeStoreData = exports.store = exports.migratePasswordHash = exports.needsPasswordMigration = exports.removePostgreSQLConfigSecure = exports.getPostgreSQLConfigSecure = exports.savePostgreSQLConfigSecure = exports.AISummarizationService = exports.ThemeTrackingService = exports.VisualizationService = exports.AIPreprocessingService = exports.AICredentialService = exports.EncryptedIntegrationService = exports.secureSessionManager = void 0;
 __exportStar(require("./types"), exports);
 __exportStar(require("./utils"), exports);
 __exportStar(require("./validation"), exports);
@@ -34,6 +34,8 @@ var encryptedIntegrationService_1 = require("./services/encryptedIntegrationServ
 Object.defineProperty(exports, "EncryptedIntegrationService", { enumerable: true, get: function () { return encryptedIntegrationService_1.EncryptedIntegrationService; } });
 // biometricAuthService is only used dynamically to avoid bundle conflicts
 __exportStar(require("./services/aiAssistantService"), exports);
+var aiCredentialService_1 = require("./services/aiCredentialService");
+Object.defineProperty(exports, "AICredentialService", { enumerable: true, get: function () { return aiCredentialService_1.AICredentialService; } });
 // Re-export preprocessing service but avoid duplicate exports
 var aiPreprocessingService_1 = require("./services/aiPreprocessingService");
 Object.defineProperty(exports, "AIPreprocessingService", { enumerable: true, get: function () { return aiPreprocessingService_1.AIPreprocessingService; } });
@@ -47,6 +49,8 @@ __exportStar(require("./services/actionabilityService"), exports);
 __exportStar(require("./services/feedbackService"), exports);
 var themeTrackingService_1 = require("./services/themeTrackingService");
 Object.defineProperty(exports, "ThemeTrackingService", { enumerable: true, get: function () { return themeTrackingService_1.ThemeTrackingService; } });
+var aiSummarizationService_1 = require("./services/aiSummarizationService");
+Object.defineProperty(exports, "AISummarizationService", { enumerable: true, get: function () { return aiSummarizationService_1.AISummarizationService; } });
 // Export secure storage functions
 var secureStorage_1 = require("./utils/secureStorage");
 Object.defineProperty(exports, "savePostgreSQLConfigSecure", { enumerable: true, get: function () { return secureStorage_1.savePostgreSQLConfigSecure; } });

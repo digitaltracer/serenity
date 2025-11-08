@@ -62,18 +62,29 @@ CREATE TABLE IF NOT EXISTS verification_tokens (
     PRIMARY KEY (identifier, token)
 );
 
--- Add encryption status to sensitive tables
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS encrypted BOOLEAN DEFAULT FALSE;
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS encryption_iv TEXT;
+-- Add encryption status to sensitive tables (only if tables exist)
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'tasks') THEN
+        ALTER TABLE tasks ADD COLUMN IF NOT EXISTS encrypted BOOLEAN DEFAULT FALSE;
+        ALTER TABLE tasks ADD COLUMN IF NOT EXISTS encryption_iv TEXT;
+    END IF;
 
-ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS encrypted BOOLEAN DEFAULT FALSE;
-ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS encryption_iv TEXT;
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'journal_entries') THEN
+        ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS encrypted BOOLEAN DEFAULT FALSE;
+        ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS encryption_iv TEXT;
+    END IF;
 
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS encrypted BOOLEAN DEFAULT FALSE;
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS encryption_iv TEXT;
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'projects') THEN
+        ALTER TABLE projects ADD COLUMN IF NOT EXISTS encrypted BOOLEAN DEFAULT FALSE;
+        ALTER TABLE projects ADD COLUMN IF NOT EXISTS encryption_iv TEXT;
+    END IF;
 
-ALTER TABLE goals ADD COLUMN IF NOT EXISTS encrypted BOOLEAN DEFAULT FALSE;
-ALTER TABLE goals ADD COLUMN IF NOT EXISTS encryption_iv TEXT;
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'goals') THEN
+        ALTER TABLE goals ADD COLUMN IF NOT EXISTS encrypted BOOLEAN DEFAULT FALSE;
+        ALTER TABLE goals ADD COLUMN IF NOT EXISTS encryption_iv TEXT;
+    END IF;
+END $$;
 
 -- Sync metadata for bidirectional sync
 CREATE TABLE IF NOT EXISTS sync_metadata (

@@ -98,8 +98,9 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
   }
 
   const navigationItems = [
-    { path: '/', label: 'Home', icon: Home },
+    { path: '/home', label: 'Home', icon: Home },
     { path: '/actionhub', label: 'ActionHub', icon: CheckSquare },
+    { path: '/today', label: 'Today', icon: Calendar },
     { path: '/journal', label: 'Journal', icon: BookOpen },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   ]
@@ -107,7 +108,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
   const isActive = (path: string) => pathname === path
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-full">
       {/* Sidebar */}
       <Sidebar collapsed={sidebarCollapsed}>
         {/* Header with collapse button */}

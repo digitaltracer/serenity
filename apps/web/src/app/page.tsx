@@ -1,4 +1,16 @@
-export default function HomePage() {
+import { auth } from '@/lib/auth/config'
+import Link from 'next/link'
+
+export default async function LandingPage() {
+  const session = await auth()
+
+  // Determine the "Get Started" link based on auth status
+  const getStartedHref = session?.user
+    ? (session.user.hasEncryptionKey ? '/home' : '/auth/setup-encryption')
+    : '/login'
+
+  const getStartedText = session?.user ? 'Go to Dashboard' : 'Get Started'
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-24">
       <div className="max-w-2xl text-center space-y-6">
@@ -9,12 +21,12 @@ export default function HomePage() {
           Your productivity companion with tasks, journal, and AI insights
         </p>
         <div className="flex gap-4 justify-center mt-8">
-          <a
-            href="/login"
+          <Link
+            href={getStartedHref}
             className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity font-medium"
           >
-            Get Started
-          </a>
+            {getStartedText}
+          </Link>
           <a
             href="https://github.com/your-username/serenity"
             target="_blank"

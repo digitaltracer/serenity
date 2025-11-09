@@ -32,6 +32,7 @@ const nextConfig = {
         pg: false,
         'pg-native': false,
         'pg-hstore': false,
+        child_process: false,
       }
     }
     return config

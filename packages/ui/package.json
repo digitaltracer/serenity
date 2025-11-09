@@ -20,11 +20,12 @@
   },
   "dependencies": {
     "@serenity/core": "*",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "clsx": "^2.0.0",
-    "tailwind-merge": "^1.14.0",
-    "lucide-react": "^0.274.0"
+    "lucide-react": "^0.274.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
+    "recharts": "^3.3.0",
+    "tailwind-merge": "^1.14.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.20",

@@ -23,6 +23,7 @@
     "@serenity/core": "*",
     "@serenity/database": "*",
     "@serenity/ui": "*",
+    "@tanstack/react-virtual": "^3.13.12",
     "@types/dompurify": "^3.0.5",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.0.0",

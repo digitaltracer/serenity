@@ -3,11 +3,11 @@ import { redirect } from 'next/navigation'
 import { OAuthButtons } from '@/components/auth/OAuthButtons'
 
 export default async function LoginPage() {
-  // If user is already signed in, redirect to encryption setup or dashboard
+  // If user is already signed in, redirect to encryption setup or home
   const session = await auth()
   if (session?.user) {
     if (session.user.hasEncryptionKey) {
-      redirect('/dashboard')
+      redirect('/')
     } else {
       redirect('/auth/setup-encryption')
     }

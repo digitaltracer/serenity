@@ -68,7 +68,7 @@ export function EncryptionSetup({ onComplete }: EncryptionSetupProps) {
       if (onComplete) {
         onComplete()
       } else {
-        router.push('/dashboard')
+        router.push('/')
       }
     } catch (err: any) {
       setError(err.message || 'Failed to set up encryption')

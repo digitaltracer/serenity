@@ -17,7 +17,7 @@ export default async function SetupEncryptionPage() {
   )
 
   if (result.rows.length > 0) {
-    redirect('/dashboard')
+    redirect('/')
   }
 
   return (

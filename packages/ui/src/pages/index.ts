@@ -6,6 +6,7 @@
 export { HomePage } from './HomePage';
 export { TodayPage } from './TodayPage';
 export { GoalsPage } from './GoalsPage';
+export { InsightsPage } from './InsightsPage';
 export { DatabasePage } from './DatabasePage';
 export { IntegrationsPage } from './IntegrationsPage';
 export { SummaryPage } from './SummaryPage';

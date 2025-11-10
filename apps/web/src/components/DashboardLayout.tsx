@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSelector, useDispatch } from 'react-redux'
 import {
@@ -13,8 +13,21 @@ import {
   selectAllTasks,
   addEntry,
   addUsedTags,
+  selectTaskModalOpen,
+  selectJournalModalOpen,
+  selectSubtaskModalOpen,
+  openTaskModal,
+  closeTaskModal,
+  openJournalModal,
+  closeJournalModal,
+  openSubtaskModal,
+  closeSubtaskModal,
+  selectIsGlobalSearchOpen,
+  openGlobalSearch,
+  closeGlobalSearch,
   Task,
-  JournalEntry
+  JournalEntry,
+  SearchResult
 } from '@serenity/core'
 import {
   Sidebar,
@@ -26,7 +39,8 @@ import {
   TaskModal,
   JournalEntryModal,
   ThemeToggle,
-  SubtaskModal
+  SubtaskModal,
+  GlobalSearchModal
 } from '@serenity/ui'
 import {
   Home,
@@ -45,7 +59,8 @@ import {
   Brain,
   Sparkles,
   Globe,
-  Database
+  Database,
+  Search
 } from 'lucide-react'
 
 interface DashboardLayoutProps {
@@ -61,11 +76,12 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
   const sidebarCollapsed = useSelector(selectSidebarCollapsed)
   const currentTheme = useSelector(selectTheme)
   const tasks = useSelector(selectAllTasks)
+  const isTaskModalOpen = useSelector(selectTaskModalOpen)
+  const isJournalModalOpen = useSelector(selectJournalModalOpen)
+  const isSubtaskModalOpen = useSelector(selectSubtaskModalOpen)
+  const isGlobalSearchOpen = useSelector(selectIsGlobalSearchOpen)
   const pathname = usePathname()
   const router = useRouter()
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
-  const [isJournalModalOpen, setIsJournalModalOpen] = useState(false)
-  const [isSubtaskModalOpen, setIsSubtaskModalOpen] = useState(false)
 
   const toggleSidebar = () => {
     dispatch(setSidebarCollapsed(!sidebarCollapsed))
@@ -79,7 +95,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
       dispatch(addUsedTags(taskData.tags))
     }
 
-    setIsTaskModalOpen(false)
+    dispatch(closeTaskModal())
   }
 
   const handleCreateJournalEntry = (entryData: Partial<JournalEntry>) => {
@@ -90,7 +106,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
       dispatch(addUsedTags(entryData.tags))
     }
 
-    setIsJournalModalOpen(false)
+    dispatch(closeJournalModal())
   }
 
   const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
@@ -99,7 +115,21 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
 
   const handleCreateSubtask = (taskId: string, subtaskTitle: string) => {
     dispatch(addSubtask({ taskId, title: subtaskTitle }))
-    setIsSubtaskModalOpen(false)
+    dispatch(closeSubtaskModal())
+  }
+
+  const handleSearchResultClick = (result: SearchResult) => {
+    // Navigate to the appropriate page based on result type
+    if (result.type === 'task') {
+      router.push('/actionhub')
+    } else if (result.type === 'journal') {
+      router.push('/journal')
+    } else if (result.type === 'project') {
+      router.push('/actionhub')
+    } else if (result.type === 'goal') {
+      router.push('/goals')
+    }
+    dispatch(closeGlobalSearch())
   }
 
   const navigationItems = [
@@ -193,19 +223,19 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
             <SidebarSection title="Quick Actions">
               <SidebarItem
                 icon={<Plus className="w-5 h-5" />}
-                onClick={() => setIsTaskModalOpen(true)}
+                onClick={() => dispatch(openTaskModal())}
               >
                 New Task
               </SidebarItem>
               <SidebarItem
                 icon={<BookOpen className="w-5 h-5" />}
-                onClick={() => setIsJournalModalOpen(true)}
+                onClick={() => dispatch(openJournalModal())}
               >
                 New Entry
               </SidebarItem>
               <SidebarItem
                 icon={<ListChecks className="w-5 h-5" />}
-                onClick={() => setIsSubtaskModalOpen(true)}
+                onClick={() => dispatch(openSubtaskModal())}
               >
                 Add Subtask
               </SidebarItem>
@@ -216,15 +246,15 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
             <div className="space-y-2 mt-4">
               <SidebarItem
                 icon={<Plus className="w-5 h-5" />}
-                onClick={() => setIsTaskModalOpen(true)}
+                onClick={() => dispatch(openTaskModal())}
               />
               <SidebarItem
                 icon={<BookOpen className="w-5 h-5" />}
-                onClick={() => setIsJournalModalOpen(true)}
+                onClick={() => dispatch(openJournalModal())}
               />
               <SidebarItem
                 icon={<ListChecks className="w-5 h-5" />}
-                onClick={() => setIsSubtaskModalOpen(true)}
+                onClick={() => dispatch(openSubtaskModal())}
               />
             </div>
           )}
@@ -257,9 +287,18 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header with theme toggle */}
+        {/* Header with search and theme toggle */}
         <div className="h-10 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 flex items-center justify-end px-4">
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => dispatch(openGlobalSearch())}
+              className="gap-2"
+            >
+              <Search className="w-4 h-4" />
+              <span className="hidden sm:inline">Search</span>
+            </Button>
             <ThemeToggle
               theme={currentTheme}
               onThemeChange={handleThemeChange}
@@ -277,23 +316,30 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
       {/* Task Modal */}
       <TaskModal
         isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
+        onClose={() => dispatch(closeTaskModal())}
         onSave={handleCreateTask}
       />
 
       {/* Journal Entry Modal */}
       <JournalEntryModal
         isOpen={isJournalModalOpen}
-        onClose={() => setIsJournalModalOpen(false)}
+        onClose={() => dispatch(closeJournalModal())}
         onSave={handleCreateJournalEntry}
       />
 
       {/* Subtask Modal */}
       <SubtaskModal
         isOpen={isSubtaskModalOpen}
-        onClose={() => setIsSubtaskModalOpen(false)}
+        onClose={() => dispatch(closeSubtaskModal())}
         onSave={handleCreateSubtask}
         tasks={tasks}
+      />
+
+      {/* Global Search Modal */}
+      <GlobalSearchModal
+        isOpen={isGlobalSearchOpen}
+        onClose={() => dispatch(closeGlobalSearch())}
+        onResultClick={handleSearchResultClick}
       />
     </div>
   )

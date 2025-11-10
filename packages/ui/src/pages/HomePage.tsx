@@ -1,13 +1,109 @@
-import React from 'react';
-import { Link } from '../routing';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button } from '../components';
-import { CheckSquare, BookOpen, FolderOpen, Sparkles, Lightbulb } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useNavigation, Link } from '../routing';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Button,
+  EnhancedTextInput,
+  useToast,
+} from '../components';
+import { useDispatch, useSelector } from 'react-redux';
+import { addTask, addEntry, parseQuickInput, selectActiveProjects, selectAllEntries, logger } from '@serenity/core';
+import { RootState } from '@serenity/core';
+import { CheckSquare, BookOpen, FolderOpen, Lightbulb, Loader2, Sparkles } from 'lucide-react';
 
 /**
- * Shared HomePage component that works across desktop and web platforms
- * Uses universal routing abstractions for cross-platform compatibility
+ * Shared HomePage component with AI-powered quick-add functionality
+ * Works across desktop (Electron) and web (Next.js) platforms
  */
 export const HomePage: React.FC = () => {
+  const navigation = useNavigation();
+  const dispatch = useDispatch();
+  const { showSuccess, showError } = useToast();
+  const [quickText, setQuickText] = useState('');
+  const [activeProvider, setActiveProvider] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const activeProjects = useSelector(selectActiveProjects);
+  const journalEntries = useSelector(selectAllEntries);
+  const tasks = useSelector((state: RootState) => state.tasks.tasks);
+
+  // Check if user has any existing data
+  const hasExistingData = tasks.length > 0 || journalEntries.length > 0 || activeProjects.length > 0;
+
+  // Check if we're in Electron environment
+  const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
+
+  useEffect(() => {
+    if (!isElectron) {
+      // Web environment - AI features not yet available
+      setActiveProvider(null);
+      return;
+    }
+
+    logger.debug('useEffect triggered - starting AI settings load', { component: 'HomePage', operation: 'loadAISettings' });
+    (async () => {
+      try {
+        logger.debug('Loading AI assistant settings', { component: 'HomePage', operation: 'loadAISettings' });
+
+        const electronAPI = (window as any).electronAPI;
+        logger.trace('electronAPI availability check', { component: 'HomePage', operation: 'loadAISettings', metadata: { available: !!electronAPI } });
+
+        const aiAssistant = electronAPI?.aiAssistant;
+        logger.trace('aiAssistant availability check', { component: 'HomePage', operation: 'loadAISettings', metadata: { available: !!aiAssistant, hasGetSettings: !!aiAssistant?.getSettings } });
+
+        if (!electronAPI || !aiAssistant || !aiAssistant.getSettings) {
+          logger.error('AI assistant not available', { component: 'HomePage', operation: 'loadAISettings' });
+          setActiveProvider(null);
+          return;
+        }
+
+        logger.debug('Calling getSettings', { component: 'HomePage', operation: 'loadAISettings' });
+        const settingsResult = await aiAssistant.getSettings();
+        logger.trace('Settings result received', { component: 'HomePage', operation: 'loadAISettings', metadata: { success: settingsResult?.success, hasSettings: !!settingsResult?.settings } });
+
+        if (!settingsResult?.success || !settingsResult.settings) {
+          logger.error('getSettings failed', { component: 'HomePage', operation: 'loadAISettings', metadata: { result: settingsResult } });
+          setActiveProvider(null);
+          return;
+        }
+
+        const provider = settingsResult.settings.activeProvider;
+        const providersWithKeys = settingsResult.settings.providersWithKeys;
+        logger.trace('Providers with keys', { component: 'HomePage', operation: 'loadAISettings', metadata: { providersWithKeys } });
+
+        const hasKey = provider ? !!providersWithKeys?.[provider] : false;
+        logger.trace('Provider key check', { component: 'HomePage', operation: 'loadAISettings', metadata: { provider, hasKey } });
+
+        if (provider && hasKey) {
+          logger.info('Setting activeProvider', { component: 'HomePage', operation: 'loadAISettings', metadata: { provider } });
+          setActiveProvider(provider);
+        } else if (!provider) {
+          logger.debug('No activeProvider set, looking for first provider with key', { component: 'HomePage', operation: 'loadAISettings' });
+          const firstWithKey = (['openai', 'gemini', 'anthropic'] as const).find(p => providersWithKeys?.[p]);
+          logger.debug('First provider with key search result', { component: 'HomePage', operation: 'loadAISettings', metadata: { firstWithKey } });
+
+          if (firstWithKey) {
+            logger.info('Auto-setting activeProvider', { component: 'HomePage', operation: 'loadAISettings', metadata: { provider: firstWithKey } });
+            setActiveProvider(firstWithKey);
+          } else {
+            logger.warn('No providers have API keys, setting to null', { component: 'HomePage', operation: 'loadAISettings' });
+            setActiveProvider(null);
+          }
+        } else {
+          logger.warn('Provider set but no API key, setting to null', { component: 'HomePage', operation: 'loadAISettings', metadata: { provider } });
+          setActiveProvider(null);
+        }
+
+      } catch (error) {
+        logger.error('Error loading AI settings', { component: 'HomePage', operation: 'loadAISettings' }, error as Error);
+        setActiveProvider(null);
+      }
+    })();
+  }, [isElectron]);
+
   const features = [
     {
       title: 'ActionHub',
@@ -41,6 +137,125 @@ export const HomePage: React.FC = () => {
     },
   ];
 
+  const handleQuickAdd = async () => {
+    if (isProcessing || !quickText.trim()) {
+      return;
+    }
+
+    const text = quickText.trim();
+    setIsProcessing(true);
+
+    try {
+      logger.info('User submitted input - Starting LLM processing', { component: 'HomePage', operation: 'quickAdd', metadata: { text } });
+
+      let res: any = null;
+
+      // Try AI processing if in Electron environment
+      if (isElectron) {
+        const llm = (window as any).electronAPI?.aiAssistant;
+
+        logger.trace('QuickAdd availability check', {
+          component: 'HomePage',
+          operation: 'quickAdd',
+          metadata: {
+            llmAvailable: !!llm,
+            quickAddAvailable: !!llm?.quickAdd,
+            activeProvider,
+            providerType: typeof activeProvider,
+            providerTruthy: !!activeProvider,
+          },
+        });
+
+        if (llm?.quickAdd && activeProvider) {
+          logger.debug('Calling LLM with provider', { component: 'HomePage', operation: 'quickAdd', metadata: { provider: activeProvider } });
+          const r = await llm.quickAdd(text, activeProvider as 'openai' | 'gemini' | 'anthropic', true);
+          logger.debug('IPC result received', { component: 'HomePage', operation: 'quickAdd', metadata: { success: r?.success, hasData: !!r?.data } });
+          if (r?.success && r.data) {
+            res = r.data;
+            if (r.debug) {
+              logger.trace('LLM details', {
+                component: 'HomePage',
+                operation: 'quickAdd',
+                metadata: {
+                  provider: r.debug.provider,
+                  model: r.debug.model,
+                  contentSample: r.debug.contentSample,
+                },
+              });
+            }
+          } else {
+            logger.warn('LLM quick-add failed, falling back to local parsing', {
+              component: 'HomePage',
+              operation: 'quickAdd',
+              metadata: { error: r?.error, debug: r?.debug },
+            });
+          }
+        } else {
+          logger.warn('LLM conditions not met - skipping LLM call', {
+            component: 'HomePage',
+            operation: 'quickAdd',
+            metadata: { quickAddAvailable: !!llm?.quickAdd, activeProvider },
+          });
+        }
+      }
+
+      // Fallback to local parsing if AI didn't work or not in Electron
+      if (!res) {
+        const local = parseQuickInput(text);
+        logger.info('Local parse fallback', { component: 'HomePage', operation: 'quickAdd', metadata: { kind: local.kind } });
+        if (local.kind === 'task') {
+          res = { ...local.task, kind: 'task', project: local.debug?.project };
+        } else {
+          res = { ...local.entry, kind: 'journal', project: local.debug?.project };
+        }
+      }
+
+      const findProjectByName = (projectName: string | null) => {
+        if (!projectName || typeof projectName !== 'string') return undefined;
+        const project = activeProjects.find(p => p.name.toLowerCase() === projectName.toLowerCase());
+        return project?.id;
+      };
+
+      if (res.kind === 'task') {
+        const projectId = findProjectByName(res.project);
+        const task = {
+          title: res.title || text,
+          description: res.description || undefined,
+          completed: false,
+          priority: res.priority || 'medium',
+          dueDate: res.dueDate ? new Date(res.dueDate) : undefined,
+          projectId,
+          tags: Array.isArray(res.tags) ? res.tags : [],
+          subtasks: [],
+          recurring: undefined,
+          userId: undefined,
+        } as any;
+        logger.info('Saving task', { component: 'HomePage', operation: 'quickAdd', metadata: { title: task.title, projectId, priority: task.priority } });
+        dispatch(addTask(task));
+        const projectName = projectId ? activeProjects.find(p => p.id === projectId)?.name : null;
+        const message = projectName ? `Task created in ${projectName}` : 'Task created';
+        showSuccess(message, task.title);
+      } else {
+        const entry = {
+          title: undefined,
+          content: res.description || res.title || text,
+          date: new Date(),
+          tags: Array.isArray(res.tags) ? res.tags : [],
+          pinned: false,
+        } as any;
+        logger.info('Saving journal entry', { component: 'HomePage', operation: 'quickAdd', metadata: { tagCount: entry.tags.length } });
+        dispatch(addEntry(entry));
+        showSuccess('Journal added');
+      }
+      setQuickText('');
+    } catch (err: any) {
+      logger.error('QuickAdd error', { component: 'HomePage', operation: 'quickAdd' }, err);
+      showError('Could not interpret input', err?.message || 'Try a simpler sentence.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="flex-1 h-full bg-background relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.09),transparent_55%)] opacity-40" />
@@ -67,6 +282,35 @@ export const HomePage: React.FC = () => {
               </div>
             </div>
 
+            <section className="space-y-6">
+              <div className="relative">
+                <EnhancedTextInput
+                  value={quickText}
+                  onChange={setQuickText}
+                  onSubmit={handleQuickAdd}
+                  placeholder={
+                    isProcessing
+                      ? 'Processing with AI...'
+                      : "Speak naturally… 'Remind me to call mom tomorrow afternoon', or 'I felt great after my run today'. Press Enter to capture."
+                  }
+                  helperText="Just write like you speak. We'll interpret it into a task or a journal entry, and fill in tags, priority, and due dates automatically."
+                  badge={activeProvider ? `Provider: ${activeProvider}` : 'Provider: not set'}
+                  isProcessing={isProcessing}
+                  disabled={isProcessing}
+                />
+                {isProcessing && (
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/90 px-4 py-2 shadow-lg backdrop-blur">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <span className="text-sm text-muted-foreground">
+                        {activeProvider ? `Processing with ${activeProvider}...` : 'Processing...'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+
             <section className="space-y-10">
               <div className="grid gap-6 md:grid-cols-2">
                 {features.map(feature => {
@@ -91,26 +335,28 @@ export const HomePage: React.FC = () => {
                 })}
               </div>
 
-              <div className="flex justify-center">
-                <Card className="relative overflow-hidden border border-border/60 bg-card/80 backdrop-blur">
-                  <CardContent className="relative z-10 flex flex-col items-center gap-6 py-10 px-10 text-center">
-                    <h2 className="text-2xl font-semibold text-foreground">
-                      Ready to get started?
-                    </h2>
-                    <p className="max-w-xl text-muted-foreground">
-                      Choose your workflow and begin your journey to enhanced productivity.
-                    </p>
-                    <div className="flex flex-wrap justify-center gap-4">
-                      <Link href="/actionhub">
-                        <Button>Start with Tasks</Button>
-                      </Link>
-                      <Link href="/journal">
-                        <Button variant="secondary">Begin Journaling</Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              {!hasExistingData && (
+                <div className="flex justify-center">
+                  <Card className="relative overflow-hidden border border-border/60 bg-card/80 backdrop-blur">
+                    <CardContent className="relative z-10 flex flex-col items-center gap-6 py-10 px-10 text-center">
+                      <h2 className="text-2xl font-semibold text-foreground">
+                        Ready to get started?
+                      </h2>
+                      <p className="max-w-xl text-muted-foreground">
+                        Choose your workflow and begin your journey to enhanced productivity.
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-4">
+                        <Link href="/actionhub">
+                          <Button>Start with Tasks</Button>
+                        </Link>
+                        <Link href="/journal">
+                          <Button variant="secondary">Begin Journaling</Button>
+                        </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </section>
           </div>
         </div>

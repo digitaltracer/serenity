@@ -1,5 +1,8 @@
 'use client'
 
-import { InsightsPage } from '@serenity/ui'
+/**
+ * Next.js wrapper for shared InsightsHubPage component
+ */
+import { InsightsHubPage } from '@serenity/ui'
 
-export default InsightsPage
+export default InsightsHubPage

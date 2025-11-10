@@ -5,8 +5,13 @@
 
 export { HomePage } from './HomePage';
 export { TodayPage } from './TodayPage';
+export { ActionHubPage } from './ActionHubPage';
+export { JournalPage } from './JournalPage';
 export { GoalsPage } from './GoalsPage';
+export { AnalyticsPage } from './AnalyticsPage';
 export { InsightsPage } from './InsightsPage';
+export { InsightsHubPage } from './InsightsHubPage';
+export { SettingsPage } from './SettingsPage';
 export { DatabasePage } from './DatabasePage';
 export { IntegrationsPage } from './IntegrationsPage';
 export { SummaryPage } from './SummaryPage';

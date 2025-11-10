@@ -79,6 +79,12 @@ class PlatformService {
     async aiSetApiKey(provider, apiKey) {
         return this.adapter.aiSetApiKey(provider, apiKey);
     }
+    async aiRemoveApiKey(provider) {
+        return this.adapter.aiRemoveApiKey(provider);
+    }
+    async aiListUsage(limit) {
+        return this.adapter.aiListUsage(limit);
+    }
     async aiAnalyze(options) {
         return this.adapter.aiAnalyze(options);
     }

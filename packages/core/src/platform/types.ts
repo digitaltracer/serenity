@@ -61,6 +61,22 @@ export interface AIGenerateSummaryOptions {
   provider?: 'openai' | 'gemini' | 'anthropic';
 }
 
+export interface AIUsageRecord {
+  id?: number;
+  provider: 'openai' | 'gemini' | 'anthropic';
+  operation: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  timestamp: string;
+}
+
+export interface AIUsageResult {
+  success: boolean;
+  usage?: AIUsageRecord[];
+  error?: string;
+}
+
 // ============================================================================
 // Database Service Types
 // ============================================================================
@@ -99,6 +115,8 @@ export interface IPlatformAdapter {
   aiQuickAdd(options: AIQuickAddOptions): Promise<AIQuickAddResult>;
   aiGetSettings(): Promise<AISettingsResult>;
   aiSetApiKey(provider: string, apiKey: string): Promise<{ success: boolean; error?: string }>;
+  aiRemoveApiKey(provider: 'openai' | 'gemini' | 'anthropic'): Promise<{ success: boolean; error?: string }>;
+  aiListUsage(limit?: number): Promise<AIUsageResult>;
   aiAnalyze(options: AIAnalyzeOptions): Promise<{ success: boolean; error?: string }>;
   aiGenerateSummary(options: AIGenerateSummaryOptions): Promise<{ success: boolean; data?: any; error?: string }>;
 

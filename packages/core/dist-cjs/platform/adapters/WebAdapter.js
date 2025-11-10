@@ -77,6 +77,34 @@ class WebAdapter {
             };
         }
     }
+    async aiRemoveApiKey(provider) {
+        try {
+            const result = await this.fetch(`/ai/api-key?provider=${provider}`, {
+                method: 'DELETE',
+            });
+            return result;
+        }
+        catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to remove API key',
+            };
+        }
+    }
+    async aiListUsage(limit = 500) {
+        try {
+            const result = await this.fetch(`/ai/usage?limit=${limit}`, {
+                method: 'GET',
+            });
+            return result;
+        }
+        catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to list usage',
+            };
+        }
+    }
     async aiAnalyze(options) {
         try {
             const result = await this.fetch('/ai/analyze', {

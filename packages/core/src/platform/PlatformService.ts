@@ -93,6 +93,14 @@ class PlatformService implements IPlatformAdapter {
     return this.adapter.aiSetApiKey(provider, apiKey);
   }
 
+  async aiRemoveApiKey(provider: 'openai' | 'gemini' | 'anthropic') {
+    return this.adapter.aiRemoveApiKey(provider);
+  }
+
+  async aiListUsage(limit?: number) {
+    return this.adapter.aiListUsage(limit);
+  }
+
   async aiAnalyze(options: Parameters<IPlatformAdapter['aiAnalyze']>[0]) {
     return this.adapter.aiAnalyze(options);
   }

@@ -4,7 +4,7 @@
  * Makes fetch calls to Next.js API routes to implement the IPlatformAdapter interface.
  * This adapter is used when running in the web browser environment.
  */
-import { IPlatformAdapter, AIQuickAddOptions, AIQuickAddResult, AISettingsResult, AIAnalyzeOptions, AIGenerateSummaryOptions, DatabaseStats, IntegrationAuthResult, IntegrationSyncResult } from '../types';
+import { IPlatformAdapter, AIQuickAddOptions, AIQuickAddResult, AISettingsResult, AIAnalyzeOptions, AIGenerateSummaryOptions, AIUsageResult, DatabaseStats, IntegrationAuthResult, IntegrationSyncResult } from '../types';
 export declare class WebAdapter implements IPlatformAdapter {
     readonly name: "web";
     private baseUrl;
@@ -17,6 +17,11 @@ export declare class WebAdapter implements IPlatformAdapter {
         success: boolean;
         error?: string;
     }>;
+    aiRemoveApiKey(provider: 'openai' | 'gemini' | 'anthropic'): Promise<{
+        success: boolean;
+        error?: string;
+    }>;
+    aiListUsage(limit?: number): Promise<AIUsageResult>;
     aiAnalyze(options: AIAnalyzeOptions): Promise<{
         success: boolean;
         error?: string;

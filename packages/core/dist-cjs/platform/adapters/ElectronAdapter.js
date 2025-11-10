@@ -59,6 +59,39 @@ class ElectronAdapter {
             };
         }
     }
+    async aiRemoveApiKey(provider) {
+        try {
+            const result = await this.electronAPI.aiAssistant.removeApiKey(provider);
+            return result;
+        }
+        catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to remove API key',
+            };
+        }
+    }
+    async aiListUsage(limit = 500) {
+        try {
+            const result = await this.electronAPI.aiAssistant.listUsage();
+            if (result.success && result.data) {
+                return {
+                    success: true,
+                    usage: result.data.slice(0, limit),
+                };
+            }
+            return {
+                success: false,
+                error: result.error || 'Failed to list usage',
+            };
+        }
+        catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to list usage',
+            };
+        }
+    }
     async aiAnalyze(options) {
         try {
             const result = await this.electronAPI.aiAssistant.analyzeData({

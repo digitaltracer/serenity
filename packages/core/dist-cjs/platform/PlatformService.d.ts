@@ -41,6 +41,11 @@ declare class PlatformService implements IPlatformAdapter {
         success: boolean;
         error?: string;
     }>;
+    aiRemoveApiKey(provider: 'openai' | 'gemini' | 'anthropic'): Promise<{
+        success: boolean;
+        error?: string;
+    }>;
+    aiListUsage(limit?: number): Promise<import("./types").AIUsageResult>;
     aiAnalyze(options: Parameters<IPlatformAdapter['aiAnalyze']>[0]): Promise<{
         success: boolean;
         error?: string;

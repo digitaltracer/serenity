@@ -29,18 +29,20 @@ import { Layout } from './components/Layout';
 import { ThemeProvider } from './components/ThemeProvider';
 import { KeyboardShortcutsProvider } from './components/KeyboardShortcutsProvider';
 
-// Lazy load all page components for better performance and code splitting
-const HomePage = lazy(() => import('./pages/HomePage').then(module => ({ default: module.HomePage })));
+// Lazy load shared pages from @serenity/ui
+const HomePage = lazy(() => import('@serenity/ui').then(module => ({ default: module.HomePage })));
+const TodayPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.TodayPage })));
+const GoalsPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.GoalsPage })));
+const DatabasePage = lazy(() => import('@serenity/ui').then(module => ({ default: module.DatabasePage })));
+const IntegrationsPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.IntegrationsPage })));
+const SummaryPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.SummaryPage })));
+
+// Desktop-specific pages (not yet migrated to shared package)
 const ActionHubPage = lazy(() => import('./pages/ActionHubPage').then(module => ({ default: module.ActionHubPage })));
-const TodayPage = lazy(() => import('./pages/TodayPage').then(module => ({ default: module.TodayPage })));
-const JournalPage = lazy(() => import('./pages/JournalPage').then(module => ({ default: module.JournalPage })));
-const GoalsPage = lazy(() => import('./pages/GoalsPage').then(module => ({ default: module.GoalsPage })));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(module => ({ default: module.AnalyticsPage })));
 const InsightsHubPage = lazy(() => import('./pages/InsightsHubPage').then(module => ({ default: module.InsightsHubPage })));
+const JournalPage = lazy(() => import('./pages/JournalPage').then(module => ({ default: module.JournalPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
-const DatabasePage = lazy(() => import('./pages/DatabasePage').then(module => ({ default: module.DatabasePage })));
-const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage').then(module => ({ default: module.IntegrationsPage })));
-const SummaryPage = lazy(() => import('./pages/SummaryPage'));
 
 // Loading fallback component for route transitions
 function RouteLoadingFallback() {

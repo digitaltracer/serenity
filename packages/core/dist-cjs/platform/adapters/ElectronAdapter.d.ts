@@ -4,7 +4,7 @@
  * Wraps Electron IPC calls (window.electronAPI) to implement the IPlatformAdapter interface.
  * This adapter is used when running in the Electron desktop environment.
  */
-import { IPlatformAdapter, AIQuickAddOptions, AIQuickAddResult, AISettingsResult, AIAnalyzeOptions, AIGenerateSummaryOptions, DatabaseStats, IntegrationAuthResult, IntegrationSyncResult } from '../types';
+import { IPlatformAdapter, AIQuickAddOptions, AIQuickAddResult, AISettingsResult, AIAnalyzeOptions, AIGenerateSummaryOptions, AIUsageResult, DatabaseStats, IntegrationAuthResult, IntegrationSyncResult } from '../types';
 export declare class ElectronAdapter implements IPlatformAdapter {
     readonly name: "electron";
     get isAvailable(): boolean;
@@ -15,6 +15,11 @@ export declare class ElectronAdapter implements IPlatformAdapter {
         success: boolean;
         error?: string;
     }>;
+    aiRemoveApiKey(provider: 'openai' | 'gemini' | 'anthropic'): Promise<{
+        success: boolean;
+        error?: string;
+    }>;
+    aiListUsage(limit?: number): Promise<AIUsageResult>;
     aiAnalyze(options: AIAnalyzeOptions): Promise<{
         success: boolean;
         error?: string;

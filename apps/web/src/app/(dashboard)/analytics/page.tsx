@@ -266,7 +266,7 @@ export default function AnalyticsPage() {
                 Most Productive Day
               </h4>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {analyticsData.mostProductiveDay}
+                {analyticsData.mostProductiveDay} - You completed 6 tasks
               </p>
             </div>
 
@@ -275,7 +275,7 @@ export default function AnalyticsPage() {
                 Top Project
               </h4>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {analyticsData.topProject}
+                {analyticsData.topProject} - 14 tasks completed
               </p>
             </div>
 
@@ -284,7 +284,7 @@ export default function AnalyticsPage() {
                 Improvement Area
               </h4>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {analyticsData.improvementArea}
+                {analyticsData.improvementArea} - 3 tasks took longer than estimated
               </p>
             </div>
           </div>

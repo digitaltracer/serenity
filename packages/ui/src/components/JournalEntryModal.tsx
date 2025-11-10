@@ -3,17 +3,20 @@ import { JournalEntry } from '@serenity/core';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { Input } from './Input';
-import { Select } from './Select';
-import { RichTextEditor } from './RichTextEditor';
+import { CustomSelect } from './CustomSelect';
+import { QuillEditor } from './QuillEditor';
 import { TagInput } from './TagInput';
 import { DatePicker } from './DatePicker';
-import { Pin, Calendar } from 'lucide-react';
+import { MediaUploader, MediaFile } from './MediaUploader';
+import { Pin, Calendar, Paperclip } from 'lucide-react';
 
 export interface JournalEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (entry: Partial<JournalEntry>) => void;
   entry?: JournalEntry | null;
+  templateContent?: string;
+  templateTags?: string[];
 }
 
 const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
@@ -21,6 +24,8 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
   onClose,
   onSave,
   entry,
+  templateContent,
+  templateTags,
 }) => {
   const [formData, setFormData] = useState({
     title: '',
@@ -30,6 +35,8 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
     pinned: false,
     mood: '' as JournalEntry['mood'] | '',
   });
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const [showMediaUploader, setShowMediaUploader] = useState(false);
 
 
   useEffect(() => {
@@ -42,17 +49,21 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
         pinned: entry.pinned,
         mood: entry.mood || '',
       });
+      // TODO: Load existing attachments
+      setMediaFiles([]);
     } else {
       setFormData({
         title: '',
-        content: '',
+        content: templateContent || '',
         date: new Date(),
-        tags: [],
+        tags: templateTags || [],
         pinned: false,
         mood: '',
       });
+      setMediaFiles([]);
     }
-  }, [entry, isOpen]);
+    setShowMediaUploader(false);
+  }, [entry, isOpen, templateContent, templateTags]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,11 +106,11 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={entry ? 'Edit Journal Entry' : 'New Journal Entry'}
-      size="xl"
+      size="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3 text-sm">
         {/* Title and Date */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-3">
           <Input
             label="Title (optional)"
             placeholder="Give your entry a title..."
@@ -112,33 +123,35 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
             value={formData.date}
             onChange={(date) => setFormData(prev => ({ ...prev, date: date || new Date() }))}
             required
+            className="text-sm"
           />
         </div>
 
         {/* Content Editor */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
             Content
           </label>
-          <RichTextEditor
+          <QuillEditor
             value={formData.content}
             onChange={(content) => setFormData(prev => ({ ...prev, content }))}
             placeholder="Write your thoughts..."
-            minHeight={300}
+            minHeight={150}
           />
         </div>
 
         {/* Mood and Pin */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
+        <div className="space-y-3">
+          <CustomSelect
             label="Mood"
             value={formData.mood}
-            onChange={(e) => setFormData(prev => ({ ...prev, mood: e.target.value as JournalEntry['mood'] }))}
+            onChange={(value) => setFormData(prev => ({ ...prev, mood: value as JournalEntry['mood'] }))}
             options={moodOptions}
+            className="text-sm"
           />
           
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
               Options
             </label>
             <div className="flex items-center gap-2">
@@ -147,8 +160,9 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
                 variant={formData.pinned ? 'primary' : 'secondary'}
                 size="sm"
                 onClick={() => setFormData(prev => ({ ...prev, pinned: !prev.pinned }))}
+                className="text-xs h-8 rounded-lg"
               >
-                <Pin className="w-4 h-4 mr-2" />
+                <Pin className="w-3 h-3 mr-1" />
                 {formData.pinned ? 'Pinned' : 'Pin Entry'}
               </Button>
             </div>
@@ -162,14 +176,47 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({
           onChange={handleTagsChange}
           placeholder="Add a tag..."
           maxTags={8}
+          className="text-sm"
         />
 
+        {/* Media Attachments */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+              Attachments
+            </label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowMediaUploader(!showMediaUploader)}
+              className="text-xs h-7 rounded-lg"
+            >
+              <Paperclip className="w-3 h-3 mr-1" />
+              {showMediaUploader ? 'Hide' : 'Add Files'}
+            </Button>
+          </div>
+          {showMediaUploader && (
+            <MediaUploader
+              value={mediaFiles}
+              onChange={setMediaFiles}
+              maxFiles={5}
+              maxFileSize={25}
+            />
+          )}
+          {!showMediaUploader && mediaFiles.length > 0 && (
+            <div className="text-xs text-muted-foreground">
+              {mediaFiles.length} file(s) attached
+            </div>
+          )}
+        </div>
+
         {/* Actions */}
-        <div className="flex gap-3 pt-4">
-          <Button type="submit" className="flex-1">
+        <div className="flex gap-2 pt-3 border-t border-gray-200/30 dark:border-gray-700/20">
+          <Button type="submit" className="flex-1 rounded-lg text-sm h-9">
             {entry ? 'Update Entry' : 'Save Entry'}
           </Button>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose} className="rounded-lg text-sm h-9">
             Cancel
           </Button>
         </div>

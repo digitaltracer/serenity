@@ -1,4 +1,6 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
+import { selectCompactMode } from '@serenity/core';
 import { cn } from '../utils/cn';
 
 export interface SidebarProps {
@@ -19,12 +21,12 @@ const Sidebar: React.FC<SidebarProps> = ({ children, className, collapsed }) => 
   return (
     <div
       className={cn(
-        'flex flex-col h-full bg-white border-r border-gray-200',
-        'dark:bg-gray-900 dark:border-gray-800',
-        'transition-all duration-300',
+        // Tokenized sidebar
+        'flex flex-col h-full bg-card border-r border-border text-card-foreground',
+        'transition-all duration-200 ease-in-out',
         {
           'w-56': !collapsed,
-          'w-20': collapsed,
+          'w-16': collapsed,
         },
         className
       )}
@@ -38,8 +40,18 @@ const SidebarHeader: React.FC<{ children: React.ReactNode; className?: string }>
   children, 
   className 
 }) => {
+  const compactMode = useSelector(selectCompactMode);
+  
   return (
-    <div className={cn('p-4 border-b border-gray-200 dark:border-gray-800', className)}>
+    <div className={cn(
+      'border-b border-border bg-card text-card-foreground',
+      // Compact mode responsive padding
+      {
+        'p-6': !compactMode,
+        'p-4': compactMode,
+      },
+      className
+    )}>
       {children}
     </div>
   );
@@ -50,7 +62,7 @@ const SidebarContent: React.FC<{ children: React.ReactNode; className?: string }
   className 
 }) => {
   return (
-    <div className={cn('flex-1 overflow-y-auto p-2', className)}>
+    <div className={cn('flex-1 overflow-y-auto p-4', className)}>
       {children}
     </div>
   );
@@ -63,14 +75,20 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   onClick, 
   className 
 }) => {
+  const compactMode = useSelector(selectCompactMode);
+  
   return (
     <div
       className={cn(
-        'flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors',
-        'hover:bg-gray-100 dark:hover:bg-gray-700',
+        'relative flex items-center rounded-lg cursor-pointer transition-colors duration-150',
+        'hover:bg-accent/60',
+        // Compact mode responsive padding and spacing
         {
-          'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300': active,
-          'text-gray-700 dark:text-gray-200': !active,
+          'gap-3 px-4 py-3': !compactMode,
+          'gap-2 px-3 py-2': compactMode,
+          // Active state styling for both themes
+          'bg-accent text-accent-foreground before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2px] before:bg-ring': active,
+          'text-foreground/80 hover:text-foreground': !active,
           'justify-center': !children, // Center icon when no text
         },
         className
@@ -78,7 +96,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
       onClick={onClick}
     >
       {icon && (
-        <div className="flex-shrink-0 w-5 h-5">
+        <div className="flex-shrink-0 w-4 h-4">
           {icon}
         </div>
       )}
@@ -92,12 +110,28 @@ const SidebarSection: React.FC<{
   children: React.ReactNode; 
   className?: string;
 }> = ({ title, children, className }) => {
+  const compactMode = useSelector(selectCompactMode);
+  
   return (
-    <div className={cn('mb-4', className)}>
-      <h3 className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-300">
+    <div className={cn(
+      // Compact mode responsive margin
+      {
+        'mb-6': !compactMode,
+        'mb-4': compactMode,
+      },
+      className
+    )}>
+      <h3 className={cn(
+        'text-xs font-semibold text-muted-foreground uppercase tracking-wider',
+        // Compact mode responsive spacing
+        {
+          'px-4 mb-3': !compactMode,
+          'px-3 mb-2': compactMode,
+        }
+      )}>
         {title}
       </h3>
-      <div className="space-y-1">
+      <div className="space-y-2">
         {children}
       </div>
     </div>

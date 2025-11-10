@@ -7,6 +7,7 @@ export interface ProgressBarProps {
   size?: 'sm' | 'md' | 'lg';
   variant?: 'default' | 'success' | 'warning' | 'danger';
   showValue?: boolean;
+  animated?: boolean;
   className?: string;
 }
 
@@ -16,42 +17,55 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
   size = 'md',
   variant = 'default',
   showValue = false,
+  animated = false,
   className,
 }) => {
   const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
 
   const sizeClasses = {
-    sm: 'h-2',
-    md: 'h-3',
-    lg: 'h-4',
+    sm: 'h-1.5',
+    md: 'h-2.5',
+    lg: 'h-3',
   };
 
   const variantClasses = {
-    default: 'bg-blue-500',
-    success: 'bg-green-500',
-    warning: 'bg-yellow-500',
-    danger: 'bg-red-500',
-  };
+    default: { bg: 'bg-primary' },
+    success: { bg: 'bg-green-500' },
+    warning: { bg: 'bg-yellow-500' },
+    danger: { bg: 'bg-destructive' },
+  } as const;
+
+  const currentVariant = variantClasses[variant];
 
   return (
     <div className={cn('w-full', className)}>
+      {/* Progress Track */}
       <div
         className={cn(
-          'w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden',
+          'w-full rounded-full bg-muted border border-border overflow-hidden',
           sizeClasses[size]
         )}
       >
+        {/* Progress Fill */}
         <div
           className={cn(
-            'h-full transition-all duration-300 ease-in-out rounded-full',
-            variantClasses[variant]
+            'h-full transition-all duration-300 ease-out rounded-full',
+            currentVariant.bg,
+            { 'animate-pulse': animated && percentage > 0 }
           )}
           style={{ width: `${percentage}%` }}
         />
       </div>
+      
+      {/* Value Display */}
       {showValue && (
-        <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          {Math.round(percentage)}%
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-sm font-medium text-foreground/80">
+            {Math.round(percentage)}%
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {value} / {max}
+          </span>
         </div>
       )}
     </div>

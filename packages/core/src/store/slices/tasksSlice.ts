@@ -1,6 +1,8 @@
 import { createSlice, createSelector, PayloadAction } from '@reduxjs/toolkit';
 import { Task } from '../../types';
 import { generateId } from '../../utils';
+import { loadTasks } from '../../utils/persistence';
+import { logger } from '../../utils/logger';
 
 export interface TasksState {
   tasks: Task[];
@@ -12,10 +14,25 @@ export interface TasksState {
     status: 'all' | 'pending' | 'completed';
     project: string | null;
   };
+  pagination: {
+    currentPage: number;
+    tasksPerPage: number;
+    hasMore: boolean;
+  };
 }
 
+// Load tasks from localStorage on initialization
+const initialTasks = (() => {
+  try {
+    return loadTasks();
+  } catch (error) {
+    logger.error('Failed to load tasks from storage:', { component: 'tasksSlice', operation: 'failedLoadTasks' }, error as Error);
+    return [];
+  }
+})();
+
 const initialState: TasksState = {
-  tasks: [],
+  tasks: initialTasks,
   loading: false,
   error: null,
   filters: {
@@ -24,20 +41,30 @@ const initialState: TasksState = {
     status: 'all',
     project: null,
   },
+  pagination: {
+    currentPage: 1,
+    tasksPerPage: 10,
+    hasMore: true,
+  },
 };
 
 const tasksSlice = createSlice({
   name: 'tasks',
   initialState,
   reducers: {
-    addTask: (state, action: PayloadAction<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>) => {
-      const newTask: Task = {
-        ...action.payload,
-        id: generateId(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      state.tasks.push(newTask);
+    addTask: {
+      reducer: (state, action: PayloadAction<Task>) => {
+        state.tasks.push(action.payload);
+      },
+      prepare: (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
+        const newTask: Task = {
+          ...taskData,
+          id: generateId(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        return { payload: newTask };
+      }
     },
     updateTask: (state, action: PayloadAction<Partial<Task> & { id: string }>) => {
       const index = state.tasks.findIndex(task => task.id === action.payload.id);
@@ -55,8 +82,50 @@ const tasksSlice = createSlice({
     toggleTask: (state, action: PayloadAction<string>) => {
       const task = state.tasks.find(task => task.id === action.payload);
       if (task) {
+        const wasCompleted = task.completed;
         task.completed = !task.completed;
+        task.completedAt = task.completed ? new Date() : undefined;
         task.updatedAt = new Date();
+
+        // If task is being marked as completed and has a recurring pattern, create a new instance
+        if (task.completed && !wasCompleted && task.recurring) {
+          const { type, interval, endDate } = task.recurring;
+          
+          // Check if the recurrence should continue (not past endDate)
+          const now = new Date();
+          if (!endDate || new Date(endDate) > now) {
+            // Calculate next due date
+            let nextDueDate = task.dueDate ? new Date(task.dueDate) : now;
+            
+            switch (type) {
+              case 'daily':
+                nextDueDate.setDate(nextDueDate.getDate() + interval);
+                break;
+              case 'weekly':
+                nextDueDate.setDate(nextDueDate.getDate() + (interval * 7));
+                break;
+              case 'monthly':
+                nextDueDate.setMonth(nextDueDate.getMonth() + interval);
+                break;
+              case 'custom':
+                nextDueDate.setDate(nextDueDate.getDate() + interval);
+                break;
+            }
+
+            // Create new recurring task instance
+            const newTask: Task = {
+              ...task,
+              id: generateId(),
+              completed: false,
+              completedAt: undefined,
+              dueDate: nextDueDate,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+
+            state.tasks.push(newTask);
+          }
+        }
       }
     },
     toggleSubtask: (state, action: PayloadAction<{ taskId: string; subtaskId: string }>) => {
@@ -90,6 +159,16 @@ const tasksSlice = createSlice({
         task.updatedAt = new Date();
       }
     },
+    updateSubtaskTitle: (state, action: PayloadAction<{ taskId: string; subtaskId: string; title: string }>) => {
+      const task = state.tasks.find(task => task.id === action.payload.taskId);
+      if (task && task.subtasks) {
+        const subtask = task.subtasks.find(st => st.id === action.payload.subtaskId);
+        if (subtask) {
+          subtask.title = action.payload.title;
+          task.updatedAt = new Date();
+        }
+      }
+    },
     setTaskFilter: (state, action: PayloadAction<Partial<TasksState['filters']>>) => {
       state.filters = { ...state.filters, ...action.payload };
     },
@@ -105,6 +184,117 @@ const tasksSlice = createSlice({
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
     },
+    
+    // Drag and Drop Actions
+    reorderTasks: (state, action: PayloadAction<{ taskIds: string[]; newOrder: number[] }>) => {
+      const { taskIds, newOrder } = action.payload;
+      const reorderedTasks = [];
+      
+      // Create new array in the specified order
+      for (let i = 0; i < newOrder.length; i++) {
+        const taskId = taskIds[newOrder[i]];
+        const task = state.tasks.find(t => t.id === taskId);
+        if (task) {
+          reorderedTasks.push({ ...task, updatedAt: new Date() });
+        }
+      }
+      
+      // Add tasks that weren't in the reorder operation
+      const reorderedIds = new Set(taskIds);
+      const otherTasks = state.tasks.filter(t => !reorderedIds.has(t.id));
+      
+      state.tasks = [...reorderedTasks, ...otherTasks];
+    },
+    
+    moveTaskToProject: (state, action: PayloadAction<{ taskId: string; projectId: string | undefined }>) => {
+      const { taskId, projectId } = action.payload;
+      const task = state.tasks.find(t => t.id === taskId);
+      if (task) {
+        task.projectId = projectId;
+        task.updatedAt = new Date();
+      }
+    },
+    
+    changeTaskPriority: (state, action: PayloadAction<{ taskId: string; priority: 'low' | 'medium' | 'high' }>) => {
+      const { taskId, priority } = action.payload;
+      const task = state.tasks.find(t => t.id === taskId);
+      if (task) {
+        task.priority = priority;
+        task.updatedAt = new Date();
+      }
+    },
+    
+    scheduleTask: (state, action: PayloadAction<{ taskId: string; dueDate: Date | undefined }>) => {
+      const { taskId, dueDate } = action.payload;
+      const task = state.tasks.find(t => t.id === taskId);
+      if (task) {
+        task.dueDate = dueDate;
+        task.updatedAt = new Date();
+      }
+    },
+    
+    reorderSubtasks: (state, action: PayloadAction<{ parentTaskId: string; subtaskIds: string[]; newOrder: number[] }>) => {
+      const { parentTaskId, subtaskIds, newOrder } = action.payload;
+      const parentTask = state.tasks.find(t => t.id === parentTaskId);
+      if (parentTask && parentTask.subtasks) {
+        const reorderedSubtasks = [];
+        
+        // Create new array in the specified order
+        for (let i = 0; i < newOrder.length; i++) {
+          const subtaskId = subtaskIds[newOrder[i]];
+          const subtask = parentTask.subtasks.find(st => st.id === subtaskId);
+          if (subtask) {
+            reorderedSubtasks.push(subtask);
+          }
+        }
+        
+        // Add subtasks that weren't in the reorder operation
+        const reorderedIds = new Set(subtaskIds);
+        const otherSubtasks = parentTask.subtasks.filter(st => !reorderedIds.has(st.id));
+        
+        parentTask.subtasks = [...reorderedSubtasks, ...otherSubtasks];
+        parentTask.updatedAt = new Date();
+      }
+    },
+    
+    // Bulk operations (for future bulk operations feature)
+    bulkUpdateTasks: (state, action: PayloadAction<{ taskIds: string[]; updates: Partial<Task> }>) => {
+      const { taskIds, updates } = action.payload;
+      taskIds.forEach(taskId => {
+        const task = state.tasks.find(t => t.id === taskId);
+        if (task) {
+          const updatedData = { ...updates, updatedAt: new Date() };
+          // If we're updating completion status, set/clear completedAt timestamp
+          if (updates.completed !== undefined) {
+            updatedData.completedAt = updates.completed ? new Date() : undefined;
+          }
+          Object.assign(task, updatedData);
+        }
+      });
+    },
+    
+    bulkDeleteTasks: (state, action: PayloadAction<string[]>) => {
+      const taskIds = action.payload;
+      state.tasks = state.tasks.filter(task => !taskIds.includes(task.id));
+    },
+    
+    updateAllTasks: (state, action: PayloadAction<Task[]>) => {
+      state.tasks = action.payload;
+    },
+    
+    // Pagination Actions
+    loadMoreTasks: (state) => {
+      state.pagination.currentPage += 1;
+    },
+    
+    resetPagination: (state) => {
+      state.pagination.currentPage = 1;
+      state.pagination.hasMore = true;
+    },
+    
+    setPaginationHasMore: (state, action: PayloadAction<boolean>) => {
+      state.pagination.hasMore = action.payload;
+    },
   },
 });
 
@@ -116,11 +306,26 @@ export const {
   toggleSubtask,
   addSubtask,
   removeSubtask,
+  updateSubtaskTitle,
   setTaskFilter,
   clearFilters: clearTaskFilters,
   setTasks,
   setLoading: setTasksLoading,
   setError: setTasksError,
+  // Drag and Drop actions
+  reorderTasks,
+  moveTaskToProject,
+  changeTaskPriority,
+  scheduleTask,
+  reorderSubtasks,
+  // Bulk operations
+  bulkUpdateTasks,
+  bulkDeleteTasks,
+  updateAllTasks,
+  // Pagination actions
+  loadMoreTasks,
+  resetPagination,
+  setPaginationHasMore,
 } = tasksSlice.actions;
 
 // Selectors
@@ -128,6 +333,7 @@ export const selectAllTasks = (state: { tasks: TasksState }) => state.tasks.task
 export const selectTasksLoading = (state: { tasks: TasksState }) => state.tasks.loading;
 export const selectTasksError = (state: { tasks: TasksState }) => state.tasks.error;
 export const selectTaskFilters = (state: { tasks: TasksState }) => state.tasks.filters;
+export const selectTasksPagination = (state: { tasks: TasksState }) => state.tasks.pagination;
 
 export const selectFilteredTasks = createSelector(
   [selectAllTasks, selectTaskFilters],
@@ -175,6 +381,63 @@ export const selectTodayTasks = createSelector(
       const taskDateString = new Date(task.dueDate).toISOString().split('T')[0];
       return taskDateString === todayString;
     });
+  }
+);
+
+export const selectPaginatedTasks = createSelector(
+  [selectFilteredTasks, selectTasksPagination],
+  (filteredTasks, pagination) => {
+    // Sort tasks: unfinished tasks first (by due date, then created date), then completed tasks (by completion date)
+    const sortedTasks = [...filteredTasks].sort((a, b) => {
+      // If one is completed and the other isn't, put unfinished first
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1;
+      }
+      
+      // Both are unfinished - sort by due date first, then created date
+      if (!a.completed && !b.completed) {
+        // Tasks with due dates come first
+        if (a.dueDate && !b.dueDate) return -1;
+        if (!a.dueDate && b.dueDate) return 1;
+        
+        // Both have due dates - sort by due date
+        if (a.dueDate && b.dueDate) {
+          const dueDateDiff = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+          if (dueDateDiff !== 0) return dueDateDiff;
+        }
+        
+        // Sort by created date (newest first for unfinished tasks)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      
+      // Both are completed - sort by completion date (newest first)
+      if (a.completed && b.completed) {
+        const aCompletedDate = a.completedAt ? new Date(a.completedAt) : 
+                               a.updatedAt ? new Date(a.updatedAt) : 
+                               new Date(a.createdAt);
+        const bCompletedDate = b.completedAt ? new Date(b.completedAt) : 
+                               b.updatedAt ? new Date(b.updatedAt) : 
+                               new Date(b.createdAt);
+        return bCompletedDate.getTime() - aCompletedDate.getTime();
+      }
+      
+      return 0;
+    });
+    
+    // Calculate pagination
+    const { currentPage, tasksPerPage } = pagination;
+    const startIndex = 0; // Always start from the beginning
+    const endIndex = currentPage * tasksPerPage;
+    
+    const paginatedTasks = sortedTasks.slice(startIndex, endIndex);
+    const hasMore = endIndex < sortedTasks.length;
+    
+    return {
+      tasks: paginatedTasks,
+      hasMore,
+      totalTasks: sortedTasks.length,
+      currentlyShowing: paginatedTasks.length,
+    };
   }
 );
 

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { Button } from './Button';
+import { Portal } from './Portal';
 
 export interface DatePickerProps {
   value?: Date | null;
@@ -28,11 +29,22 @@ const DatePicker: React.FC<DatePickerProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(value || new Date());
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const [dropdownDirection, setDropdownDirection] = useState<'above' | 'below'>('below');
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
+  const DROPDOWN_WIDTH = 256; // matches w-64
+  const HORIZONTAL_MARGIN = 12;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node) &&
+        calendarRef.current &&
+        !calendarRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -40,6 +52,21 @@ const DatePicker: React.FC<DatePickerProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleScroll = () => {
+      setIsOpen(false);
+    };
+
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [isOpen]);
 
   const formatDate = (date: Date | null) => {
     if (!date) return '';
@@ -127,15 +154,74 @@ const DatePicker: React.FC<DatePickerProps> = ({
       
       <div className="relative">
         <button
+          ref={buttonRef}
           type="button"
-          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onClick={() => {
+            if (!disabled) {
+              if (!isOpen && buttonRef.current) {
+                const rect = buttonRef.current.getBoundingClientRect();
+                const viewportLeft = window.scrollX;
+                const viewportRight = viewportLeft + window.innerWidth;
+                const viewportTop = window.scrollY;
+                const viewportBottom = viewportTop + window.innerHeight;
+
+                let left = rect.left + window.scrollX;
+                const rightEdge = left + DROPDOWN_WIDTH;
+
+                if (rightEdge > viewportRight - HORIZONTAL_MARGIN) {
+                  left = rect.right + window.scrollX - DROPDOWN_WIDTH;
+                }
+
+                if (left < viewportLeft + HORIZONTAL_MARGIN) {
+                  left = viewportLeft + HORIZONTAL_MARGIN;
+                }
+
+                const spaceBelow = viewportBottom - rect.bottom;
+                const spaceAbove = rect.top - viewportTop;
+                const dropdownHeight = 320; // approximate height of calendar panel
+                const verticalMargin = 8;
+
+                const hasRoomBelow = spaceBelow >= dropdownHeight;
+                const hasRoomAbove = spaceAbove >= dropdownHeight;
+
+                let direction: 'above' | 'below' = 'below';
+                let top = rect.bottom + window.scrollY + verticalMargin;
+
+                if (!hasRoomBelow && hasRoomAbove) {
+                  direction = 'above';
+                  top = rect.top + window.scrollY - dropdownHeight - verticalMargin;
+                } else {
+                  direction = 'below';
+                  top = rect.bottom + window.scrollY + verticalMargin;
+                }
+
+                if (direction === 'above') {
+                  top = Math.max(viewportTop + verticalMargin, top);
+                }
+
+                setDropdownDirection(direction);
+                setDropdownPosition({
+                  top,
+                  left,
+                });
+              }
+              setIsOpen(!isOpen);
+            }
+          }}
           disabled={disabled}
           className={cn(
-            'w-full flex items-center justify-between px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md',
-            'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
-            'disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed',
-            'hover:border-gray-400 dark:hover:border-gray-500'
+            // Premium date picker styling with elegant gradients and shadows
+            'w-full flex items-center justify-between px-4 py-2.5 border border-gray-200/60 rounded-lg h-12',
+            'bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm text-gray-900 transition-all duration-200 ease-out',
+            'shadow-sm shadow-gray-200/30 ring-1 ring-gray-100/50',
+            'focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400/60',
+            'focus:shadow-md focus:shadow-blue-200/40',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            'hover:shadow-md hover:shadow-gray-300/40',
+            'dark:border-gray-600/60 dark:from-gray-800 dark:to-gray-900 dark:text-gray-100',
+            'dark:shadow-black/20 dark:ring-gray-800/40',
+            'dark:focus:ring-gray-400/40 dark:focus:border-gray-400/60',
+            'dark:focus:shadow-black/40 dark:hover:shadow-black/30'
           )}
         >
           <span className={cn(
@@ -144,23 +230,32 @@ const DatePicker: React.FC<DatePickerProps> = ({
           )}>
             {value ? formatDate(value) : placeholder}
           </span>
-          <Calendar className="w-4 h-4 text-gray-400" />
+          <Calendar className="w-4 h-4 text-gray-600 dark:text-gray-400" />
         </button>
 
         {isOpen && (
-          <div className="absolute z-50 w-80 mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg">
+          <Portal>
+            <div 
+              ref={calendarRef}
+              className="absolute z-50 w-64 bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-800/90 dark:to-gray-900/60 backdrop-blur-xl border border-gray-200/60 dark:border-gray-700/40 rounded-lg shadow-xl shadow-gray-300/50 dark:shadow-black/40 ring-1 ring-gray-100/80 dark:ring-gray-800/60" 
+              style={{
+                top: dropdownPosition.top,
+                left: dropdownPosition.left,
+                transformOrigin: dropdownDirection === 'above' ? 'bottom center' : 'top center',
+              }}
+            >
             {/* Header */}
-            <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700/20">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handlePrevMonth}
-                className="w-8 h-8 p-0"
+                className="w-6 h-6 p-0"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3 h-3" />
               </Button>
               
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              <h3 className="text-xs font-semibold text-gray-900 dark:text-white">
                 {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
               </h3>
               
@@ -168,9 +263,9 @@ const DatePicker: React.FC<DatePickerProps> = ({
                 variant="ghost"
                 size="sm"
                 onClick={handleNextMonth}
-                className="w-8 h-8 p-0"
+                className="w-6 h-6 p-0"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3 h-3" />
               </Button>
             </div>
 
@@ -181,7 +276,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
                 {dayNames.map((day) => (
                   <div
                     key={day}
-                    className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 py-2"
+                    className="text-center text-xs font-medium text-gray-600 dark:text-gray-400 py-1"
                   >
                     {day}
                   </div>
@@ -192,7 +287,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
               <div className="grid grid-cols-7 gap-1">
                 {getDaysInMonth(currentMonth).map((date, index) => {
                   if (!date) {
-                    return <div key={index} className="w-8 h-8" />;
+                    return <div key={index} className="w-6 h-6" />;
                   }
 
                   const disabled = isDateDisabled(date);
@@ -203,17 +298,22 @@ const DatePicker: React.FC<DatePickerProps> = ({
                     <button
                       key={index}
                       type="button"
-                      onClick={() => handleDateClick(date)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDateClick(date);
+                      }}
                       disabled={disabled}
                       className={cn(
-                        'w-8 h-8 text-sm rounded-md flex items-center justify-center',
-                        'hover:bg-gray-100 dark:hover:bg-gray-800',
-                        'focus:outline-none focus:ring-2 focus:ring-blue-500',
-                        'disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-transparent',
+                        'w-6 h-6 text-xs rounded-lg flex items-center justify-center transition-all duration-200',
+                        'hover:bg-gray-200 hover:scale-110 dark:hover:bg-gray-700/50',
+                        'focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-gray-400/50',
+                        'disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:scale-100',
+                        'dark:disabled:text-gray-600',
                         {
-                          'bg-blue-600 text-white hover:bg-blue-700': selected,
-                          'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200': today && !selected,
-                          'text-gray-900 dark:text-gray-100': !selected && !today,
+                          'bg-blue-500 text-white hover:bg-blue-600 shadow-lg dark:bg-gray-600 dark:text-gray-100 dark:hover:bg-gray-500': selected,
+                          'bg-gray-300 text-gray-700 border border-gray-400 dark:bg-gray-700/50 dark:text-gray-300 dark:border-gray-500/30': today && !selected,
+                          'text-gray-700 hover:text-gray-900 dark:text-gray-200 dark:hover:text-white': !selected && !today,
                         }
                       )}
                     >
@@ -225,12 +325,12 @@ const DatePicker: React.FC<DatePickerProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="flex justify-between items-center p-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex justify-between items-center p-3 border-t border-gray-200 dark:border-gray-700/20">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleClear}
-                className="text-gray-500 dark:text-gray-400"
+                className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
               >
                 Clear
               </Button>
@@ -246,7 +346,8 @@ const DatePicker: React.FC<DatePickerProps> = ({
                 Today
               </Button>
             </div>
-          </div>
+            </div>
+          </Portal>
         )}
       </div>
     </div>

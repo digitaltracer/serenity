@@ -1,34 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { 
-  selectAllEntries, 
+import {
+  selectAllEntries,
   selectPinnedEntries,
-  addEntry, 
+  selectCompactMode,
+  addEntry,
   updateEntry,
+  deleteEntry,
   togglePin,
   setJournalFilter,
-  JournalEntry 
+  updateGoalsProgress,
+  selectAllTasks,
+  selectAllProjects,
+  JournalEntry
 } from '@serenity/core';
-import { 
-  Card, 
-  CardHeader, 
-  CardTitle, 
-  CardContent, 
-  Button, 
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
   Input,
   JournalEntryCard,
-  JournalEntryModal
+  SelectableItem,
+  BulkOperationsToolbar,
+  BulkActionsButton,
+  JournalEntryModal,
+  JournalTemplateSelector,
+  cn
 } from '@serenity/ui';
-import { Plus, BookOpen, Search, Pin } from 'lucide-react';
+import { JournalTemplate } from '@serenity/core';
+import { Plus, BookOpen, Search, Pin, FileText } from 'lucide-react';
 
 export const JournalPage: React.FC = () => {
   const dispatch = useDispatch();
   const entries = useSelector(selectAllEntries);
   const pinnedEntries = useSelector(selectPinnedEntries);
+  const tasks = useSelector(selectAllTasks);
+  const projects = useSelector(selectAllProjects);
+  const compactMode = useSelector(selectCompactMode);
   const [searchQuery, setSearchQuery] = useState('');
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
   const [activeView, setActiveView] = useState<'all' | 'pinned'>('all');
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<{ content: string; tags: string[] } | null>(null);
+
+  // Auto-update goal progress when journal entries change
+  useEffect(() => {
+    dispatch(updateGoalsProgress({ tasks, journalEntries: entries, projects }));
+  }, [dispatch, tasks, entries, projects]);
 
   const thisMonthEntries = entries.filter(entry => {
     const entryDate = new Date(entry.date);
@@ -43,10 +64,32 @@ export const JournalPage: React.FC = () => {
 
   const avgWordsPerEntry = entries.length > 0 ? Math.round(totalWords / entries.length) : 0;
 
-  const displayedEntries = activeView === 'pinned' ? pinnedEntries : entries;
+  // Filter entries based on search query and view
+  const filteredEntries = activeView === 'pinned' ? pinnedEntries : entries;
+  const displayedEntries = filteredEntries.filter(entry => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase();
+    return (
+      entry.title?.toLowerCase().includes(query) ||
+      entry.content.toLowerCase().includes(query) ||
+      entry.tags.some(tag => tag.toLowerCase().includes(query)) ||
+      entry.mood?.toLowerCase().includes(query)
+    );
+  });
 
   const handleCreateEntry = () => {
     setEditingEntry(null);
+    setSelectedTemplate(null);
+    setShowEntryModal(true);
+  };
+
+  const handleTemplateSelect = (template: JournalTemplate) => {
+    setEditingEntry(null);
+    setSelectedTemplate({
+      content: template.content,
+      tags: template.tags,
+    });
     setShowEntryModal(true);
   };
 
@@ -74,6 +117,10 @@ export const JournalPage: React.FC = () => {
     dispatch(togglePin(entryId));
   };
 
+  const handleDeleteEntry = (entryId: string) => {
+    dispatch(deleteEntry(entryId));
+  };
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
@@ -81,23 +128,52 @@ export const JournalPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="flex-1 h-full bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Journal</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Capture thoughts, ideas, and reflections
-          </p>
+      <div className="bg-card text-card-foreground border-b border-border px-6 py-4">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-foreground">
+              Journal
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Capture thoughts, ideas, and reflections
+            </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <BulkActionsButton variant="icon" />
+            <Button 
+              variant="secondary" 
+              onClick={() => setShowTemplateSelector(true)} 
+              className="rounded-xl gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              Templates
+            </Button>
+            <Button onClick={handleCreateEntry} className="rounded-xl gap-2">
+              <Plus className="w-4 h-4" />
+              New Entry
+            </Button>
+          </div>
         </div>
-        <Button onClick={handleCreateEntry}>
-          <Plus className="w-4 h-4 mr-2" />
-          New Entry
-        </Button>
       </div>
 
+      <div className={cn(
+        'flex-1 overflow-auto',
+        {
+          'p-6': !compactMode,
+          'p-4': compactMode,
+        }
+      )}>
+
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className={cn(
+        'grid grid-cols-1 md:grid-cols-3',
+        {
+          'gap-6 mb-6': !compactMode,
+          'gap-4 mb-4': compactMode,
+        }
+      )}>
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -145,6 +221,7 @@ export const JournalPage: React.FC = () => {
             placeholder="Search entries, tags, or content..."
             value={searchQuery}
             onChange={handleSearchChange}
+            className="rounded-xl"
           />
         </div>
         
@@ -152,15 +229,15 @@ export const JournalPage: React.FC = () => {
         <div className="flex gap-2">
           <Button
             variant={activeView === 'all' ? 'primary' : 'secondary'}
-            size="sm"
             onClick={() => setActiveView('all')}
+            className="rounded-xl"
           >
             All Entries
           </Button>
           <Button
             variant={activeView === 'pinned' ? 'primary' : 'secondary'}
-            size="sm"
             onClick={() => setActiveView('pinned')}
+            className="rounded-xl"
           >
             <Pin className="w-4 h-4 mr-2" />
             Pinned
@@ -168,19 +245,34 @@ export const JournalPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Template Selector Modal */}
+      <JournalTemplateSelector
+        isOpen={showTemplateSelector}
+        onClose={() => setShowTemplateSelector(false)}
+        onSelect={handleTemplateSelect}
+      />
+
       {/* Journal Entry Modal */}
       <JournalEntryModal
         isOpen={showEntryModal}
         onClose={() => {
           setShowEntryModal(false);
           setEditingEntry(null);
+          setSelectedTemplate(null);
         }}
         onSave={handleSaveEntry}
         entry={editingEntry}
+        templateContent={selectedTemplate?.content}
+        templateTags={selectedTemplate?.tags}
       />
 
       {/* Entries List */}
-      <div className="space-y-4">
+      <div className={cn(
+        {
+          'space-y-4': !compactMode,
+          'space-y-2': compactMode,
+        }
+      )}>
         {entries.length === 0 ? (
           <Card>
             <CardContent className="text-center py-12">
@@ -191,7 +283,7 @@ export const JournalPage: React.FC = () => {
               <p className="text-gray-600 dark:text-gray-400 mb-4">
                 Create your first journal entry to begin capturing your thoughts and experiences.
               </p>
-              <Button onClick={handleCreateEntry}>
+              <Button onClick={handleCreateEntry} className="rounded-xl">
                 <Plus className="w-4 h-4 mr-2" />
                 Write Your First Entry
               </Button>
@@ -199,15 +291,21 @@ export const JournalPage: React.FC = () => {
           </Card>
         ) : (
           displayedEntries.map((entry) => (
-            <JournalEntryCard
-              key={entry.id}
-              entry={entry}
-              onClick={handleEditEntry}
-              onTogglePin={handleTogglePin}
-            />
+            <SelectableItem key={entry.id} id={entry.id} type="journalEntries">
+              <JournalEntryCard
+                entry={entry}
+                onClick={handleEditEntry}
+                onTogglePin={handleTogglePin}
+                onDelete={handleDeleteEntry}
+              />
+            </SelectableItem>
           ))
         )}
       </div>
+      </div>
+      
+      {/* Bulk Operations Toolbar */}
+      <BulkOperationsToolbar />
     </div>
   );
 };

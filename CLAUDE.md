@@ -1,341 +1,392 @@
-# Serenity Notes - Development Guide
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Documentation
+
+**Comprehensive documentation available in `/docs/` folder:**
+
+- **`docs/STATUS.md`** - Current implementation status (what's working, what's not)
+- **`docs/DEVELOPMENT.md`** - Development patterns, best practices, how-tos
+- **`docs/architecture/decisions/`** - Architecture Decision Records (ADRs)
+  - ADR-001: SQLite as Primary Database
+  - ADR-002: AI Insights Context Continuity
+  - ADR-003: Turborepo Monorepo Structure
+  - ADR-004: Electron IPC Architecture
+- **`docs/features/`** - Feature-specific documentation
+  - `ai-insights.md` - AI Insights architecture and usage
+  - `database.md` - Database schema, migrations, best practices
+  - `ipc-communication.md` - IPC architecture and patterns
+- **`docs/api/`** - Auto-generated API reference (run `npm run docs:generate`)
+
+**Before implementing features, check:**
+1. `docs/STATUS.md` - Is it already implemented?
+2. `docs/architecture/decisions/` - Are there relevant ADRs?
+3. `docs/features/` - Is there a feature guide?
+4. `docs/DEVELOPMENT.md` - Are there relevant patterns?
+
+## Plan & Review
+
+### Before starting work
+- Always in plan mode to make a plan
+- After you get the plan, make sure you Write the plan to .claude/tasks/TASK_NAME.md
+- The plan should be a detailed implementation plan and the reasoning behind them, as well as tasks broken down.
+- If the task require external knowledge or certain package, also research to get the latest knowledge (Use Task tool for research)
+- Don't over plan it, always think MVP.
+- Oce you write the plan, firstly ask me to review it. Do not continue until I approve the plan.
+
+### While implementing
+- You should update the plan as you work.
+- After you complete tasks in the plan, you should update and append detailed descriptions of the changes you made, so following tasks can be easily hand over to other engineers.
 
 ## Project Overview
 
-Serenity Notes is a cross-platform productivity application that integrates task management (ActionHub) and journaling functionality. Built with a monorepo architecture supporting both desktop (Electron) and mobile (React Native) platforms.
+Serenity Notes is a cross-platform productivity application that combines task management (ActionHub) with journaling. Built with a monorepo architecture using Turborepo, it consists of an Electron desktop app with shared TypeScript packages.
 
-### Key Features
-- **ActionHub**: Comprehensive task management with projects, priorities, and due dates
-- **Journal**: Rich text journaling with task integration and tagging
-- **Analytics**: Productivity insights and progress tracking
-- **Cross-Platform**: Desktop (Electron) and Mobile (React Native) applications
-- **Self-Hosted**: User-controlled PostgreSQL database
-- **Themes**: Light/Dark mode with system preference detection and top-right toggle
-- **Advanced Features**: Subtasks, recurring patterns, tag suggestions, real-time analytics
+## Build & Development Commands
+
+### Root Level
+```bash
+npm install                     # Install all dependencies (automatically builds all packages via postinstall hook)
+npm run build                   # Build all packages in dependency order (core → database → ui → desktop)
+npm run dev                     # Start all apps in watch mode with Turborepo
+npm run lint                    # Lint all packages
+npm run test                    # Run tests across all packages
+npm run clean                   # Clean all build artifacts
+npm run format                  # Format code with Prettier
+npm run type-check              # TypeScript type checking without emitting
+```
+
+**First-time Setup**: After cloning the repository, simply run `npm install`. The postinstall hook will automatically build all packages in the correct order, ensuring all build artifacts (including `dist-cjs/` for CommonJS) are generated.
+
+### Desktop App (apps/desktop)
+```bash
+npm run dev                     # Start Vite dev server (renderer) + TypeScript watch (main)
+npm run build                   # Build both renderer (Vite) and main process (tsc)
+npm run build:renderer          # Build renderer process only (Vite)
+npm run build:main              # Build main process only (TypeScript)
+npm run electron                # Run the built Electron app
+npm run start                   # Build and run
+npm run dist                    # Create distribution packages
+npm run rebuild                 # Rebuild native modules (better-sqlite3) for Electron
+```
+
+### Package Development
+```bash
+# Watch mode for individual packages
+cd packages/core && npm run dev        # Watch core package
+cd packages/ui && npm run dev          # Watch UI components
+cd packages/database && npm run dev    # Watch database package
+
+# Build individual packages
+npm -w @serenity/core run build
+npm -w @serenity/ui run build
+npm -w @serenity/database run build
+```
+
+### Important Notes
+- **First Install**: Run `npm install` after cloning - the postinstall hook will automatically build all packages (including `dist-cjs/` for CommonJS).
+- **Build Order**: Always build packages in order: `core → database → ui → desktop`. The root `npm run build` handles this automatically.
+- **Native Modules**: After `npm install`, native modules (better-sqlite3) are automatically rebuilt for your Node.js/Electron version via postinstall hook.
+- **Dual Module System**: `@serenity/core` outputs both ESM (`dist/`) and CommonJS (`dist-cjs/`) for maximum compatibility.
+- **Build Issues**: If you encounter "Cannot find module" errors, run `npm run clean && npm run build` to clear stale build caches and rebuild from scratch.
 
 ## Architecture
 
+### Monorepo Structure
 ```
 serenity/
-├── packages/
-│   ├── core/         # Business logic, Redux store, TypeScript types
-│   ├── ui/           # Shared UI components with Tailwind CSS
-│   └── database/     # PostgreSQL schema and query functions
 ├── apps/
-│   ├── desktop/      # Electron application
-│   └── mobile/       # React Native application
-└── scripts/          # Build and development scripts
+│   └── desktop/               # Electron application
+│       ├── src/
+│       │   ├── main/          # Electron main process (Node.js)
+│       │   │   ├── ipc/       # IPC handlers (tasks, journal, auth, integrations, etc.)
+│       │   │   ├── services/  # Backend services (TaskService, JournalService, etc.)
+│       │   │   ├── security/  # Security policies and CSP
+│       │   │   ├── middleware/# IPC middleware for auth and validation
+│       │   │   ├── preload.ts # Preload script exposing safe APIs to renderer
+│       │   │   └── main.ts    # App initialization
+│       │   └── renderer/      # React UI (browser context)
+│       │       ├── pages/     # Page components (ActionHub, Journal, Analytics, etc.)
+│       │       ├── components/# Renderer-specific components
+│       │       ├── store/     # Redux store configuration for renderer
+│       │       └── App.tsx    # Main React app with routing
+│       ├── vite.config.ts     # Vite build for renderer
+│       └── tsconfig.main.json # TypeScript config for main process
+│
+└── packages/
+    ├── core/                  # Business logic, Redux store, utilities
+    │   ├── src/
+    │   │   ├── store/         # Redux Toolkit setup
+    │   │   │   ├── slices/    # Redux slices (tasks, journal, auth, ui, goals, insights, etc.)
+    │   │   │   └── middleware/# Custom middleware (persistence, error handling)
+    │   │   ├── services/      # Core services
+    │   │   │   ├── AI services: aiAssistantService, aiPreprocessingService
+    │   │   │   │              promptEngineeringService, insightQualityService
+    │   │   │   │              userProfileService, themeTrackingService
+    │   │   │   ├── Integrations: googleCalendarService, githubService
+    │   │   │   │               integrationSyncService, encryptedIntegrationService
+    │   │   │   └── Other: actionabilityService, feedbackService, visualizationService
+    │   │   ├── database/      # DatabaseManager (adapter pattern)
+    │   │   ├── utils/         # Utilities (logger, crypto, privacy, secureStorage)
+    │   │   ├── types/         # TypeScript type definitions
+    │   │   ├── validation/    # Zod schemas
+    │   │   ├── hooks/         # React hooks (keyboard shortcuts, drag-drop)
+    │   │   └── persistence/   # Persistence layer abstraction
+    │   ├── dist/              # ESM build output
+    │   └── dist-cjs/          # CommonJS build output
+    │
+    ├── ui/                    # Shared React components with Tailwind
+    │   └── src/
+    │       ├── components/    # Reusable UI components (70+ components)
+    │       ├── hooks/         # UI-specific hooks
+    │       └── utils/         # UI utilities
+    │
+    └── database/              # Database layer (SQLite primary, PostgreSQL optional)
+        └── src/
+            ├── adapters/      # SQLiteAdapter, PostgresAdapter
+            ├── sqlite/        # SQLite service and initialization
+            ├── queries/       # Query functions (sqlite/, postgres/)
+            │   ├── sqlite/    # SQLite-specific queries
+            │   └── postgres/  # PostgreSQL-specific queries
+            └── schema/        # SQL schema files
 ```
 
-## Technology Stack
+### Key Architectural Concepts
 
-- **Frontend**: React 18, TypeScript, Tailwind CSS
-- **State Management**: Redux Toolkit with RTK Query
-- **Desktop**: Electron with security best practices
-- **Mobile**: React Native with NativeWind
-- **Database**: PostgreSQL with pg-promise
-- **Build System**: Turborepo, Vite, TypeScript
-- **Styling**: Tailwind CSS with custom design system
+#### 1. Electron IPC Architecture
+- **Main Process**: Node.js with full system access, manages SQLite database, handles business logic
+- **Renderer Process**: Sandboxed browser context running React UI
+- **Preload Script** (`apps/desktop/src/main/preload.ts`): Safely exposes IPC APIs to renderer via `window.api`
+- **IPC Handlers** (`apps/desktop/src/main/ipc/`): Organized by domain (tasks, journal, auth, integrations, etc.)
+- **Services** (`apps/desktop/src/main/services/`): Backend services called by IPC handlers
 
-## Current Implementation Status
+#### 2. Database Architecture
+- **DatabaseManager** (`packages/core/src/database/DatabaseManager.ts`): Abstraction layer using adapter pattern
+- **Primary**: SQLite (via better-sqlite3) for desktop - offline-first, no setup required
+- **Optional**: PostgreSQL for server deployments
+- **Adapters**: `SQLiteAdapter` and `PostgresAdapter` implement common `DatabaseOperations` interface
+- **Queries**: Separate implementations in `packages/database/src/queries/sqlite/` and `packages/database/src/queries/postgres/`
+- **AI Insights Tables** (SQLite):
+  - `ai_insights`: Stores all AI-generated insights with quality scores and metadata
+  - `analysis_summaries`: Stores summaries of each analysis session for context continuity (automatically limited to last 10 summaries)
+  - `insight_themes`: Tracks recurring themes across insights with occurrence counts and severity trends
+  - Schema migrations are automatic on app startup via `SQLiteAdapter.initialize()`
 
-### ✅ Completed
-- Core architecture and monorepo setup
-- TypeScript interfaces and types
-- Redux state management (tasks, projects, journal, UI, user, tags)
-- Comprehensive UI component library with dark theme support
-- Desktop app structure with Electron and proper window controls
-- **Complete theme system with top-right toggle (light/dark/system)**
-- **Real-time analytics with intelligent insights**
-- **Advanced task management with subtasks and recurring patterns**
-- **Intelligent tag suggestion system with autocomplete**
-- **Separate subtask modal with parent task selection**
-- **Draggable app window with proper header regions**
-- Main page components (HomePage, ActionHubPage, JournalPage, AnalyticsPage, SettingsPage)
-- Task and Journal CRUD operations
-- Rich component library (TaskModal, JournalEntryModal, SubtaskModal, TagInput, ThemeToggle)
-- Build system fixes (Vite/Rollup export issues)
-- Theme toggle functionality
-- Layout component with proper UI components
-- Quick add task and journal entry modals
-- Rich text editor for journal entries
+#### 3. State Management
+- **Redux Toolkit** with multiple slices:
+  - `tasksSlice`: Task management with subtasks, projects, priorities
+  - `journalSlice`: Journal entries with mood tracking
+  - `authSlice`: Authentication and master password
+  - `integrationsSlice`: Google Calendar, GitHub integration state
+  - `uiSlice`: UI preferences, theme, compact mode
+  - `goalsSlice`: Goal tracking and progress
+  - `aiAssistantSlice`: AI-powered insights and analysis
+  - `searchSlice`: Global search state
+  - `shortcutsSlice`: Keyboard shortcut configuration
+- **Enhanced Store** (`packages/core/src/store/enhancedStore.ts`): Custom persistence middleware for Redux state
+- **Renderer Store** (`apps/desktop/src/renderer/store/`): Additional renderer-only configuration
 
-### 🚧 In Progress
-- Performance optimizations and UI polish
-- Advanced filtering and search capabilities
+#### 4. Security Architecture
+- **Master Password**: bcryptjs with dynamic salt generation (see `packages/core/src/utils/privacy.ts`)
+- **Secure Session Manager**: In-memory password storage during session
+- **Encrypted Storage**: Electron safeStorage API for OAuth tokens
+- **EncryptedIntegrationService**: Handles encrypted token storage/retrieval
+- **CSP**: Content Security Policy enforcement
+- **Sandboxing**: Renderer process runs in sandbox with restricted Node.js access
 
-### ⏳ Planned
-- Database integration for persistence
-- Mobile application
-- Advanced keyboard shortcuts
-- Data export/import functionality
-- Advanced recurring task patterns
-- Team collaboration features
-- Advanced analytics charts and visualizations
-- Real-time sync across devices
+#### 5. AI Services & Insights Architecture
+- **AIPreprocessingService**: Smart data summarization, temporal weighting, entity extraction
+- **PromptEngineeringService**: Context-rich prompts with chain-of-thought reasoning, includes previous analysis summaries for longitudinal tracking
+- **InsightQualityService**: Multi-dimensional quality scoring (relevance, actionability, novelty)
+- **UserProfileService**: User behavior profiling for personalized insights
+- **ThemeTrackingService**: Automatic theme extraction from insights using pattern matching (12 predefined themes)
+- **AI Analysis Modes**:
+  - **Incremental** (default): Analyzes only new/updated tasks and journals since last analysis
+  - **Window**: Analyzes specific date ranges (e.g., "last 7 days", "monthly review")
+  - **Full**: Re-analyzes all data regardless of previous analyses
+- **Context Continuity**: After each analysis, a summary is generated and stored in the `analysis_summaries` table. Future analyses automatically include previous summaries in the prompt, enabling the AI to track longitudinal patterns, identify improvements, and detect worsening trends.
+- **Insight Evolution Tracking**: Insights are categorized into themes (procrastination, burnout, focus_issues, etc.) and tracked over time with occurrence counts and severity trends (improving/stable/worsening).
+- See `AI-INSIGHTS-IMPLEMENTATION-SUMMARY.md` for complete implementation details
 
-## Recent Enhancements
-
-### 🎨 UI/UX Improvements
-- **Draggable Window**: App is now draggable from header region with proper window controls
-- **Theme Toggle**: Convenient top-right theme toggle button (light/dark/system)
-- **Dark Mode**: Enhanced dark theme colors matching modern design standards
-- **Responsive Design**: Improved layout and component responsiveness
-
-### 🚀 Feature Additions
-- **Subtask Management**: Separate modal for adding subtasks with parent task selection
-- **Tag Suggestions**: Intelligent autocomplete system for tags with stored suggestions
-- **Real-time Analytics**: Live calculations based on actual task and journal data
-- **Recurring Tasks**: Support for daily, weekly, and monthly recurring patterns
-
-### 🔧 Technical Improvements
-- **Build System**: Fixed Vite/Rollup export issues for reliable builds
-- **Component Library**: Expanded with specialized components (TagInput, ThemeToggle, SubtaskModal)
-- **State Management**: Added tags slice for intelligent tag suggestions
-- **Type Safety**: Enhanced TypeScript coverage across all components
-
-### 📊 Analytics Features
-- **Smart Metrics**: Completion rates, productivity streaks, task distribution
-- **Intelligent Insights**: Personalized suggestions based on user behavior
-- **Dynamic Calculations**: Real-time updates based on actual data
-- **Trend Analysis**: Most productive day, project analysis, improvement suggestions
-
-## Development Workflow
-
-### Setup
-```bash
-# Install dependencies
-npm install
-
-# Build shared packages
-npm run build
-
-# Start development (builds only)
-npm run dev
-
-# Run the desktop app
-npm run build  # Build first
-cd apps/desktop && npm run electron
-
-# Or use the start script
-npm run start
-```
-
-### Build Commands
-```bash
-# Build all packages
-npm run build
-
-# Build specific package
-npm run build --filter=@serenity/desktop
-
-# Clean build artifacts
-npm run clean
-
-# Lint code
-npm run lint
-
-# Run tests
-npm run test
-```
-
-### Desktop Development
-```bash
-cd apps/desktop
-
-# Development with hot reload
-npm run dev
-
-# Build for production
-npm run build
-
-# Create distribution packages
-npm run dist
-```
-
-## Key Components
-
-### Core Package (@serenity/core)
-- **Types**: Task, Project, JournalEntry, User interfaces
-- **Store**: Redux slices for state management
-- **Utils**: Helper functions and utilities
-- **Exports**: All shared business logic
-
-### UI Package (@serenity/ui)
-- **Components**: Reusable UI components
-- **Styling**: Tailwind CSS with design system
-- **Exports**: All UI components and utilities
-
-### Database Package (@serenity/database)
-- **Schema**: PostgreSQL table definitions
-- **Queries**: Database interaction functions
-- **Migrations**: Database schema updates
-
-## Design System
-
-### Colors
-- **Light Theme**: 
-  - Background: White, light grays
-  - Text: Dark grays, blacks
-  - Accent: Blue (#3B82F6)
-  - Success: Green, Warning: Orange, Error: Red
-
-- **Dark Theme**:
-  - Background: Dark navy (#1E293B), blacks
-  - Text: Light grays, whites
-  - Accent: Blue (#60A5FA)
-  - Borders: Subtle grays
-
-### Layout Patterns
-- **Sidebar Navigation**: Collapsible with animated transitions
-- **Card-Based UI**: Clean cards with shadows and rounded corners
-- **Progress Indicators**: Circular progress bars for completion
-- **Tag System**: Color-coded tags for organization
-
-### Typography
-- **Headers**: Clear hierarchy (text-3xl, text-2xl, text-xl)
-- **Body**: Readable sizes (text-base, text-sm)
-- **Colors**: High contrast ratios for accessibility
-
-## State Management
-
-### Redux Slices
-1. **tasksSlice**: Task CRUD operations, filtering, completion
-2. **projectsSlice**: Project management and organization
-3. **journalSlice**: Journal entry management
-4. **userSlice**: User preferences and settings
-5. **uiSlice**: Theme, sidebar state, modals, notifications
-
-### Key Selectors
-- `selectFilteredTasks`: Get filtered and sorted tasks
-- `selectActiveProjects`: Get non-archived projects
-- `selectSidebarCollapsed`: Get sidebar state
-- `selectTheme`: Get current theme preference
+#### 6. Module System & Build
+- **core package**: Dual build (ESM + CommonJS) to support both Electron main and renderer
+  - ESM: `dist/index.js` (for modern imports)
+  - CJS: `dist-cjs/index.js` (for Electron main process compatibility)
+- **Renderer**: Vite bundles React app with code splitting (vendor, ui, core, database chunks)
+- **Main Process**: TypeScript compiled to `dist/main.js`
+- **Vite Externals**: Node.js modules (pg, better-sqlite3) externalized from renderer bundle
 
 ## Common Development Tasks
 
-### Adding New Components
-1. Create component in `packages/ui/src/components/`
-2. Export from `packages/ui/src/index.ts`
-3. Build UI package: `cd packages/ui && npm run build`
-4. Import in app: `import { Component } from '@serenity/ui'`
+### Adding a New IPC Handler
+1. Create handler in `apps/desktop/src/main/ipc/[domain]Handlers.ts`
+2. Register in `apps/desktop/src/main/ipc/index.ts`
+3. Add type definitions to `packages/core/src/types/ipc.ts`
+4. Update preload script if exposing new API to renderer
 
-### Adding New Features
-1. Define types in `packages/core/src/types/`
-2. Create Redux slice in `packages/core/src/store/slices/`
-3. Add database queries in `packages/database/src/queries/`
-4. Build core package: `cd packages/core && npm run build`
-5. Implement UI in desktop app
+### Adding a New Redux Slice
+1. Create slice in `packages/core/src/store/slices/[feature]Slice.ts`
+2. Add to root reducer in `packages/core/src/store/store.ts`
+3. Export types from `packages/core/src/store/index.ts`
+4. Use in renderer via `useSelector` and `useDispatch`
 
-### Theme Development
-- Use Tailwind dark: variants (`dark:bg-gray-800`)
-- Update theme via `dispatch(setTheme('dark' | 'light' | 'system'))`
-- Test both themes during development
+### Database Changes
+1. Modify schema in `packages/database/src/schema/`
+2. Update both SQLite and PostgreSQL adapters
+3. Add migration script in `packages/database/src/migrations/`
+4. Update query functions in `packages/database/src/queries/sqlite/` and `packages/database/src/queries/postgres/`
 
-## Troubleshooting
+### Working with AI Insights
+The AI Insights system has three main components:
 
-### Build Issues
-```bash
-# Clean and rebuild all packages
-npx turbo clean
-npm run build
-
-# Check specific package exports
-node -e "console.log(Object.keys(require('./packages/core/dist/index.js')))"
+**1. Generating Insights**
+```typescript
+// In renderer or IPC handler
+await window.api.analyzeData({
+  provider: 'anthropic',
+  dataTypes: ['tasks', 'journal'],
+  analysisMode: 'incremental',  // 'incremental' | 'window' | 'full'
+  timeWindow: {                   // optional, for 'window' mode
+    start: '2025-10-01',
+    end: '2025-10-31'
+  }
+});
 ```
 
-### Import/Export Issues
-- Ensure proper exports in package index files
-- Check TypeScript declarations are generated
-- Verify package.json main/types fields
+**2. Context Continuity (Automatic)**
+- Analysis summaries are automatically generated and stored after each analysis
+- Previous summaries (last 2-3) are automatically included in future prompts
+- No manual intervention needed - the system handles longitudinal tracking
 
-### Theme Issues
-- Check Tailwind CSS is properly configured
-- Ensure dark: variants are applied correctly
-- Verify theme state updates in Redux DevTools
+**3. Theme Tracking (Optional Integration)**
+```typescript
+import { ThemeTrackingService } from '@serenity/core';
 
-## Performance Considerations
+// Extract theme from an insight
+const theme = ThemeTrackingService.extractTheme(insight);
 
-- **UI Virtualization**: For large task/journal lists
-- **Lazy Loading**: For images and rich content
-- **Memory Management**: Cleanup event listeners and subscriptions
-- **Bundle Size**: Code splitting for large features
+if (theme) {
+  // Get or create theme in database
+  const themeRow = await sqliteService.ai.getOrCreateTheme(
+    theme.themeName,
+    insight.category
+  );
 
-## Security Best Practices
-
-- **Data Sanitization**: Escape user input in rich text
-- **Credential Storage**: Use OS keychain for sensitive data
-- **Database Security**: Parameterized queries, input validation
-- **File Handling**: Validate uploads and file types
-
-## Testing Strategy
-
-### Unit Tests
-- Core business logic functions
-- Redux reducers and selectors
-- Utility functions
-
-### Integration Tests
-- Database query functions
-- API endpoints and data flow
-- Cross-package interactions
-
-### E2E Tests
-- Critical user journeys
-- Task creation and completion
-- Journal entry workflows
-
-## Deployment
-
-### Desktop Distribution
-```bash
-cd apps/desktop
-npm run dist
-
-# Platform-specific builds
-npm run dist -- --mac
-npm run dist -- --win
-npm run dist -- --linux
+  // Track occurrence and update severity trend
+  await sqliteService.ai.trackThemeOccurrence(
+    themeRow.id,
+    insight.id,
+    theme.confidence
+  );
+}
 ```
 
-### Database Setup
-```sql
--- Create database
-CREATE DATABASE serenity_notes;
+**Database Operations**
+```typescript
+// Get recent analysis summaries
+const summaries = await sqliteService.getRecentAnalysisSummaries(3);
 
--- Run migrations
-\i packages/database/src/schema/schema.sql
+// Get recurring themes
+const themes = await sqliteService.ai.getRecurringThemes();
+
+// Cleanup old summaries (keeps last 10)
+await sqliteService.deleteOldAnalysisSummaries(10);
 ```
 
-## Future Roadmap
+### Adding UI Components
+1. Add to `packages/ui/src/components/` if reusable across apps
+2. Use Tailwind CSS for styling (configured in `tailwind.config.js`)
+3. Export from `packages/ui/src/index.ts`
+4. Import in renderer: `import { Component } from '@serenity/ui'`
 
-### Short Term
-- [ ] Complete build system fixes
-- [ ] Implement theme toggle
-- [ ] Add quick task/journal modals
-- [ ] Rich text editor integration
+### Working with Native Modules
+- **better-sqlite3** is a native addon requiring compilation
+- Rebuild after Node.js/Electron version changes: `cd apps/desktop && npm run rebuild`
+- `postinstall` hook auto-rebuilds on `npm install`
 
-### Medium Term
-- [ ] Mobile app development
-- [ ] Advanced task features
-- [ ] Analytics dashboard
-- [ ] Keyboard shortcuts
+## Important Patterns & Conventions
 
-### Long Term
-- [ ] Real-time collaboration
-- [ ] Plugin system
-- [ ] AI-powered suggestions
-- [ ] Calendar integration
+### Logging
+- Use structured logger from `@serenity/core`: `import { logger } from '@serenity/core'`
+- Log levels: `logger.debug()`, `logger.info()`, `logger.warn()`, `logger.error()`
+- Include context: `logger.info('message', { component: 'ComponentName', operation: 'operationName' })`
+- Production builds strip `debug` and `trace` calls via Vite plugin
 
-## Contributing
+### Error Handling
+- React Error Boundaries in renderer for graceful degradation
+- Try-catch in IPC handlers with detailed error logging
+- Return consistent error shapes: `{ success: false, error: string }`
 
-1. Follow conventional commit messages
-2. Use TypeScript strict mode
-3. Add tests for new features
-4. Update documentation
-5. Ensure cross-platform compatibility
+### Type Safety
+- Strict TypeScript mode enabled
+- No `any` types - use `unknown` with type guards
+- Zod schemas for runtime validation (see `packages/core/src/validation/`)
+- Shared types in `packages/core/src/types/`
 
----
+### Security Best Practices
+- Never store passwords in plain text
+- Use `secureSessionManager` for in-memory password storage
+- Use `EncryptedIntegrationService` for OAuth tokens
+- Validate all IPC inputs in middleware
+- Sanitize user input before database queries
 
-**Last Updated**: July 2025
-**Version**: 0.1.0 Alpha
+### State Persistence
+- Redux state persisted to SQLite via custom middleware
+- Selective persistence (auth tokens excluded)
+- Rehydration on app startup from database
+
+### Performance Considerations
+- Virtual scrolling for large lists (using @tanstack/react-virtual)
+- Code splitting in Vite config (vendor, ui, core chunks)
+- Debounced search inputs
+- Optimized SQLite queries (avoid N+1 with proper joins)
+
+## Testing
+
+- Testing framework: Jest (configured but limited coverage)
+- Run tests: `npm run test` or `npm run test --filter=@serenity/core`
+- Test files: `*.test.ts` or `*.spec.ts` (currently minimal)
+
+## Environment Variables
+
+See `.env.example` for configuration options:
+- PostgreSQL connection settings (optional, SQLite is default)
+- Google Calendar OAuth credentials
+- GitHub integration credentials
+- Analytics and monitoring settings
+
+## Git Workflow
+
+- Main branch: `feature/initial`
+- Current branch: `improv/code-improvements`
+- Use conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`
+
+## Known Issues & Considerations
+
+- SQLite is primary database; PostgreSQL support is experimental
+- Native module rebuilding required when switching Node.js/Electron versions
+- Dual module system (ESM + CJS) required for Electron compatibility
+- Renderer cannot directly access Node.js APIs (use IPC through preload)
+
+## Documentation Maintenance
+
+**When making changes, update documentation:**
+
+### For New Features
+1. Create ADR in `docs/architecture/decisions/` if architectural decision
+2. Create or update feature doc in `docs/features/`
+3. Add JSDoc comments to new services/methods
+4. Run `npm run docs:generate` to update API docs
+5. Update `docs/STATUS.md` with new status
+
+### For Bug Fixes
+1. Update feature doc if behavior changes
+2. Update `docs/STATUS.md` if changing status (⚠️ → ✅)
+
+### For Refactoring
+1. Create ADR if changing architecture
+2. Update affected feature docs
+3. Regenerate API docs if interfaces changed
+
+**Documentation workflow prevents knowledge loss and speeds up future development.**

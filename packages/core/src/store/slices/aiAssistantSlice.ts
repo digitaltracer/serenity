@@ -1,0 +1,871 @@
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { AIAssistantService } from '../../services/aiAssistantService';
+import { AIProviderCredential, AIProviderCredentialInput } from '../../services/aiCredentialService';
+import { Task, JournalEntry } from '../../types';
+import { logger } from '../../utils/logger';
+
+export interface AIProvider {
+  id: 'openai' | 'gemini' | 'anthropic';
+  name: string;
+  hasApiKey: boolean;
+  lastUsed?: string;
+  isActive: boolean;
+  modelInfo?: {
+    model: string;
+    version: string;
+  };
+}
+
+export interface AIInsight {
+  id: string;
+  type: 'productivity' | 'behavior' | 'recommendation' | 'warning';
+  title: string;
+  description: string;
+  confidence: number; // 0-1 score
+  createdAt: string;
+  source: 'openai' | 'gemini' | 'anthropic';
+  category: 'tasks' | 'journal' | 'habits' | 'goals';
+  actionable?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AIRecap {
+  id: string;
+  type: 'weekly' | 'monthly';
+  title: string;
+  summary: string;
+  highlights: string[];
+  challenges: string[];
+  recommendations: string[];
+  period: {
+    start: string;
+    end: string;
+  };
+  createdAt: string;
+  source: 'openai' | 'gemini' | 'anthropic';
+  metadata?: Record<string, unknown>;
+}
+
+export interface AnalysisTracker {
+  lastTaskAnalysis?: string;
+  lastJournalAnalysis?: string;
+  processedTaskIds: string[];
+  processedJournalIds: string[];
+  totalTasksAnalyzed: number;
+  totalJournalEntriesAnalyzed: number;
+}
+
+export interface AIUsageEntry {
+  id: string;
+  timestamp: string;
+  provider: 'openai' | 'gemini' | 'anthropic';
+  operation: 'analyze' | 'recap' | 'quickadd' | 'summary';
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  note?: string;
+}
+
+export interface AIAssistantState {
+  // Provider management
+  providers: AIProvider[];
+  activeProvider?: 'openai' | 'gemini' | 'anthropic';
+
+  // Credential management (new multi-key system)
+  credentials: AIProviderCredential[];
+  isLoadingCredentials: boolean;
+  credentialError?: string;
+
+  // Analysis state
+  isAnalyzing: boolean;
+  analysisProgress: number; // 0-100
+  analysisStatus: string;
+  lastAnalysis?: string;
+
+  // Insights and recommendations
+  insights: AIInsight[];
+  recaps: AIRecap[];
+
+  // Analysis tracking to prevent duplicates
+  analysisTracker: AnalysisTracker;
+
+  // Configuration
+  autoAnalyze: boolean;
+  analysisFrequency: 'daily' | 'weekly' | 'manual';
+  dataTypes: {
+    includeTasks: boolean;
+    includeJournal: boolean;
+    includeProjects: boolean;
+  };
+
+  // Error handling
+  lastError?: string;
+  errors: string[];
+  usage: AIUsageEntry[];
+}
+
+const loadStoredUsage = (): AIUsageEntry[] => {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem('serenity_ai_usage');
+      if (raw) return JSON.parse(raw);
+    }
+  } catch {}
+  return [];
+};
+
+const initialState: AIAssistantState = {
+  providers: [
+    { id: 'openai', name: 'OpenAI', hasApiKey: false, isActive: false },
+    { id: 'gemini', name: 'Google Gemini', hasApiKey: false, isActive: false },
+    { id: 'anthropic', name: 'Anthropic Claude', hasApiKey: false, isActive: false },
+  ],
+  credentials: [],
+  isLoadingCredentials: false,
+  isAnalyzing: false,
+  analysisProgress: 0,
+  analysisStatus: 'Ready',
+  insights: [],
+  recaps: [],
+  analysisTracker: {
+    processedTaskIds: [],
+    processedJournalIds: [],
+    totalTasksAnalyzed: 0,
+    totalJournalEntriesAnalyzed: 0,
+  },
+  autoAnalyze: false,
+  analysisFrequency: 'manual',
+  dataTypes: {
+    includeTasks: true,
+    includeJournal: true,
+    includeProjects: true,
+  },
+  errors: [],
+  usage: loadStoredUsage(),
+};
+
+// Async thunks for AI operations
+export const setApiKey = createAsyncThunk(
+  'aiAssistant/setApiKey',
+  async ({ provider, apiKey }: { provider: 'openai' | 'gemini' | 'anthropic'; apiKey: string }) => {
+    // This will be handled by the main process for security
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.electronAPI?.aiAssistant?.setApiKey) {
+      logger.info(`[aiAssistant/setApiKey] Calling main process setApiKey for ${provider}`, { component: 'aiAssistantSlice', operation: '[aiassistant/setapikey]CallingMain' });
+      const result = await (globalThis as any).window.electronAPI.aiAssistant.setApiKey(provider, apiKey);
+      logger.info('[aiAssistant/setApiKey] Main returned', { component: 'aiAssistantSlice', operation: '[aiassistant/setapikey]MainReturned', metadata: { result } });
+      if (result.success) {
+        const payload = { provider, hasKey: true, modelInfo: result.modelInfo, usage: result.usage } as any;
+        logger.info('[aiAssistant/setApiKey] Fulfilled payload', { component: 'aiAssistantSlice', operation: '[aiassistant/setapikey]FulfilledPayload', metadata: { payload } });
+        return payload;
+      } else {
+        throw new Error(result.error || 'Failed to set API key');
+      }
+    }
+    throw new Error('AI Assistant API not available');
+  }
+);
+
+export const testApiKey = createAsyncThunk(
+  'aiAssistant/testApiKey',
+  async (provider: 'openai' | 'gemini' | 'anthropic') => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.electronAPI?.aiAssistant?.testApiKey) {
+      const result = await (globalThis as any).window.electronAPI.aiAssistant.testApiKey(provider);
+      if (result.success) {
+        return { provider, isValid: true };
+      } else {
+        throw new Error(result.error || 'API key test failed');
+      }
+    }
+    throw new Error('AI Assistant API not available');
+  }
+);
+
+// Initialize AI settings and provider states from stored configuration
+export const initializeAISettings = createAsyncThunk(
+  'aiAssistant/initializeSettings',
+  async () => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.electronAPI?.aiAssistant?.getSettings) {
+      logger.info('[aiAssistant/initializeSettings] Loading AI settings from main process', { component: 'aiAssistantSlice', operation: 'initializeAISettings' });
+      const result = await (globalThis as any).window.electronAPI.aiAssistant.getSettings();
+      if (result.success) {
+        logger.info('[aiAssistant/initializeSettings] Settings loaded successfully', {
+          component: 'aiAssistantSlice',
+          operation: 'initializeAISettings',
+          metadata: {
+            activeProvider: result.settings?.activeProvider,
+            providersWithKeys: result.settings?.providersWithKeys
+          }
+        });
+        return {
+          activeProvider: result.settings.activeProvider,
+          providersWithKeys: result.settings.providersWithKeys || {},
+          modelInfo: result.settings.modelInfo || {},
+          autoAnalyze: result.settings.autoAnalyze ?? false,
+          analysisFrequency: result.settings.analysisFrequency || 'manual',
+          dataTypes: result.settings.dataTypes || {
+            includeTasks: true,
+            includeJournal: true,
+            includeProjects: true,
+          },
+        };
+      } else {
+        logger.warn('[aiAssistant/initializeSettings] Failed to load settings', { component: 'aiAssistantSlice', operation: 'initializeAISettings', metadata: { error: result.error } });
+        throw new Error(result.error || 'Failed to load AI settings');
+      }
+    }
+    throw new Error('Electron API not available');
+  }
+);
+
+export const analyzeUserData = createAsyncThunk(
+  'aiAssistant/analyzeUserData',
+  async ({ 
+    provider, 
+    dataTypes,
+    forceReAnalyze = false,
+    tasks,
+    journalEntries,
+    forceLocal = false,
+  }: { 
+    provider: 'openai' | 'gemini' | 'anthropic';
+    dataTypes: string[];
+    forceReAnalyze?: boolean;
+    tasks?: any[];
+    journalEntries?: any[];
+    forceLocal?: boolean;
+  }, { getState }) => {
+    const state = getState() as { aiAssistant: AIAssistantState };
+
+    // Try Electron-backed analysis first if available
+    if (!forceLocal && typeof globalThis !== 'undefined' && (globalThis as any).window?.electronAPI?.aiAssistant?.analyzeData) {
+      try {
+        const result = await (globalThis as any).window.electronAPI.aiAssistant.analyzeData({
+          provider,
+          dataTypes,
+          forceReAnalyze,
+          tasks,
+          journalEntries,
+          analysisTracker: state.aiAssistant.analysisTracker,
+        });
+
+        if (result.success && Array.isArray(result.insights) && result.insights.length > 0) {
+          // Apply quality scoring to AI-generated insights as well
+          const qualityInsights = AIAssistantService.applyQualityScoring(result.insights, {
+            previousInsights: state.aiAssistant.insights,
+            minimumQuality: 0.4,
+          });
+
+          return {
+            insights: qualityInsights,
+            processedData: result.processedData || {},
+            usage: result.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+            provider,
+            operation: 'analyze' as const,
+          };
+        }
+      } catch (e) {
+        // Fall back to local analysis below
+      }
+    }
+
+    // Fallback: generate local insights so the user sees value without an API
+    const safeTasks = (tasks as Task[] | undefined) || [];
+    const safeJournal = (journalEntries as JournalEntry[] | undefined) || [];
+  const local = AIAssistantService.generateLocalInsights(safeTasks, safeJournal);
+  const nowIso = new Date().toISOString();
+    const rawInsights = local.map((i, idx) => ({
+      id: `local_${Date.now()}_${idx}`,
+      type: i.type,
+      title: i.title,
+      description: i.description,
+      confidence: i.confidence,
+      createdAt: nowIso,
+      source: provider,
+      category: i.category,
+      actionable: i.actionable,
+      metadata: { ...(i.metadata || {}), fallback: true },
+    }));
+
+    // Apply quality scoring, filtering, deduplication, and ranking
+    const insights = AIAssistantService.applyQualityScoring(rawInsights, {
+      previousInsights: state.aiAssistant.insights,
+      minimumQuality: 0.4,
+    });
+
+  return {
+    insights,
+    processedData: {
+      processedTaskIds: safeTasks.map(t => t.id),
+      processedJournalIds: safeJournal.map(j => j.id),
+      lastTaskAnalysis: safeTasks.length > 0 ? nowIso : undefined,
+      lastJournalAnalysis: safeJournal.length > 0 ? nowIso : undefined,
+      totalTasksAnalyzed: safeTasks.length,
+      totalJournalEntriesAnalyzed: safeJournal.length,
+    },
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+      provider,
+      operation: 'analyze' as const,
+    };
+  }
+);
+
+export const generateRecap = createAsyncThunk(
+  'aiAssistant/generateRecap',
+  async ({
+    provider,
+    type,
+    period,
+    tasks,
+    journalEntries,
+  }: {
+    provider: 'openai' | 'gemini' | 'anthropic';
+    type: 'weekly' | 'monthly';
+    period: { start: string; end: string };
+    tasks?: any[];
+    journalEntries?: any[];
+  }) => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.electronAPI?.aiAssistant?.generateRecap) {
+      const result = await (globalThis as any).window.electronAPI.aiAssistant.generateRecap({
+        provider,
+        type,
+        period,
+        tasks,
+        journalEntries,
+      });
+
+      if (result.success) {
+        return { recap: result.recap, usage: result.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 }, provider, operation: 'recap' as const };
+      } else {
+        throw new Error(result.error || 'Recap generation failed');
+      }
+    }
+    throw new Error('AI Assistant API not available');
+  }
+);
+
+// Credential management async thunks
+export const fetchCredentials = createAsyncThunk(
+  'aiAssistant/fetchCredentials',
+  async (enabledOnly: boolean = false) => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.api?.['ai-credentials:list']) {
+      const result = await (globalThis as any).window.api['ai-credentials:list'](enabledOnly);
+      if (result.success) {
+        return result.credentials;
+      } else {
+        throw new Error(result.error || 'Failed to fetch credentials');
+      }
+    }
+    throw new Error('Credential API not available');
+  }
+);
+
+export const addCredential = createAsyncThunk(
+  'aiAssistant/addCredential',
+  async (input: AIProviderCredentialInput) => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.api?.['ai-credentials:add']) {
+      const result = await (globalThis as any).window.api['ai-credentials:add'](input);
+      if (result.success) {
+        return result.credential;
+      } else {
+        throw new Error(result.error || 'Failed to add credential');
+      }
+    }
+    throw new Error('Credential API not available');
+  }
+);
+
+export const updateCredential = createAsyncThunk(
+  'aiAssistant/updateCredential',
+  async ({ id, updates }: {
+    id: string;
+    updates: {
+      name?: string;
+      modelPreference?: string;
+      enabled?: boolean;
+      priority?: number;
+    }
+  }) => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.api?.['ai-credentials:update']) {
+      const result = await (globalThis as any).window.api['ai-credentials:update'](id, updates);
+      if (result.success) {
+        return { id, updates };
+      } else {
+        throw new Error(result.error || 'Failed to update credential');
+      }
+    }
+    throw new Error('Credential API not available');
+  }
+);
+
+export const deleteCredential = createAsyncThunk(
+  'aiAssistant/deleteCredential',
+  async (id: string) => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.api?.['ai-credentials:delete']) {
+      const result = await (globalThis as any).window.api['ai-credentials:delete'](id);
+      if (result.success) {
+        return id;
+      } else {
+        throw new Error(result.error || 'Failed to delete credential');
+      }
+    }
+    throw new Error('Credential API not available');
+  }
+);
+
+export const testCredential = createAsyncThunk(
+  'aiAssistant/testCredential',
+  async (id: string) => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.api?.['ai-credentials:test']) {
+      const result = await (globalThis as any).window.api['ai-credentials:test'](id);
+      if (result.success) {
+        return { id, modelInfo: result.modelInfo };
+      } else {
+        throw new Error(result.error || 'API key test failed');
+      }
+    }
+    throw new Error('Credential API not available');
+  }
+);
+
+export const reorderCredentials = createAsyncThunk(
+  'aiAssistant/reorderCredentials',
+  async (priorities: Array<{ id: string; priority: number }>) => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).window?.api?.['ai-credentials:reorder']) {
+      const result = await (globalThis as any).window.api['ai-credentials:reorder'](priorities);
+      if (result.success) {
+        return priorities;
+      } else {
+        throw new Error(result.error || 'Failed to reorder credentials');
+      }
+    }
+    throw new Error('Credential API not available');
+  }
+);
+
+const aiAssistantSlice = createSlice({
+  name: 'aiAssistant',
+  initialState,
+  reducers: {
+    setActiveProvider: (state, action: PayloadAction<'openai' | 'gemini' | 'anthropic'>) => {
+      state.activeProvider = action.payload;
+      // Update provider last used timestamp
+      const provider = state.providers.find(p => p.id === action.payload);
+      if (provider) {
+        provider.lastUsed = new Date().toISOString();
+        provider.isActive = true;
+      }
+      // Deactivate other providers
+      state.providers.forEach(p => {
+        if (p.id !== action.payload) {
+          p.isActive = false;
+        }
+      });
+    },
+    clearActiveProvider: (state) => {
+      state.activeProvider = undefined;
+      state.providers.forEach(p => { p.isActive = false; });
+    },
+    clearProviderModelInfo: (state, action: PayloadAction<'openai' | 'gemini' | 'anthropic'>) => {
+      const provider = state.providers.find(p => p.id === action.payload);
+      if (provider) {
+        provider.modelInfo = undefined;
+      }
+    },
+    
+    setAutoAnalyze: (state, action: PayloadAction<boolean>) => {
+      state.autoAnalyze = action.payload;
+    },
+    
+    setAnalysisFrequency: (state, action: PayloadAction<'daily' | 'weekly' | 'manual'>) => {
+      state.analysisFrequency = action.payload;
+    },
+    
+    setDataTypes: (state, action: PayloadAction<Partial<AIAssistantState['dataTypes']>>) => {
+      state.dataTypes = { ...state.dataTypes, ...action.payload };
+    },
+    
+    addInsight: (state, action: PayloadAction<AIInsight>) => {
+      state.insights.unshift(action.payload);
+      // Keep only last 50 insights
+      if (state.insights.length > 50) {
+        state.insights = state.insights.slice(0, 50);
+      }
+    },
+    
+    removeInsight: (state, action: PayloadAction<string>) => {
+      state.insights = state.insights.filter(insight => insight.id !== action.payload);
+    },
+    
+    clearInsights: (state) => {
+      state.insights = [];
+    },
+    restoreInsights: (state, action: PayloadAction<AIInsight[]>) => {
+      state.insights = action.payload || [];
+    },
+    
+    addRecap: (state, action: PayloadAction<AIRecap>) => {
+      state.recaps.unshift(action.payload);
+      // Keep only last 20 recaps
+      if (state.recaps.length > 20) {
+        state.recaps = state.recaps.slice(0, 20);
+      }
+    },
+    
+    removeRecap: (state, action: PayloadAction<string>) => {
+      state.recaps = state.recaps.filter(recap => recap.id !== action.payload);
+    },
+    restoreRecaps: (state, action: PayloadAction<AIRecap[]>) => {
+      state.recaps = action.payload || [];
+    },
+    
+    updateAnalysisTracker: (state, action: PayloadAction<Partial<AnalysisTracker>>) => {
+      state.analysisTracker = { ...state.analysisTracker, ...action.payload };
+    },
+    
+    clearAIError: (state) => {
+      state.lastError = undefined;
+    },
+    
+    clearAllErrors: (state) => {
+      state.errors = [];
+      state.lastError = undefined;
+    },
+    
+    updateProvidersWithModelInfo: (state, action: PayloadAction<{ [key: string]: { model: string; version: string } }>) => {
+      Object.entries(action.payload).forEach(([providerId, modelInfo]) => {
+        const provider = state.providers.find(p => p.id === providerId);
+        if (provider) {
+          provider.modelInfo = modelInfo;
+        }
+      });
+    },
+    
+    updateProvidersWithApiKeys: (state, action: PayloadAction<{ [key: string]: boolean }>) => {
+      Object.entries(action.payload).forEach(([providerId, hasKey]) => {
+        const provider = state.providers.find(p => p.id === providerId);
+        if (provider) {
+          provider.hasApiKey = hasKey;
+        }
+      });
+    },
+    recordUsage: (state, action: PayloadAction<AIUsageEntry>) => {
+      state.usage.unshift(action.payload);
+      if (state.usage.length > 500) {
+        state.usage = state.usage.slice(0, 500);
+      }
+    },
+    clearUsage: (state) => {
+      state.usage = [];
+    },
+    restoreUsage: (state, action: PayloadAction<AIUsageEntry[]>) => {
+      state.usage = action.payload || [];
+    },
+  },
+  
+  extraReducers: (builder) => {
+    // Set API Key
+    builder
+      .addCase(setApiKey.pending, (state) => {
+        state.lastError = undefined;
+      })
+      .addCase(setApiKey.fulfilled, (state, action) => {
+        const provider = state.providers.find(p => p.id === action.payload.provider);
+        if (provider) {
+          provider.hasApiKey = action.payload.hasKey;
+          if (action.payload.modelInfo) {
+            provider.modelInfo = action.payload.modelInfo;
+          }
+        }
+        // Record any usage returned from key setup
+        const anyAction: any = action as any;
+        if (anyAction.payload && anyAction.payload.usage) {
+          const u = anyAction.payload.usage;
+          state.usage.unshift({
+            id: `usage_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            provider: anyAction.payload.provider,
+            operation: 'analyze',
+            promptTokens: Number(u.promptTokens || 0),
+            completionTokens: Number(u.completionTokens || 0),
+            totalTokens: Number(u.totalTokens || 0),
+            note: 'API key setup verification',
+          });
+        }
+      })
+      .addCase(setApiKey.rejected, (state, action) => {
+        state.lastError = action.error.message;
+        state.errors.push(`API Key Setup: ${action.error.message}`);
+      });
+
+    // Test API Key
+    builder
+      .addCase(testApiKey.pending, (state) => {
+        state.lastError = undefined;
+      })
+      .addCase(testApiKey.fulfilled, (state, action) => {
+        const provider = state.providers.find(p => p.id === action.payload.provider);
+        if (provider) {
+          provider.hasApiKey = action.payload.isValid;
+        }
+      })
+      .addCase(testApiKey.rejected, (state, action) => {
+        state.lastError = action.error.message;
+        state.errors.push(`API Key Test: ${action.error.message}`);
+      });
+
+    // Initialize AI Settings
+    builder
+      .addCase(initializeAISettings.fulfilled, (state, action) => {
+        // Update active provider
+        if (action.payload.activeProvider) {
+          state.activeProvider = action.payload.activeProvider;
+        }
+
+        // Update providers with API key status
+        Object.entries(action.payload.providersWithKeys).forEach(([providerId, hasKey]) => {
+          const provider = state.providers.find(p => p.id === providerId);
+          if (provider) {
+            provider.hasApiKey = hasKey as boolean;
+            if (providerId === action.payload.activeProvider) {
+              provider.isActive = true;
+            }
+          }
+        });
+
+        // Update model info
+        Object.entries(action.payload.modelInfo).forEach(([providerId, modelInfo]) => {
+          const provider = state.providers.find(p => p.id === providerId);
+          if (provider) {
+            provider.modelInfo = modelInfo as any;
+          }
+        });
+
+        // Update configuration settings
+        state.autoAnalyze = action.payload.autoAnalyze;
+        state.analysisFrequency = action.payload.analysisFrequency;
+        state.dataTypes = action.payload.dataTypes;
+      })
+      .addCase(initializeAISettings.rejected, (state, action) => {
+        logger.warn('[aiAssistant] Failed to initialize AI settings', { component: 'aiAssistantSlice', operation: 'initializeAISettings.rejected', metadata: { error: action.error.message } });
+        // Don't set error state as this is non-critical initialization
+      });
+
+    // Analyze User Data
+    builder
+      .addCase(analyzeUserData.pending, (state) => {
+        state.isAnalyzing = true;
+        state.analysisProgress = 0;
+        state.analysisStatus = 'Analyzing your data...';
+        state.lastError = undefined;
+      })
+      .addCase(analyzeUserData.fulfilled, (state, action) => {
+        state.isAnalyzing = false;
+        state.analysisProgress = 100;
+        state.analysisStatus = 'Analysis complete';
+        state.lastAnalysis = new Date().toISOString();
+        
+        // Add new insights
+        action.payload.insights.forEach((insight: AIInsight) => {
+          state.insights.unshift(insight);
+        });
+        
+        // Update analysis tracker
+        if (action.payload.processedData) {
+          state.analysisTracker = {
+            ...state.analysisTracker,
+            ...action.payload.processedData,
+          };
+        }
+        // Record usage entry
+        if (action.payload.usage) {
+          const u = action.payload.usage as any;
+          state.usage.unshift({
+            id: `usage_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            provider: action.payload.provider,
+            operation: 'analyze',
+            promptTokens: Number(u.promptTokens || 0),
+            completionTokens: Number(u.completionTokens || 0),
+            totalTokens: Number(u.totalTokens || 0),
+          });
+        }
+        
+        // Keep only last 50 insights
+        if (state.insights.length > 50) {
+          state.insights = state.insights.slice(0, 50);
+        }
+      })
+      .addCase(analyzeUserData.rejected, (state, action) => {
+        state.isAnalyzing = false;
+        state.analysisProgress = 0;
+        state.analysisStatus = 'Analysis failed';
+        state.lastError = action.error.message;
+        state.errors.push(`Data Analysis: ${action.error.message}`);
+      });
+
+    // Generate Recap
+    builder
+      .addCase(generateRecap.pending, (state) => {
+        state.isAnalyzing = true;
+        state.analysisStatus = 'Generating recap...';
+        state.lastError = undefined;
+      })
+      .addCase(generateRecap.fulfilled, (state, action) => {
+        state.isAnalyzing = false;
+        state.analysisStatus = 'Recap generated';
+        state.recaps.unshift(action.payload.recap);
+        // Record usage entry
+        if (action.payload.usage) {
+          const u = action.payload.usage as any;
+          state.usage.unshift({
+            id: `usage_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            provider: action.payload.provider,
+            operation: 'recap',
+            promptTokens: Number(u.promptTokens || 0),
+            completionTokens: Number(u.completionTokens || 0),
+            totalTokens: Number(u.totalTokens || 0),
+          });
+        }
+
+        // Keep only last 20 recaps
+        if (state.recaps.length > 20) {
+          state.recaps = state.recaps.slice(0, 20);
+        }
+      })
+      .addCase(generateRecap.rejected, (state, action) => {
+        state.isAnalyzing = false;
+        state.analysisStatus = 'Recap generation failed';
+        state.lastError = action.error.message;
+        state.errors.push(`Recap Generation: ${action.error.message}`);
+      });
+
+    // Fetch Credentials
+    builder
+      .addCase(fetchCredentials.pending, (state) => {
+        state.isLoadingCredentials = true;
+        state.credentialError = undefined;
+      })
+      .addCase(fetchCredentials.fulfilled, (state, action) => {
+        state.isLoadingCredentials = false;
+        state.credentials = action.payload;
+      })
+      .addCase(fetchCredentials.rejected, (state, action) => {
+        state.isLoadingCredentials = false;
+        state.credentialError = action.error.message;
+      });
+
+    // Add Credential
+    builder
+      .addCase(addCredential.pending, (state) => {
+        state.credentialError = undefined;
+      })
+      .addCase(addCredential.fulfilled, (state, action) => {
+        state.credentials.push(action.payload);
+        // Sort by priority
+        state.credentials.sort((a, b) => a.priority - b.priority);
+      })
+      .addCase(addCredential.rejected, (state, action) => {
+        state.credentialError = action.error.message;
+      });
+
+    // Update Credential
+    builder
+      .addCase(updateCredential.fulfilled, (state, action) => {
+        const index = state.credentials.findIndex(c => c.id === action.payload.id);
+        if (index !== -1) {
+          state.credentials[index] = { ...state.credentials[index], ...action.payload.updates };
+        }
+      })
+      .addCase(updateCredential.rejected, (state, action) => {
+        state.credentialError = action.error.message;
+      });
+
+    // Delete Credential
+    builder
+      .addCase(deleteCredential.fulfilled, (state, action) => {
+        state.credentials = state.credentials.filter(c => c.id !== action.payload);
+      })
+      .addCase(deleteCredential.rejected, (state, action) => {
+        state.credentialError = action.error.message;
+      });
+
+    // Test Credential
+    builder
+      .addCase(testCredential.rejected, (state, action) => {
+        state.credentialError = action.error.message;
+      });
+
+    // Reorder Credentials
+    builder
+      .addCase(reorderCredentials.fulfilled, (state, action) => {
+        // Update priorities
+        action.payload.forEach(({ id, priority }) => {
+          const credential = state.credentials.find(c => c.id === id);
+          if (credential) {
+            credential.priority = priority;
+          }
+        });
+        // Sort by priority
+        state.credentials.sort((a, b) => a.priority - b.priority);
+      })
+      .addCase(reorderCredentials.rejected, (state, action) => {
+        state.credentialError = action.error.message;
+      });
+  },
+});
+
+export const {
+  setActiveProvider,
+  clearActiveProvider,
+  setAutoAnalyze,
+  setAnalysisFrequency,
+  setDataTypes,
+  addInsight,
+  removeInsight,
+  clearInsights,
+  restoreInsights,
+  addRecap,
+  removeRecap,
+  restoreRecaps,
+  updateAnalysisTracker,
+  clearAIError,
+  clearAllErrors,
+  updateProvidersWithModelInfo,
+  updateProvidersWithApiKeys,
+  clearProviderModelInfo,
+  recordUsage,
+  clearUsage,
+  restoreUsage,
+} = aiAssistantSlice.actions;
+
+// Selectors
+export const selectAIProviders = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.providers;
+export const selectActiveProvider = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.activeProvider;
+export const selectIsAnalyzing = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.isAnalyzing;
+export const selectAnalysisProgress = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.analysisProgress;
+export const selectAnalysisStatus = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.analysisStatus;
+export const selectLastAnalysis = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.lastAnalysis;
+export const selectAIInsights = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.insights;
+export const selectAIRecaps = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.recaps;
+export const selectAnalysisTracker = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.analysisTracker;
+export const selectAIConfiguration = (state: { aiAssistant: AIAssistantState }) => ({
+  autoAnalyze: state.aiAssistant.autoAnalyze,
+  analysisFrequency: state.aiAssistant.analysisFrequency,
+  dataTypes: state.aiAssistant.dataTypes,
+});
+export const selectAIErrors = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.errors;
+export const selectLastAIError = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.lastError;
+export const selectAIUsage = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.usage;
+
+// Credential selectors
+export const selectCredentials = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.credentials;
+export const selectIsLoadingCredentials = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.isLoadingCredentials;
+export const selectCredentialError = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.credentialError;
+export const selectEnabledCredentials = (state: { aiAssistant: AIAssistantState }) =>
+  state.aiAssistant.credentials.filter(c => c.enabled);
+export const selectCredentialsByProvider = (provider: 'openai' | 'gemini' | 'anthropic') =>
+  (state: { aiAssistant: AIAssistantState }) =>
+    state.aiAssistant.credentials.filter(c => c.provider === provider);
+
+export default aiAssistantSlice.reducer;

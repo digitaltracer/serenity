@@ -113,7 +113,7 @@ export const getUserAnalytics = async (userId: string): Promise<{
     SELECT 
       -- Task statistics
       COUNT(CASE WHEN t.completed = TRUE THEN 1 END) as tasks_completed,
-      COUNT(CASE WHEN t.completed = TRUE AND t.updated_at::date = CURRENT_DATE THEN 1 END) as tasks_completed_today,
+      COUNT(CASE WHEN t.completed = TRUE AND (t.completed_at::date = CURRENT_DATE OR (t.completed_at IS NULL AND t.updated_at::date = CURRENT_DATE)) THEN 1 END) as tasks_completed_today,
       CASE 
         WHEN COUNT(t.id) > 0 THEN ROUND((COUNT(CASE WHEN t.completed = TRUE THEN 1 END) * 100.0) / COUNT(t.id), 0)
         ELSE 0

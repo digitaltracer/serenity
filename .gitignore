@@ -202,6 +202,18 @@ app.log
 error.log
 access.log
 
+# Test files (development artifacts)
+test-*.js
+test-*.ts
+
+# Backup files
+*.backup.*
+
+# Development logs
+electron_*.log
+dev.log
+build.log
+
 # Misc
 .npmrc
 .yarnrc

@@ -1,6 +1,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Project } from '../../types';
 import { generateId } from '../../utils';
+import { loadProjects } from '../../utils/persistence';
+import { logger } from '../../utils/logger';
 
 export interface ProjectsState {
   projects: Project[];
@@ -8,8 +10,18 @@ export interface ProjectsState {
   error: string | null;
 }
 
+// Load projects from localStorage on initialization
+const initialProjects = (() => {
+  try {
+    return loadProjects();
+  } catch (error) {
+    logger.error('Failed to load projects from storage:', { component: 'projectsSlice', operation: 'failedLoadProjects' }, error as Error);
+    return [];
+  }
+})();
+
 const initialState: ProjectsState = {
-  projects: [],
+  projects: initialProjects,
   loading: false,
   error: null,
 };
@@ -18,14 +30,25 @@ const projectsSlice = createSlice({
   name: 'projects',
   initialState,
   reducers: {
-    addProject: (state, action: PayloadAction<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>) => {
-      const newProject: Project = {
-        ...action.payload,
-        id: generateId(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      state.projects.push(newProject);
+    addProject: {
+      reducer: (state, action: PayloadAction<Project>) => {
+        state.projects.push(action.payload);
+      },
+      prepare: (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'> | Project) => {
+        // If the project already has an ID (pre-generated), use it as-is
+        if ('id' in projectData && projectData.id) {
+          return { payload: projectData as Project };
+        }
+        
+        // Otherwise, generate ID and timestamps
+        const newProject: Project = {
+          ...projectData,
+          id: generateId(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        return { payload: newProject };
+      }
     },
     updateProject: (state, action: PayloadAction<Partial<Project> & { id: string }>) => {
       const index = state.projects.findIndex(project => project.id === action.payload.id);

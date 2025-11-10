@@ -1,5 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
-import { format, isToday, isPast, isFuture, startOfDay } from 'date-fns';
+// Optimized imports for smaller bundle size - import specific functions only
+import format from 'date-fns/format';
+import isToday from 'date-fns/isToday';
+import isPast from 'date-fns/isPast';
+import isFuture from 'date-fns/isFuture';
+import startOfDay from 'date-fns/startOfDay';
 
 export const generateId = (): string => uuidv4();
 
@@ -55,3 +60,38 @@ export const sortTasksByPriority = <T extends { priority: 'low' | 'medium' | 'hi
     (a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]
   );
 };
+
+// Export storage utilities
+export * from './storage';
+export * from './persistence';
+
+// Export logging utilities
+export * from './logger';
+
+// Export privacy utilities
+export * from './privacy';
+
+// Export enhanced security utilities
+export * from './securityConfig';
+export * from './secureStorage';
+export * from './encryption';
+export * from './secureExport';
+export * from './useAutoLock';
+export * from './cryptoUtils';
+
+// Export keyboard shortcuts utilities
+export * from './keyboardShortcuts';
+
+// Export search engine utilities
+export * from './searchEngine';
+
+// Export drag and drop utilities
+export * from './dragDrop';
+
+// Export goal progress utilities
+export * from './goalProgress';
+
+// Export standardized error handling
+export * from './errorHandler';
+// Natural language quick-add
+export * from './nlpQuickAdd';

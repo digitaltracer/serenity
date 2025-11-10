@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { selectAllUsedTags } from '@serenity/core';
 import { cn } from '../utils/cn';
 import { Tag, X } from 'lucide-react';
+import { Portal } from './Portal';
 
 export interface TagInputProps {
   value: string[];
@@ -24,8 +25,10 @@ const TagInput: React.FC<TagInputProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const allUsedTags = useSelector(selectAllUsedTags);
   
@@ -67,13 +70,47 @@ const TagInput: React.FC<TagInputProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
+    
+    // Check if user typed a comma
+    if (newValue.includes(',')) {
+      const beforeComma = newValue.split(',')[0].trim();
+      const afterComma = newValue.split(',').slice(1).join(',');
+      
+      if (beforeComma) {
+        addTag(beforeComma);
+      }
+      
+      setInputValue(afterComma);
+      return;
+    }
+    
     setInputValue(newValue);
-    setIsOpen(filteredSuggestions.length > 0);
+    if (getSuggestions(newValue).filter(tag => !value.includes(tag)).length > 0) {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + window.scrollY + 8,
+          left: rect.left + window.scrollX,
+          width: rect.width
+        });
+      }
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
     setHighlightedIndex(-1);
   };
 
   const handleInputFocus = () => {
     if (filteredSuggestions.length > 0) {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + window.scrollY + 8,
+          left: rect.left + window.scrollX,
+          width: rect.width
+        });
+      }
       setIsOpen(true);
     }
   };
@@ -98,6 +135,11 @@ const TagInput: React.FC<TagInputProps> = ({
       if (highlightedIndex >= 0 && highlightedIndex < filteredSuggestions.length) {
         addTag(filteredSuggestions[highlightedIndex]);
       } else if (inputValue.trim()) {
+        addTag(inputValue);
+      }
+    } else if (e.key === ',' || e.key === 'Tab') {
+      e.preventDefault();
+      if (inputValue.trim()) {
         addTag(inputValue);
       }
     } else if (e.key === 'ArrowDown') {
@@ -129,18 +171,19 @@ const TagInput: React.FC<TagInputProps> = ({
         </label>
       )}
       
-      <div className="relative">
+      <div className="relative" ref={containerRef}>
         {/* Tags and Input Container */}
-        <div className="min-h-[40px] p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 focus-within:border-blue-500 dark:focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-500 dark:focus-within:ring-blue-400">
+        <div className="min-h-[48px] p-3 border border-gray-200/60 rounded-lg bg-gradient-to-br from-white to-gray-50/30 backdrop-blur-sm shadow-sm shadow-gray-200/30 ring-1 ring-gray-100/50 dark:border-gray-600/60 dark:from-gray-800 dark:to-gray-900 dark:shadow-black/20 dark:ring-gray-800/40 focus-within:ring-2 focus-within:ring-blue-500/40 focus-within:border-blue-400/60 focus-within:from-blue-50/30 focus-within:to-white focus-within:shadow-md focus-within:shadow-blue-200/40 dark:focus-within:ring-gray-400/40 dark:focus-within:border-gray-400/60 dark:focus-within:from-gray-800 dark:focus-within:to-gray-900 dark:focus-within:shadow-black/40 transition-all duration-200 ease-out">
           <div className="flex flex-wrap gap-1 items-center">
             {/* Existing Tags */}
             {value.map((tag, index) => (
               <span
                 key={index}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 max-w-32"
+                title={tag}
               >
-                <Tag className="w-3 h-3" />
-                {tag}
+                <Tag className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{tag}</span>
                 <button
                   type="button"
                   onClick={() => removeTag(tag)}
@@ -170,10 +213,16 @@ const TagInput: React.FC<TagInputProps> = ({
 
         {/* Suggestions Dropdown */}
         {isOpen && filteredSuggestions.length > 0 && (
-          <div
-            ref={dropdownRef}
-            className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto"
-          >
+          <Portal>
+            <div
+              ref={dropdownRef}
+              className="absolute z-50 bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-800/90 dark:to-gray-900/60 border border-gray-200/60 dark:border-gray-700/40 rounded-lg shadow-xl shadow-gray-300/50 dark:shadow-black/40 backdrop-blur-sm ring-1 ring-gray-100/80 dark:ring-gray-800/60 max-h-48 overflow-y-auto" 
+              style={{
+                top: dropdownPosition.top,
+                left: dropdownPosition.left,
+                width: dropdownPosition.width
+              }}
+            >
             {filteredSuggestions.map((suggestion, index) => (
               <button
                 key={suggestion}
@@ -187,10 +236,11 @@ const TagInput: React.FC<TagInputProps> = ({
                 )}
               >
                 <Tag className="w-3 h-3 text-gray-400" />
-                <span className="text-gray-900 dark:text-gray-100">{suggestion}</span>
+                <span className="text-gray-900 dark:text-gray-100 truncate" title={suggestion}>{suggestion}</span>
               </button>
             ))}
-          </div>
+            </div>
+          </Portal>
         )}
       </div>
 

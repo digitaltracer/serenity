@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
@@ -7,12 +7,33 @@ import {
   selectTheme,
   setTheme,
   addTask, 
+  addProject,
   addSubtask,
+  removeSubtask,
+  toggleSubtask,
+  updateSubtaskTitle,
+  deleteTask,
   selectAllTasks,
+  selectAllProjects,
   addEntry,
   addUsedTags,
+  selectIsGlobalSearchOpen,
+  openGlobalSearch,
+  closeGlobalSearch,
+  openHelpModal,
+  selectTaskModalOpen,
+  selectJournalModalOpen,
+  selectSubtaskModalOpen,
+  openTaskModal,
+  closeTaskModal,
+  openJournalModal,
+  closeJournalModal,
+  openSubtaskModal,
+  closeSubtaskModal,
+  selectShortcuts,
   Task,
-  JournalEntry
+  JournalEntry,
+  SearchResult
 } from '@serenity/core';
 import { 
   Sidebar, 
@@ -24,21 +45,31 @@ import {
   TaskModal,
   JournalEntryModal,
   ThemeToggle,
-  SubtaskModal
+  SubtaskModal,
+  GlobalSearchModal,
+  PageTransition
 } from '@serenity/ui';
-import { 
+import { logger } from '@serenity/core';
+import {
   Home,
-  CheckSquare, 
-  Calendar, 
-  BookOpen, 
-  BarChart3, 
-  Settings, 
+  CheckSquare,
+  Calendar,
+  BookOpen,
+  BarChart3,
+  Settings,
   Plus,
   Menu,
   ListChecks,
   PanelLeft,
   PanelLeftClose,
-  Square
+  Square,
+  Search,
+  HelpCircle,
+  Target,
+  Database,
+  Globe,
+  Brain,
+  Sparkles
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -50,11 +81,29 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const sidebarCollapsed = useSelector(selectSidebarCollapsed);
   const currentTheme = useSelector(selectTheme);
   const tasks = useSelector(selectAllTasks);
+  const projects = useSelector(selectAllProjects);
+  const isGlobalSearchOpen = useSelector(selectIsGlobalSearchOpen);
+  const isTaskModalOpen = useSelector(selectTaskModalOpen);
+  const isJournalModalOpen = useSelector(selectJournalModalOpen);
+  const isSubtaskModalOpen = useSelector(selectSubtaskModalOpen);
+  const shortcuts = useSelector(selectShortcuts);
+  
+  // Resolve theme for logo (handles 'system')
+  const resolvedTheme = useMemo(() => {
+    if (currentTheme === 'system') {
+      if (typeof window !== 'undefined' && window.matchMedia) {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      return 'light';
+    }
+    return currentTheme;
+  }, [currentTheme]);
+
+  // Find relevant shortcuts for buttons
+  const searchShortcut = shortcuts.find(s => s.action === 'OPEN_GLOBAL_SEARCH');
+  const helpShortcut = shortcuts.find(s => s.action === 'SHOW_SHORTCUTS_HELP');
   const location = useLocation();
   const navigate = useNavigate();
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
-  const [isSubtaskModalOpen, setIsSubtaskModalOpen] = useState(false);
 
   const toggleSidebar = () => {
     dispatch(setSidebarCollapsed(!sidebarCollapsed));
@@ -68,7 +117,29 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       dispatch(addUsedTags(taskData.tags));
     }
     
-    setIsTaskModalOpen(false);
+    dispatch(closeTaskModal());
+  };
+
+  const handleCreateProject = (projectName: string) => {
+    const projectData = {
+      name: projectName,
+      color: '#8B5CF6', // Default purple color
+      description: '',
+      archived: false
+    };
+    
+    dispatch(addProject(projectData));
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    dispatch(deleteTask(taskId));
+  };
+
+  const handleArchiveTask = (taskId: string) => {
+    // For now, we'll implement archive as setting a special tag or status
+    // This can be expanded later with a proper archive field
+    logger.info('Archive task:', taskId, { component: 'Layout', operation: 'archiveTask:' });
+    // TODO: Implement proper archiving when archive field is added to Task interface
   };
 
   const handleCreateJournalEntry = (entryData: Partial<JournalEntry>) => {
@@ -79,7 +150,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       dispatch(addUsedTags(entryData.tags));
     }
     
-    setIsJournalModalOpen(false);
+    dispatch(closeJournalModal());
   };
 
   const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
@@ -88,7 +159,24 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const handleCreateSubtask = (taskId: string, subtaskTitle: string) => {
     dispatch(addSubtask({ taskId, title: subtaskTitle }));
-    setIsSubtaskModalOpen(false);
+    dispatch(closeSubtaskModal());
+  };
+
+  const handleSearchResultSelect = (result: SearchResult) => {
+    // Navigate to the appropriate page based on the result type
+    switch (result.type) {
+      case 'tasks':
+        navigate('/actionhub');
+        break;
+      case 'journal':
+        navigate('/journal');
+        break;
+      case 'projects':
+        navigate('/actionhub'); // Projects are typically managed in ActionHub
+        break;
+      default:
+        navigate('/');
+    }
   };
 
   const navigationItems = [
@@ -96,7 +184,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/actionhub', label: 'ActionHub', icon: CheckSquare },
     { path: '/today', label: 'Today', icon: Calendar },
     { path: '/journal', label: 'Journal', icon: BookOpen },
-    { path: '/analytics', label: 'Analytics', icon: BarChart3 },
+    { path: '/goals', label: 'Goals', icon: Target },
+    { path: '/insights', label: 'Insights', icon: Brain },
+    { path: '/summary', label: 'AI Summaries', icon: Sparkles },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -107,7 +197,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Sidebar collapsed={sidebarCollapsed}>
         {/* Draggable top section - reserve space for window controls */}
         <div 
-          className="h-12 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-end px-4"
+          className="h-12 bg-card text-card-foreground border-b border-border flex items-center justify-end px-4"
           style={{ WebkitAppRegion: 'drag' } as any}
         >
           {!sidebarCollapsed && (
@@ -130,9 +220,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <SidebarHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 justify-center w-full">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">S</span>
-              </div>
+              {/* Theme-aware raster logo from public/ */}
+              <LogoMark size={36} />
               {!sidebarCollapsed && (
                 <h1 className="font-semibold text-gray-900 dark:text-gray-100">
                   Serenity Notes
@@ -182,48 +271,26 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           )}
 
-          {!sidebarCollapsed && (
-            <SidebarSection title="Quick Actions">
-              <SidebarItem
-                icon={<Plus className="w-5 h-5" />}
-                onClick={() => setIsTaskModalOpen(true)}
-              >
-                New Task
-              </SidebarItem>
-              <SidebarItem
-                icon={<BookOpen className="w-5 h-5" />}
-                onClick={() => setIsJournalModalOpen(true)}
-              >
-                New Entry
-              </SidebarItem>
-              <SidebarItem
-                icon={<ListChecks className="w-5 h-5" />}
-                onClick={() => setIsSubtaskModalOpen(true)}
-              >
-                Add Subtask
-              </SidebarItem>
-            </SidebarSection>
-          )}
+          {/* Quick Actions section removed as requested */}
           
-          {sidebarCollapsed && (
-            <div className="space-y-2 mt-4">
-              <SidebarItem
-                icon={<Plus className="w-5 h-5" />}
-                onClick={() => setIsTaskModalOpen(true)}
-              />
-              <SidebarItem
-                icon={<BookOpen className="w-5 h-5" />}
-                onClick={() => setIsJournalModalOpen(true)}
-              />
-              <SidebarItem
-                icon={<ListChecks className="w-5 h-5" />}
-                onClick={() => setIsSubtaskModalOpen(true)}
-              />
-            </div>
-          )}
+          {/* Collapsed quick buttons removed */}
         </SidebarContent>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-t border-border space-y-2">
+          <SidebarItem
+            icon={<Globe className="w-5 h-5" />}
+            active={isActive('/integrations')}
+            onClick={() => navigate('/integrations')}
+          >
+            {!sidebarCollapsed && 'Integrations'}
+          </SidebarItem>
+          <SidebarItem
+            icon={<Database className="w-5 h-5" />}
+            active={isActive('/database')}
+            onClick={() => navigate('/database')}
+          >
+            {!sidebarCollapsed && 'Database'}
+          </SidebarItem>
           <SidebarItem
             icon={<Settings className="w-5 h-5" />}
             active={isActive('/settings')}
@@ -239,13 +306,31 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Drag Region Header */}
         <div 
-          className="h-10 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 flex items-center justify-end px-4"
+          className="h-10 bg-card text-card-foreground border-b border-border flex items-center justify-end px-4"
           style={{ WebkitAppRegion: 'drag' } as any}
         >
           <div 
             className="flex items-center gap-2"
             style={{ WebkitAppRegion: 'no-drag' } as any}
           >
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => dispatch(openGlobalSearch())}
+              className="opacity-70 hover:opacity-100 w-8 h-8 p-0"
+              title={`Global Search${searchShortcut ? ` (${searchShortcut.modifiers.ctrl ? (navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl+') : ''}${searchShortcut.key.toUpperCase()})` : ''}`}
+            >
+              <Search className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => dispatch(openHelpModal())}
+              className="opacity-70 hover:opacity-100 w-8 h-8 p-0"
+              title={`Keyboard Shortcuts${helpShortcut ? ` (${helpShortcut.modifiers.shift ? 'Shift+' : ''}${helpShortcut.key})` : ''}`}
+            >
+              <HelpCircle className="w-4 h-4" />
+            </Button>
             <ThemeToggle 
               theme={currentTheme}
               onThemeChange={handleThemeChange}
@@ -255,32 +340,92 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
         
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
+        <main className="flex-1 overflow-y-auto">
+          <PageTransition>{children}</PageTransition>
         </main>
       </div>
 
       {/* Task Modal */}
       <TaskModal
         isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
+        onClose={() => dispatch(closeTaskModal())}
         onSave={handleCreateTask}
+        projects={projects}
+        onCreateProject={handleCreateProject}
+        onDelete={handleDeleteTask}
+        onArchive={handleArchiveTask}
+        onSaveAsSubtaskOf={(parentId: string, subtaskTitle: string) => {
+          dispatch(addSubtask({ taskId: parentId, title: subtaskTitle }));
+        }}
+        allTasks={tasks.map(t => ({ id: t.id, title: t.title }))}
+        onToggleSubtask={(taskId, subtaskId) => dispatch(toggleSubtask({ taskId, subtaskId }))}
+        onUpdateSubtaskTitle={(taskId, subtaskId, title) => dispatch(updateSubtaskTitle({ taskId, subtaskId, title }))}
+        onRemoveSubtask={(taskId, subtaskId) => dispatch(removeSubtask({ taskId, subtaskId }))}
+        onAddSubtaskInline={(taskId, title) => dispatch(addSubtask({ taskId, title }))}
       />
 
       {/* Journal Entry Modal */}
       <JournalEntryModal
         isOpen={isJournalModalOpen}
-        onClose={() => setIsJournalModalOpen(false)}
+        onClose={() => dispatch(closeJournalModal())}
         onSave={handleCreateJournalEntry}
       />
 
       {/* Subtask Modal */}
       <SubtaskModal
         isOpen={isSubtaskModalOpen}
-        onClose={() => setIsSubtaskModalOpen(false)}
+        onClose={() => dispatch(closeSubtaskModal())}
         onSave={handleCreateSubtask}
         tasks={tasks}
       />
+
+      {/* Global Search Modal */}
+      <GlobalSearchModal
+        isOpen={isGlobalSearchOpen}
+        onClose={() => dispatch(closeGlobalSearch())}
+        onSelectResult={handleSearchResultSelect}
+      />
     </div>
+  );
+};
+
+// Small component: picks dark/light raster logo from public/ with graceful fallback
+const LogoMark: React.FC<{ size?: number }> = ({ size = 36 }) => {
+  const theme = useSelector(selectTheme);
+  const [src, setSrc] = useState<string>('');
+  const [triedFallback, setTriedFallback] = useState<boolean>(false);
+
+  useEffect(() => {
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
+    const base = (import.meta as any).env?.BASE_URL ?? './';
+    const preferred = isDark ? `${base}logo-dark.png` : `${base}logo-light.png`;
+    setSrc(preferred);
+  }, [theme]);
+
+  const onError = () => {
+    // Try the opposite theme once as a fallback, then give up
+    const base = (import.meta as any).env?.BASE_URL ?? './';
+    if (!triedFallback) {
+      setTriedFallback(true);
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
+      setSrc(isDark ? `${base}logo-light.png` : `${base}logo-dark.png`);
+      return;
+    }
+    setSrc('');
+  };
+
+  const base = (import.meta as any).env?.BASE_URL ?? './';
+  return (
+    <img
+      src={src || `${base}logo-light.png`}
+      onError={onError}
+      alt="Serenity Logo"
+      width={size}
+      height={size}
+      className="block object-contain shrink-0"
+      style={{ width: size, height: size }}
+    />
   );
 };

@@ -1,6 +1,7 @@
 {
   "name": "@serenity/desktop",
   "version": "0.1.0",
+  "author": "Adarsh <adarshnb@gmail.com>",
   "description": "Serenity Notes Desktop Application",
   "main": "dist/main.js",
   "homepage": "./",
@@ -19,107 +20,36 @@
     "dist:linux": "npm run build && electron-builder --linux",
     "pack": "npm run build && electron-builder --dir",
     "lint": "eslint src/**/*.{ts,tsx}",
-    "clean": "rm -rf dist release"
+    "clean": "rm -rf dist release",
+    "postinstall": "electron-rebuild",
+    "rebuild": "electron-rebuild"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^1.9.5",
     "@serenity/core": "*",
-    "@serenity/ui": "*",
     "@serenity/database": "*",
+    "@serenity/ui": "*",
+    "@fontsource/inter": "^5.0.8",
+    "better-sqlite3": "^11.5.0",
+    "electron-store": "^8.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.15.0",
-    "@reduxjs/toolkit": "^1.9.5",
     "react-redux": "^8.1.2",
-    "electron-store": "^8.1.0"
+    "react-router-dom": "^6.15.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
     "@types/react": "^18.2.20",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.0.4",
-    "concurrently": "^8.2.0",
-    "electron": "^26.0.0",
-    "electron-builder": "^24.6.4",
-    "typescript": "^5.2.2",
-    "vite": "^4.4.9",
-    "tailwindcss": "^3.3.3",
     "autoprefixer": "^10.4.15",
-    "postcss": "^8.4.29"
-  },
-  "build": {
-    "appId": "com.serenity.notes",
-    "productName": "Serenity Notes",
-    "directories": {
-      "output": "release",
-      "buildResources": "assets"
-    },
-    "files": [
-      "dist/**/*",
-      "node_modules/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "assets/",
-        "to": "assets/",
-        "filter": ["**/*"]
-      }
-    ],
-    "mac": {
-      "category": "public.app-category.productivity",
-      "icon": "assets/icon.icns",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": ["x64", "arm64"]
-        },
-        {
-          "target": "zip",
-          "arch": ["x64", "arm64"]
-        }
-      ],
-      "darkModeSupport": true
-    },
-    "win": {
-      "icon": "assets/icon.ico",
-      "target": [
-        {
-          "target": "nsis",
-          "arch": ["x64"]
-        },
-        {
-          "target": "portable",
-          "arch": ["x64"]
-        }
-      ]
-    },
-    "linux": {
-      "icon": "assets/icon.png",
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": ["x64"]
-        },
-        {
-          "target": "deb",
-          "arch": ["x64"]
-        },
-        {
-          "target": "rpm",
-          "arch": ["x64"]
-        }
-      ],
-      "category": "Office"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "your-username",
-      "repo": "serenity-notes"
-    }
+    "concurrently": "^8.2.0",
+    "electron": "^26.6.10",
+    "electron-builder": "^24.6.4",
+    "electron-rebuild": "^3.2.9",
+    "postcss": "^8.4.29",
+    "tailwindcss": "^3.3.3",
+    "typescript": "^5.2.2",
+    "vite": "^4.4.9"
   }
 }

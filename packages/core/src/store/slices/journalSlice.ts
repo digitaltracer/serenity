@@ -1,6 +1,8 @@
 import { createSlice, createSelector, PayloadAction } from '@reduxjs/toolkit';
 import { JournalEntry } from '../../types';
 import { generateId } from '../../utils';
+import { loadJournalEntries } from '../../utils/persistence';
+import { logger } from '../../utils/logger';
 
 export interface JournalState {
   entries: JournalEntry[];
@@ -16,8 +18,18 @@ export interface JournalState {
   };
 }
 
+// Load journal entries from localStorage on initialization
+const initialEntries = (() => {
+  try {
+    return loadJournalEntries();
+  } catch (error) {
+    logger.error('Failed to load journal entries from storage:', { component: 'journalSlice', operation: 'failedLoadJournal' }, error as Error);
+    return [];
+  }
+})();
+
 const initialState: JournalState = {
-  entries: [],
+  entries: initialEntries,
   loading: false,
   error: null,
   filters: {
@@ -34,14 +46,19 @@ const journalSlice = createSlice({
   name: 'journal',
   initialState,
   reducers: {
-    addEntry: (state, action: PayloadAction<Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>>) => {
-      const newEntry: JournalEntry = {
-        ...action.payload,
-        id: generateId(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      state.entries.push(newEntry);
+    addEntry: {
+      reducer: (state, action: PayloadAction<JournalEntry>) => {
+        state.entries.push(action.payload);
+      },
+      prepare: (entryData: Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
+        const newEntry: JournalEntry = {
+          ...entryData,
+          id: generateId(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        return { payload: newEntry };
+      }
     },
     updateEntry: (state, action: PayloadAction<Partial<JournalEntry> & { id: string }>) => {
       const index = state.entries.findIndex(entry => entry.id === action.payload.id);
@@ -78,6 +95,10 @@ const journalSlice = createSlice({
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
     },
+    
+    updateAllEntries: (state, action: PayloadAction<JournalEntry[]>) => {
+      state.entries = action.payload;
+    },
   },
 });
 
@@ -91,6 +112,7 @@ export const {
   setEntries,
   setLoading: setJournalLoading,
   setError: setJournalError,
+  updateAllEntries,
 } = journalSlice.actions;
 
 // Selectors

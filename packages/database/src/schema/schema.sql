@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     title VARCHAR(500) NOT NULL,
     description TEXT,
     completed BOOLEAN DEFAULT FALSE,
+    completed_at TIMESTAMP WITH TIME ZONE,
     priority VARCHAR(10) CHECK (priority IN ('low', 'medium', 'high')) DEFAULT 'medium',
     due_date TIMESTAMP WITH TIME ZONE,
     tags TEXT[] DEFAULT '{}',
@@ -75,6 +76,22 @@ CREATE TABLE IF NOT EXISTS task_journal_links (
     UNIQUE(task_id, journal_entry_id)
 );
 
+-- Goals table
+CREATE TABLE IF NOT EXISTS goals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    type VARCHAR(20) CHECK (type IN ('weekly_tasks', 'project_tasks', 'priority_tasks', 'daily_streak', 'journal_weekly', 'completion_rate')) NOT NULL,
+    config JSONB NOT NULL DEFAULT '{}',
+    progress JSONB NOT NULL DEFAULT '{}',
+    status VARCHAR(20) CHECK (status IN ('active', 'completed', 'paused', 'failed')) DEFAULT 'active',
+    priority VARCHAR(10) CHECK (priority IN ('low', 'medium', 'high')) DEFAULT 'medium',
+    reminders JSONB DEFAULT '[]',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Analytics/tracking table
 CREATE TABLE IF NOT EXISTS daily_stats (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -88,6 +105,15 @@ CREATE TABLE IF NOT EXISTS daily_stats (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(user_id, date)
+);
+
+-- Encrypted integrations table for secure token storage
+CREATE TABLE IF NOT EXISTS encrypted_integrations (
+    id VARCHAR(255) PRIMARY KEY,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('google_calendar', 'github')),
+    encrypted_data TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Indexes for performance
@@ -110,6 +136,57 @@ CREATE INDEX IF NOT EXISTS idx_journal_tags ON journal_entries USING GIN(tags);
 CREATE INDEX IF NOT EXISTS idx_journal_pinned ON journal_entries(pinned);
 
 CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date ON daily_stats(user_id, date);
+
+CREATE INDEX IF NOT EXISTS idx_goals_user_id ON goals(user_id);
+CREATE INDEX IF NOT EXISTS idx_goals_type ON goals(type);
+CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
+CREATE INDEX IF NOT EXISTS idx_goals_priority ON goals(priority);
+
+CREATE INDEX IF NOT EXISTS idx_encrypted_integrations_type ON encrypted_integrations(type);
+
+-- AI insights and recaps persistence
+CREATE TABLE IF NOT EXISTS ai_insights (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    provider VARCHAR(20) NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic', 'local')),
+    type VARCHAR(20) NOT NULL CHECK (type IN ('productivity', 'behavior', 'recommendation', 'warning')),
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    confidence DECIMAL(3,2) DEFAULT 0.5,
+    category VARCHAR(20) NOT NULL CHECK (category IN ('tasks', 'journal', 'habits', 'goals')),
+    actionable BOOLEAN DEFAULT FALSE,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS ai_recaps (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    provider VARCHAR(20) NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic', 'local')),
+    type VARCHAR(10) NOT NULL CHECK (type IN ('weekly', 'monthly')),
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    highlights JSONB DEFAULT '[]',
+    challenges JSONB DEFAULT '[]',
+    recommendations JSONB DEFAULT '[]',
+    period JSONB NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_insights_created_at ON ai_insights(created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_recaps_created_at ON ai_recaps(created_at);
+
+-- AI token usage persistence (per operation)
+CREATE TABLE IF NOT EXISTS ai_usage (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    provider VARCHAR(20) NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic')),
+    operation VARCHAR(10) NOT NULL CHECK (operation IN ('analyze', 'recap', 'quickadd', 'summary')),
+    prompt_tokens INTEGER DEFAULT 0,
+    completion_tokens INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_usage_timestamp ON ai_usage(timestamp);
 
 -- Triggers for updated_at timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -136,6 +213,12 @@ CREATE TRIGGER update_journal_entries_updated_at BEFORE UPDATE ON journal_entrie
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_daily_stats_updated_at BEFORE UPDATE ON daily_stats
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_goals_updated_at BEFORE UPDATE ON goals
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_encrypted_integrations_updated_at BEFORE UPDATE ON encrypted_integrations
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Function to update word count for journal entries

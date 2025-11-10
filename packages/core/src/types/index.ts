@@ -3,6 +3,7 @@ export interface Task {
   title: string;
   description?: string;
   completed: boolean;
+  completedAt?: Date;
   priority: 'low' | 'medium' | 'high';
   dueDate?: Date;
   projectId?: string;
@@ -39,6 +40,17 @@ export interface Project {
   userId?: string;
 }
 
+export interface MediaAttachment {
+  id: string;
+  type: 'image' | 'video' | 'audio' | 'file';
+  filename: string;
+  originalName: string;
+  path: string;
+  size: number;
+  mimeType: string;
+  createdAt: Date;
+}
+
 export interface JournalEntry {
   id: string;
   title?: string;
@@ -49,6 +61,7 @@ export interface JournalEntry {
   updatedAt: Date;
   pinned: boolean;
   mood?: 'happy' | 'neutral' | 'sad' | 'excited' | 'stressed';
+  attachments?: MediaAttachment[];
   userId?: string;
 }
 
@@ -85,3 +98,70 @@ export interface Analytics {
   avgWordsPerEntry: number;
   productivityTrend: 'up' | 'down' | 'stable';
 }
+
+export interface Goal {
+  id: string;
+  title: string;
+  description?: string;
+  
+  // Specific, actionable goal types
+  type: 'weekly_tasks' | 'project_tasks' | 'priority_tasks' | 'daily_streak' | 'journal_weekly' | 'completion_rate';
+  
+  // Goal-specific configuration
+  config: {
+    targetCount?: number;           // for count-based goals
+    projectId?: string;             // for project-specific goals  
+    priority?: 'high' | 'medium' | 'low'; // for priority-based goals
+    streakDays?: number;            // for streak goals
+    targetRate?: number;            // for completion rate goals (0-100)
+    timeframe: 'daily' | 'weekly' | 'monthly';
+  };
+  
+  // Auto-calculated progress
+  progress: {
+    current: number;
+    target: number;
+    percentage: number;
+    isCompleted: boolean;
+    periodStart: Date;
+    periodEnd: Date;
+  };
+  
+  status: 'active' | 'completed' | 'paused' | 'failed';
+  priority: 'low' | 'medium' | 'high';
+  reminders: Reminder[];
+  createdAt: Date;
+  updatedAt: Date;
+  userId?: string;
+}
+
+export interface Reminder {
+  id: string;
+  goalId?: string;
+  taskId?: string;
+  title: string;
+  description?: string;
+  reminderDate: Date;
+  type: 'goal_check' | 'task_due' | 'habit_reminder' | 'custom';
+  status: 'pending' | 'sent' | 'dismissed' | 'snoozed';
+  repeatPattern?: {
+    type: 'daily' | 'weekly' | 'monthly' | 'custom';
+    interval: number;
+    endDate?: Date;
+  };
+  notificationSettings: {
+    enabled: boolean;
+    sound: boolean;
+    popup: boolean;
+    beforeMinutes: number; // remind X minutes before
+  };
+  createdAt: Date;
+  updatedAt: Date;
+  userId?: string;
+}
+
+// Re-export database types
+export * from './database';
+
+// Re-export IPC types
+export * from './ipc';

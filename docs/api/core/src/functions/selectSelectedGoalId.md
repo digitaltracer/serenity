@@ -1,0 +1,23 @@
+[**serenity-notes v0.1.0**](../../../README.md)
+
+***
+
+[serenity-notes](../../../README.md) / [core/src](../README.md) / selectSelectedGoalId
+
+# Function: selectSelectedGoalId()
+
+> **selectSelectedGoalId**(`state`): `string` \| `null`
+
+Defined in: [packages/core/src/store/slices/goalsSlice.ts:239](https://github.com/digitaltracer/serenity/blob/improv/code-improvements/packages/core/src/store/slices/goalsSlice.ts#L239)
+
+## Parameters
+
+### state
+
+#### goals
+
+[`GoalsState`](../interfaces/GoalsState.md)
+
+## Returns
+
+`string` \| `null`

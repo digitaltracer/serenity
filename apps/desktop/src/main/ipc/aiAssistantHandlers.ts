@@ -1,0 +1,3065 @@
+/**
+ * AI Assistant IPC Handlers
+ * Handles secure AI API communication from the main process
+ */
+
+import { ipcMain, safeStorage, app } from 'electron';
+import { z } from 'zod';
+import * as fs from 'fs';
+import * as path from 'path';
+import { logger } from '@serenity/core';
+
+interface AIApiKeyStorage {
+  openai?: string;
+  gemini?: string;
+  anthropic?: string;
+}
+
+interface AIModelInfo {
+  openai?: { model: string; version: string };
+  gemini?: { model: string; version: string };
+  anthropic?: { model: string; version: string };
+}
+
+interface AISettings {
+  activeProvider?: 'openai' | 'gemini' | 'anthropic';
+  autoAnalyze: boolean;
+  analysisFrequency: 'daily' | 'weekly' | 'manual';
+  dataTypes: {
+    includeTasks: boolean;
+    includeJournal: boolean;
+    includeProjects: boolean;
+  };
+  preferredModels?: {
+    openai?: string;
+    gemini?: string;
+    anthropic?: string;
+  };
+}
+
+// In-memory guard to avoid repeated identical saves causing loops
+let lastSavedSettingsSignature: string | null = null;
+let lastSavedAtMs = 0;
+
+// Runtime validation schemas
+const ProviderSchema = z.enum(['openai', 'gemini', 'anthropic']);
+const AISettingsSchema = z.object({
+  activeProvider: ProviderSchema.optional(),
+  autoAnalyze: z.boolean(),
+  analysisFrequency: z.enum(['daily', 'weekly', 'manual']),
+  dataTypes: z.object({
+    includeTasks: z.boolean(),
+    includeJournal: z.boolean(),
+    includeProjects: z.boolean(),
+  }),
+  preferredModels: z
+    .object({
+      openai: z.string().optional(),
+      gemini: z.string().optional(),
+      anthropic: z.string().optional(),
+    })
+    .optional(),
+});
+
+const AnalyzeOptionsSchema = z.object({
+  provider: ProviderSchema,
+  dataTypes: z.array(z.string()),
+  forceReAnalyze: z.boolean().optional(), // deprecated, use analysisMode instead
+  analysisMode: z.enum(['incremental', 'window', 'full']).optional(),
+  timeWindow: z.object({
+    start: z.string(),
+    end: z.string(),
+  }).optional(),
+  tasks: z.array(z.any()).optional(),
+  journalEntries: z.array(z.any()).optional(),
+  analysisTracker: z.any().optional(),
+});
+
+const RecapOptionsSchema = z.object({
+  provider: ProviderSchema,
+  type: z.enum(['weekly', 'monthly']),
+  period: z.object({ start: z.string(), end: z.string() }),
+  tasks: z.array(z.any()).optional(),
+  journalEntries: z.array(z.any()).optional(),
+});
+
+// In-memory storage for API keys (encrypted)
+let encryptedApiKeys: Buffer | null = null;
+let encryptedModelInfo: Buffer | null = null;
+
+// File paths for persistent storage
+const getApiKeysFilePath = () => path.join(app.getPath('userData'), 'ai-keys.enc');
+const getModelInfoFilePath = () => path.join(app.getPath('userData'), 'ai-models.enc');
+const getSettingsFilePath = () => path.join(app.getPath('userData'), 'ai-settings.json');
+
+/**
+ * Load encrypted API keys from persistent storage
+ */
+function loadApiKeysFromDisk(): void {
+  try {
+    const filePath = getApiKeysFilePath();
+    if (fs.existsSync(filePath)) {
+      encryptedApiKeys = fs.readFileSync(filePath);
+      logger.info('🔐 Loaded encrypted API keys from disk', { component: 'Aiassistanthandlers', operation: 'loadApiKeysFromDisk' });
+    }
+  } catch (error) {
+    logger.error('❌ Failed to load API keys from disk:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+    encryptedApiKeys = null;
+  }
+}
+
+/**
+ * Encrypt and store API keys securely (both memory and disk)
+ */
+function storeApiKeys(keys: AIApiKeyStorage): void {
+  try {
+    const keysJson = JSON.stringify(keys);
+    encryptedApiKeys = safeStorage.encryptString(keysJson);
+    
+    // Save to persistent storage
+    const filePath = getApiKeysFilePath();
+    fs.writeFileSync(filePath, encryptedApiKeys);
+    
+    logger.info('🔐 AI API keys encrypted and stored securely to disk', { component: 'Aiassistanthandlers', operation: 'execute' });
+  } catch (error) {
+    logger.error('❌ Failed to encrypt and save AI API keys:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+    throw new Error('Failed to secure API keys');
+  }
+}
+
+/**
+ * Decrypt and retrieve API keys
+ */
+function getApiKeys(): AIApiKeyStorage {
+  try {
+    // Load from disk if not in memory
+    if (!encryptedApiKeys) {
+      loadApiKeysFromDisk();
+    }
+    
+    if (!encryptedApiKeys) {
+      return {};
+    }
+    
+    const keysJson = safeStorage.decryptString(encryptedApiKeys);
+    return JSON.parse(keysJson);
+  } catch (error) {
+    logger.error('❌ Failed to decrypt AI API keys:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+    return {};
+  }
+}
+
+/**
+ * Load encrypted model info from persistent storage
+ */
+function loadModelInfoFromDisk(): void {
+  try {
+    const filePath = getModelInfoFilePath();
+    if (fs.existsSync(filePath)) {
+      encryptedModelInfo = fs.readFileSync(filePath);
+      logger.info('🔐 Loaded encrypted model info from disk', { component: 'Aiassistanthandlers', operation: 'loadModelInfoFromDisk' });
+    }
+  } catch (error) {
+    logger.error('❌ Failed to load model info from disk:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+    encryptedModelInfo = null;
+  }
+}
+
+/**
+ * Encrypt and store model info securely (both memory and disk)
+ */
+function storeModelInfo(info: AIModelInfo): void {
+  try {
+    const infoJson = JSON.stringify(info);
+    encryptedModelInfo = safeStorage.encryptString(infoJson);
+    
+    // Save to persistent storage
+    const filePath = getModelInfoFilePath();
+    fs.writeFileSync(filePath, encryptedModelInfo);
+    
+    logger.info('🔐 AI model info encrypted and stored securely to disk', { component: 'Aiassistanthandlers', operation: 'execute' });
+  } catch (error) {
+    logger.error('❌ Failed to encrypt and save AI model info:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+    throw new Error('Failed to secure model info');
+  }
+}
+
+/**
+ * Decrypt and retrieve model info
+ */
+function getModelInfo(): AIModelInfo {
+  try {
+    // Load from disk if not in memory
+    if (!encryptedModelInfo) {
+      loadModelInfoFromDisk();
+    }
+    
+    if (!encryptedModelInfo) {
+      return {};
+    }
+    
+    const infoJson = safeStorage.decryptString(encryptedModelInfo);
+    return JSON.parse(infoJson);
+  } catch (error) {
+    logger.error('❌ Failed to decrypt AI model info:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+    return {};
+  }
+}
+
+/**
+ * Load AI settings from persistent storage
+ */
+function loadAISettings(): AISettings {
+  try {
+    const filePath = getSettingsFilePath();
+    if (fs.existsSync(filePath)) {
+      const settingsJson = fs.readFileSync(filePath, 'utf8');
+      const settings = JSON.parse(settingsJson);
+      logger.info('⚙️ Loaded AI settings from disk', { component: 'Aiassistanthandlers', operation: 'load' });
+      return settings;
+    }
+  } catch (error) {
+    logger.error('❌ Failed to load AI settings from disk:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+  }
+  
+  // Return default settings
+  return {
+    activeProvider: undefined, // No provider selected by default
+    autoAnalyze: false,
+    analysisFrequency: 'manual',
+    dataTypes: {
+      includeTasks: true,
+      includeJournal: true,
+      includeProjects: true,
+    },
+  };
+}
+
+/**
+ * Save AI settings to persistent storage
+ */
+function saveAISettings(settings: AISettings): void {
+  try {
+    const filePath = getSettingsFilePath();
+    const settingsJson = JSON.stringify(settings, null, 2);
+    fs.writeFileSync(filePath, settingsJson, 'utf8');
+    logger.info('⚙️ AI settings saved to disk', { component: 'Aiassistanthandlers', operation: 'saveAISettings' });
+  } catch (error) {
+    logger.error('❌ Failed to save AI settings to disk:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+    throw new Error('Failed to save AI settings');
+  }
+}
+
+/**
+ * Persist AI settings to SQLite secure_settings table
+ */
+async function persistAISettingsToDatabase(settings: AISettings): Promise<void> {
+  try {
+    const { sqliteService } = await import('@serenity/database');
+    await sqliteService.initialize();
+    await sqliteService.executeRawQuery(
+      `INSERT OR REPLACE INTO secure_settings (key, value, created_at, updated_at) VALUES (?, ?, ?, ?)`,
+      [
+        'ai_settings',
+        JSON.stringify(settings),
+        new Date().toISOString(),
+        new Date().toISOString(),
+      ]
+    );
+    logger.info('💾 AI settings saved to database (secure_settings)', { component: 'Aiassistanthandlers', operation: 'save' });
+  } catch (error) {
+    logger.error('⚠️ Failed to persist AI settings to database:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+  }
+}
+
+/**
+ * Load AI settings from SQLite secure_settings table (if present)
+ */
+async function loadAISettingsFromDatabase(): Promise<AISettings | null> {
+  try {
+    const { sqliteService } = await import('@serenity/database');
+    await sqliteService.initialize();
+    logger.info('🔍 [loadAISettingsFromDatabase] Querying secure_settings for ai_settings...', { component: 'Aiassistanthandlers', operation: 'loadAISettingsFromDatabase' });
+    const result = await sqliteService.executeRawQuery(
+      `SELECT value FROM secure_settings WHERE key = ? ORDER BY updated_at DESC LIMIT 1`,
+      ['ai_settings']
+    );
+    logger.info('🔍 [loadAISettingsFromDatabase] Query result:', {  component: 'Aiassistanthandlers', operation: 'query' , metadata: { value: result } });
+    logger.info('🔍 [loadAISettingsFromDatabase] Result type:' + ' type: ' + typeof result + ' isArray ' + Array.isArray(result), {  component: 'Aiassistanthandlers', operation: 'execute'  });
+
+    const row = Array.isArray(result) ? result[0] : (result && (result as any)[0]);
+    logger.info('🔍 [loadAISettingsFromDatabase] Extracted row:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: row } });
+
+    if (row && ((row as any).value || (row as any)["value"])) {
+      const value = (row as any).value ?? (row as any)["value"];
+      logger.info('🔍 [loadAISettingsFromDatabase] Raw value from DB:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: value } });
+      const parsed = JSON.parse(value as string);
+      logger.info('💾 [loadAISettingsFromDatabase] Parsed AI settings:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: parsed } });
+      logger.info(`💾 [loadAISettingsFromDatabase] Parsed activeProvider: ${parsed?.activeProvider}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+      return parsed;
+    } else {
+      logger.info('⚠️ [loadAISettingsFromDatabase] No ai_settings found in secure_settings table', { component: 'Aiassistanthandlers', operation: 'execute' });
+    }
+  } catch (error) {
+    logger.error('⚠️ [loadAISettingsFromDatabase] Failed to load AI settings from database:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+  }
+  return null;
+}
+
+/**
+ * Get current AI settings from DB or file (DB preferred)
+ */
+async function getCurrentAISettings(): Promise<AISettings> {
+  logger.info('🔍 [getCurrentAISettings] Loading AI settings...', { component: 'Aiassistanthandlers', operation: 'getCurrentAISettings' });
+
+  const db = await loadAISettingsFromDatabase();
+
+  if (db) {
+    logger.info(`✅ [getCurrentAISettings] Using database settings - activeProvider: ${db?.activeProvider}`, { component: 'Aiassistanthandlers', operation: 'if' });
+    return db;
+  }
+
+  logger.info('⚠️ [getCurrentAISettings] No database settings found, falling back to file settings', { component: 'Aiassistanthandlers', operation: 'if' });
+  const file = loadAISettings();
+  logger.info(`📁 [getCurrentAISettings] Using file settings - activeProvider: ${file?.activeProvider}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+
+  return file;
+}
+
+/**
+ * Utility to choose model for a provider
+ */
+async function resolveModelForProvider(provider: 'openai' | 'gemini' | 'anthropic', fallbackModel: string): Promise<string> {
+  try {
+    const settings = await getCurrentAISettings();
+    const preferred = settings.preferredModels?.[provider];
+    if (preferred && typeof preferred === 'string' && preferred.trim().length > 0) {
+      return preferred.trim();
+    }
+    // Fall back to stored detected model
+    const info = getModelInfo();
+    const stored = (info as any)[provider]?.model;
+    if (stored) return stored;
+  } catch {}
+  return fallbackModel;
+}
+
+/**
+ * List available models for a provider using the stored API key
+ */
+async function verifyModelUsable(provider: 'openai' | 'gemini' | 'anthropic', apiKey: string, model: string): Promise<boolean> {
+  try {
+    if (provider === 'openai') {
+      // Try Chat Completions first
+      let r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages: [{ role: 'user', content: 'test' }], max_tokens: 1, temperature: 0 }),
+      });
+      if (r.ok) return true;
+      // Some newer models are Responses API only; try that as well
+      r = await fetch('https://api.openai.com/v1/responses', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, input: 'test', max_output_tokens: 1 }),
+      });
+      return r.ok;
+    }
+    if (provider === 'gemini') {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: 'test' }] }], generationConfig: { maxOutputTokens: 1, temperature: 0 } })
+      });
+      return r.ok;
+    }
+    // anthropic
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: 1, temperature: 0, messages: [{ role: 'user', content: 'test' }] })
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
+// Simple in-memory cache to avoid repeated model discovery (and network loops)
+const modelListCache: Record<string, { models: { id: string; label: string; verified: boolean }[]; fetchedAt: number; failUntil?: number }> = {};
+
+// Node/Electron main doesn't have DOM lib types; use broad types to avoid TS errors
+async function fetchWithTimeout(input: string | URL, init: { timeoutMs?: number } & Record<string, any> = {}): Promise<any> {
+  const { timeoutMs = 8000, ...rest } = init;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...rest, signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+async function listAvailableModels(provider: 'openai' | 'gemini' | 'anthropic'): Promise<{ id: string; label: string; verified: boolean }[]> {
+  const keys = getApiKeys();
+  const apiKey = (keys as any)[provider];
+  if (!apiKey) return [];
+
+  // Serve from cache if within 15 minutes
+  const cacheKey = provider;
+  const now = Date.now();
+  const cached = modelListCache[cacheKey];
+  if (cached && now - cached.fetchedAt < 15 * 60 * 1000) {
+    return cached.models;
+  }
+  // If previous failure set a cooldown, honor it
+  if (cached?.failUntil && now < cached.failUntil) {
+    return cached.models || [];
+  }
+
+  try {
+    switch (provider) {
+      case 'openai': {
+        const r = await fetchWithTimeout('https://api.openai.com/v1/models', {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          timeoutMs: 8000,
+        });
+        if (!r.ok) return [];
+        const data = await r.json() as { data?: Array<{ id: string }> };
+        const ids = Array.from(new Set((data.data || []).map(m => m.id)));
+        const results: { id: string; label: string; verified: boolean }[] = [];
+        for (const id of ids) {
+          const ok = await verifyModelUsable('openai', apiKey, id);
+          // Include all but mark whether verified with our calling flow
+          results.push({ id, label: id, verified: ok });
+        }
+        return results.sort((a,b) => b.id.localeCompare(a.id));
+      }
+      case 'gemini': {
+        const r = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, { timeoutMs: 8000 });
+        if (!r.ok) return [];
+        const data = await r.json() as { models?: Array<{ name: string; displayName?: string }> };
+        const names = Array.from(new Set((data.models || []).map(m => (m.name || '').replace(/^models\//, ''))));
+        const results: { id: string; label: string; verified: boolean }[] = [];
+        for (const id of names) {
+          if (!id) continue;
+          const ok = await verifyModelUsable('gemini', apiKey, id);
+          results.push({ id, label: id, verified: ok });
+        }
+        modelListCache[cacheKey] = { models: results, fetchedAt: now };
+        return results;
+      }
+      case 'anthropic': {
+        const r = await fetchWithTimeout('https://api.anthropic.com/v1/models', {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'anthropic-version': '2023-06-01',
+          },
+          timeoutMs: 8000,
+        });
+        if (!r.ok) return [];
+        const data = await r.json() as { data?: Array<{ id: string }> };
+        const ids = Array.from(new Set((data.data || []).map(m => m.id)));
+        const results: { id: string; label: string; verified: boolean }[] = [];
+        for (const id of ids) {
+          const ok = await verifyModelUsable('anthropic', apiKey, id);
+          results.push({ id, label: id, verified: ok });
+        }
+        modelListCache[cacheKey] = { models: results, fetchedAt: now };
+        return results;
+      }
+      default:
+        return [];
+    }
+  } catch (e) {
+    logger.error(`Failed to list models for ${provider}`, { component: 'Aiassistanthandlers', operation: 'catch' }, e as Error);
+    // set cooldown to prevent tight retry loops
+    const previous = modelListCache[cacheKey]?.models || [];
+    modelListCache[cacheKey] = { models: previous, fetchedAt: now, failUntil: now + 2 * 60 * 1000 };
+    return previous; // return last known cache (or empty) without failing
+  }
+}
+
+/**
+ * Enhanced API key validation
+ */
+function validateApiKey(provider: 'openai' | 'gemini' | 'anthropic', apiKey: string): { valid: boolean; error?: string } {
+  if (!apiKey || apiKey.trim().length === 0) {
+    return { valid: false, error: 'API key cannot be empty' };
+  }
+
+  const trimmedKey = apiKey.trim();
+
+  switch (provider) {
+    case 'openai':
+      if (!trimmedKey.startsWith('sk-')) {
+        return { valid: false, error: 'OpenAI API keys must start with "sk-"' };
+      }
+      if (trimmedKey.length < 20) {
+        return { valid: false, error: 'OpenAI API key appears to be too short' };
+      }
+      // OpenAI keys have a specific pattern: sk-[48 characters]
+      if (!/^sk-[A-Za-z0-9]{48,}$/.test(trimmedKey)) {
+        return { valid: false, error: 'OpenAI API key format appears invalid' };
+      }
+      break;
+
+    case 'anthropic':
+      if (!trimmedKey.startsWith('sk-ant-')) {
+        return { valid: false, error: 'Anthropic API keys must start with "sk-ant-"' };
+      }
+      if (trimmedKey.length < 20) {
+        return { valid: false, error: 'Anthropic API key appears to be too short' };
+      }
+      // Anthropic keys: sk-ant-[base64-like characters]
+      if (!/^sk-ant-[A-Za-z0-9\-_]{32,}$/.test(trimmedKey)) {
+        return { valid: false, error: 'Anthropic API key format appears invalid' };
+      }
+      break;
+
+    case 'gemini':
+      if (trimmedKey.length < 10) {
+        return { valid: false, error: 'Google Gemini API key appears to be too short' };
+      }
+      // Gemini keys are typically 39 characters of alphanumeric + underscores/hyphens
+      if (!/^[A-Za-z0-9\-_]{20,50}$/.test(trimmedKey)) {
+        return { valid: false, error: 'Google Gemini API key format appears invalid' };
+      }
+      break;
+
+    default:
+      return { valid: false, error: `Unsupported provider: ${provider}` };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Check if API key has proper permissions by making a minimal test call
+ */
+async function validateApiKeyPermissions(provider: 'openai' | 'gemini' | 'anthropic', apiKey: string): Promise<{ valid: boolean; error?: string; modelInfo?: { model: string; version: string } }> {
+  try {
+    const testMessages = {
+      openai: 'Respond with only: {"test": "success"}',
+      gemini: 'Respond with only: {"test": "success"}',
+      anthropic: 'Respond with only: {"test": "success"}'
+    };
+
+    let response: Response;
+    
+    switch (provider) {
+      case 'openai':
+        response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-3.5-turbo',
+            messages: [{ role: 'user', content: testMessages.openai }],
+            max_tokens: 10,
+            temperature: 0,
+          }),
+        });
+        break;
+
+      case 'gemini':
+        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: testMessages.gemini }] }],
+            generationConfig: { maxOutputTokens: 10, temperature: 0 },
+          }),
+        });
+        break;
+
+      case 'anthropic':
+        response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-3-sonnet-20240229',
+            max_tokens: 10,
+            temperature: 0,
+            messages: [{ role: 'user', content: testMessages.anthropic }],
+          }),
+        });
+        break;
+
+      default:
+        return { valid: false, error: `Unsupported provider: ${provider}` };
+    }
+
+    if (response.ok) {
+      // For OpenAI, detect best available chat model by probing a short list
+      if (provider === 'openai') {
+        const preferredModels = [
+          'gpt-4o-mini',
+          'gpt-4o',
+          'gpt-4.1-mini',
+          'gpt-4.1',
+          'gpt-3.5-turbo'
+        ];
+
+        for (const modelName of preferredModels) {
+          try {
+            const r = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: modelName,
+                messages: [{ role: 'user', content: 'test' }],
+                max_tokens: 1,
+                temperature: 0,
+              }),
+            });
+            if (r.ok) {
+              const versionName =
+                modelName.includes('4o-mini') ? 'GPT-4o mini' :
+                modelName === 'gpt-4o' ? 'GPT-4o' :
+                modelName.includes('4.1-mini') ? 'GPT-4.1 mini' :
+                modelName === 'gpt-4.1' ? 'GPT-4.1' :
+                'GPT-3.5 Turbo';
+
+              return { valid: true, modelInfo: { model: modelName, version: versionName } };
+            }
+          } catch (_) {
+            continue;
+          }
+        }
+        // Fallback
+        return { valid: true, modelInfo: { model: 'gpt-4o-mini', version: 'GPT-4o mini (fallback)' } };
+      }
+
+      // For Gemini, detect available models and return the best one
+      if (provider === 'gemini') {
+        // Prefer dynamic discovery from the models endpoint to avoid stale names
+        try {
+          const list = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+          if (list.ok) {
+            const data = await list.json() as { models?: Array<{ name: string }> };
+            const names = (data.models || [])
+              .map(m => (m.name || '').replace(/^models\//, ''))
+              .filter(Boolean);
+            // Score models to prioritize 2.5 flash/pro (latest first), then 2.0, then 1.5
+            const score = (id: string) => {
+              let s = 0;
+              if (/-latest$/.test(id)) s += 5;
+              if (id.includes('2.5')) s += 50;
+              else if (id.includes('2.0')) s += 30;
+              else if (id.includes('1.5')) s += 10;
+              if (id.includes('flash')) s += 3;
+              if (id.includes('pro')) s += 2;
+              if (id.includes('exp')) s -= 1; // prefer non-exp if both exist
+              return s;
+            };
+            const candidates = Array.from(new Set(names))
+              .filter(id => id.startsWith('gemini-'))
+              .sort((a, b) => score(b) - score(a));
+
+            for (const modelName of candidates) {
+              try {
+                const testResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: [{ parts: [{ text: 'test' }] }],
+                    generationConfig: { maxOutputTokens: 1, temperature: 0 },
+                  }),
+                });
+                if (testResponse.ok) {
+                  const versionName = modelName.includes('2.5')
+                    ? (modelName.includes('flash') ? '2.5 Flash' : modelName.includes('pro') ? '2.5 Pro' : '2.5')
+                    : modelName.includes('2.0')
+                      ? (modelName.includes('flash') ? '2.0 Flash' : '2.0')
+                      : modelName.includes('1.5')
+                        ? (modelName.includes('flash') ? '1.5 Flash' : modelName.includes('pro') ? '1.5 Pro' : '1.5')
+                        : modelName;
+                  logger.info(`🔍 Detected working Gemini model: ${modelName} (${versionName})`, { component: 'Aiassistanthandlers', operation: 'execute' });
+                  return { valid: true, modelInfo: { model: modelName, version: versionName } };
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+
+        // As a fallback, try a small prioritized static list including '-latest' variants
+        const fallbackModels = [
+          'gemini-2.5-flash-latest', 'gemini-2.5-flash',
+          'gemini-2.5-pro-latest', 'gemini-2.5-pro',
+          'gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro'
+        ];
+        for (const modelName of fallbackModels) {
+          try {
+            const testResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [{ text: 'test' }] }], generationConfig: { maxOutputTokens: 1, temperature: 0 } })
+            });
+            if (testResponse.ok) {
+              const versionName = modelName.includes('2.5')
+                ? (modelName.includes('flash') ? '2.5 Flash' : modelName.includes('pro') ? '2.5 Pro' : '2.5')
+                : modelName.includes('2.0')
+                  ? (modelName.includes('flash') ? '2.0 Flash' : '2.0')
+                  : modelName.includes('1.5')
+                    ? (modelName.includes('flash') ? '1.5 Flash' : modelName.includes('pro') ? '1.5 Pro' : '1.5')
+                    : modelName;
+              return { valid: true, modelInfo: { model: modelName, version: versionName } };
+            }
+          } catch {}
+        }
+
+        // Fallback
+        return { valid: true, modelInfo: { model: 'gemini-2.5-flash', version: '2.5 Flash (fallback)' } };
+      }
+
+      // For Anthropic, detect best Claude model by probing a short list
+      if (provider === 'anthropic') {
+        const preferredModels = [
+          'claude-3-5-sonnet-latest',
+          'claude-3-5-haiku-latest',
+          'claude-3-opus-20240229',
+          'claude-3-sonnet-20240229',
+          'claude-3-haiku-20240307',
+        ];
+
+        for (const modelName of preferredModels) {
+          try {
+            const r = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'anthropic-version': '2023-06-01',
+              },
+              body: JSON.stringify({
+                model: modelName,
+                max_tokens: 1,
+                temperature: 0,
+                messages: [{ role: 'user', content: 'test' }],
+              }),
+            });
+            if (r.ok) {
+              const versionName =
+                modelName.includes('3-5-sonnet') ? 'Claude 3.5 Sonnet' :
+                modelName.includes('3-5-haiku') ? 'Claude 3.5 Haiku' :
+                modelName.includes('opus') ? 'Claude 3 Opus' :
+                modelName.includes('sonnet') ? 'Claude 3 Sonnet' :
+                'Claude 3 Haiku';
+
+              return { valid: true, modelInfo: { model: modelName, version: versionName } };
+            }
+          } catch (_) {
+            continue;
+          }
+        }
+        // Fallback
+        return { valid: true, modelInfo: { model: 'claude-3-5-sonnet-latest', version: 'Claude 3.5 Sonnet (fallback)' } };
+      }
+
+      return { valid: true };
+    } else {
+      const errorData = await response.json().catch(() => ({})) as any;
+      const errorMessage = errorData.error?.message || errorData.error?.type || `HTTP ${response.status}`;
+      
+      if (response.status === 401) {
+        return { valid: false, error: 'Invalid API key or insufficient permissions' };
+      } else if (response.status === 429) {
+        return { valid: false, error: 'Rate limit exceeded - key is valid but quota reached' };
+      } else {
+        return { valid: false, error: `API error: ${errorMessage}` };
+      }
+    }
+  } catch (error) {
+    return { 
+      valid: false, 
+      error: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}` 
+    };
+  }
+}
+
+/**
+ * Make API request to OpenAI
+ */
+async function callOpenAI(
+  apiKey: string,
+  prompt: string,
+  preferredModel?: string,
+  options?: {
+    temperature?: number;
+    maxTokens?: number;
+    systemPrompt?: string;
+  }
+): Promise<any> {
+  try {
+    const modelName = preferredModel || await resolveModelForProvider('openai', 'gpt-4o-mini');
+    const temperature = options?.temperature ?? 0.7;
+    const maxTokens = options?.maxTokens ?? 4000;
+    const systemPrompt = options?.systemPrompt ?? 'You are a productivity and well-being assistant. Analyze user data and provide helpful, actionable insights in JSON format.';
+
+    logger.info(`🤖 Calling OpenAI with model: ${modelName}`, {
+      component: 'aiAssistantHandlers',
+      operation: 'callOpenAI',
+      metadata: { model: modelName, preferred: !!preferredModel, temperature, maxTokens }
+    });
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: modelName,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_tokens: maxTokens,
+        temperature: temperature,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({})) as any;
+      throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json() as any;
+    return {
+      success: true,
+      content: data.choices[0]?.message?.content || '',
+      usage: data.usage,
+      rawData: data, // Include raw data for custom parsing
+    };
+  } catch (error) {
+    logger.error('❌ OpenAI API call failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'OpenAI API call failed',
+    };
+  }
+}
+
+/**
+ * Normalize provider-specific usage objects to a common shape
+ */
+function normalizeUsage(raw: any): { promptTokens: number; completionTokens: number; totalTokens: number } {
+  try {
+    if (!raw) return { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+    // OpenAI: { prompt_tokens, completion_tokens, total_tokens }
+    if (typeof raw.prompt_tokens === 'number' || typeof raw.completion_tokens === 'number' || typeof raw.total_tokens === 'number') {
+      const prompt = Number(raw.prompt_tokens || 0);
+      const completion = Number(raw.completion_tokens || 0);
+      const total = Number(raw.total_tokens || prompt + completion);
+      return { promptTokens: prompt, completionTokens: completion, totalTokens: total };
+    }
+    // Anthropic: { input_tokens, output_tokens }
+    if (typeof raw.input_tokens === 'number' || typeof raw.output_tokens === 'number') {
+      const prompt = Number(raw.input_tokens || 0);
+      const completion = Number(raw.output_tokens || 0);
+      const total = prompt + completion;
+      return { promptTokens: prompt, completionTokens: completion, totalTokens: total };
+    }
+    // Already normalized
+    if (typeof raw.promptTokens === 'number' || typeof raw.completionTokens === 'number' || typeof raw.totalTokens === 'number') {
+      const prompt = Number(raw.promptTokens || 0);
+      const completion = Number(raw.completionTokens || 0);
+      const total = Number(raw.totalTokens || prompt + completion);
+      return { promptTokens: prompt, completionTokens: completion, totalTokens: total };
+    }
+  } catch {}
+  return { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+}
+
+/**
+ * Make API request to Google Gemini
+ */
+async function callGemini(
+  apiKey: string,
+  prompt: string,
+  preferredModel?: string,
+  options?: {
+    temperature?: number;
+    maxTokens?: number;
+    systemPrompt?: string;
+  }
+): Promise<any> {
+  try {
+    // Use preferred model from credential if available, otherwise fall back to stored model info
+    let modelName = preferredModel;
+    if (!modelName) {
+      const modelInfo = getModelInfo();
+      const geminiModelInfo = modelInfo.gemini;
+      const detected = geminiModelInfo ? geminiModelInfo.model : 'gemini-2.5-flash';
+      modelName = await resolveModelForProvider('gemini', detected);
+    }
+
+    const temperature = options?.temperature ?? 0.7;
+    const maxTokens = options?.maxTokens ?? 4000;
+    const systemPrompt = options?.systemPrompt ?? 'You are a productivity and well-being assistant. Analyze user data and provide helpful, actionable insights in JSON format.';
+
+    logger.info(`🤖 Calling Gemini with model: ${modelName}`, {
+      component: 'aiAssistantHandlers',
+      operation: 'callGemini',
+      metadata: { model: modelName, preferred: !!preferredModel, temperature, maxTokens }
+    });
+
+    const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          role: 'user',
+          parts: [{
+            text: fullPrompt
+          }]
+        }],
+        generationConfig: {
+          maxOutputTokens: maxTokens,
+          temperature: temperature,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({})) as any;
+      throw new Error(`Gemini API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json() as any;
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    const textParts = Array.isArray(parts) ? parts.map((p: any) => p?.text).filter(Boolean) : [];
+    const content = textParts.join('\n').trim();
+
+    if (!content) {
+      const finish = data?.candidates?.[0]?.finishReason || data?.promptFeedback?.blockReason;
+      const reason = typeof finish === 'string' ? finish : 'no_text';
+      return {
+        success: false,
+        error: `Empty response from Gemini (reason: ${reason})`,
+      };
+    }
+
+    const um = (data as any)?.usageMetadata || {};
+    const promptTokens = Number(um.promptTokenCount || 0);
+    const completionTokens = Number(um.candidatesTokenCount || 0);
+    const totalTokens = Number(um.totalTokenCount || (promptTokens + completionTokens));
+
+    return {
+      success: true,
+      content,
+      usage: { promptTokens, completionTokens, totalTokens },
+      rawData: data, // Include raw data for custom parsing
+    };
+  } catch (error) {
+    logger.error('❌ Gemini API call failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Gemini API call failed',
+    };
+  }
+}
+
+/**
+ * Make API request to Anthropic Claude
+ */
+async function callAnthropic(
+  apiKey: string,
+  prompt: string,
+  preferredModel?: string,
+  options?: {
+    temperature?: number;
+    maxTokens?: number;
+    systemPrompt?: string;
+  }
+): Promise<any> {
+  try {
+    const modelName = preferredModel || await resolveModelForProvider('anthropic', 'claude-3-5-sonnet-latest');
+    const temperature = options?.temperature ?? 0.7;
+    const maxTokens = options?.maxTokens ?? 4000;
+    const systemPrompt = options?.systemPrompt ?? 'You are a productivity and well-being assistant. Analyze user data and provide helpful, actionable insights in JSON format.';
+
+    logger.info(`🤖 Calling Anthropic with model: ${modelName}`, {
+      component: 'aiAssistantHandlers',
+      operation: 'callAnthropic',
+      metadata: { model: modelName, preferred: !!preferredModel, temperature, maxTokens }
+    });
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: modelName,
+        max_tokens: maxTokens,
+        temperature: temperature,
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({})) as any;
+      throw new Error(`Anthropic API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json() as any;
+    const content = data.content?.[0]?.text || '';
+
+    return {
+      success: true,
+      content,
+      usage: data.usage || {
+        input_tokens: 0,
+        output_tokens: 0,
+      },
+      rawData: data, // Include raw data for custom parsing
+    };
+  } catch (error) {
+    logger.error('❌ Anthropic API call failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Anthropic API call failed',
+    };
+  }
+}
+
+/**
+ * Make API call to the specified provider
+ */
+async function makeAIApiCall(provider: 'openai' | 'gemini' | 'anthropic', prompt: string): Promise<any> {
+  const apiKeys = getApiKeys();
+  const apiKey = apiKeys[provider];
+
+  if (!apiKey) {
+    return {
+      success: false,
+      error: `No API key found for ${provider}`,
+    };
+  }
+
+  logger.info(`🤖 Making ${provider} API call...`, { component: 'Aiassistanthandlers', operation: 'execute' });
+
+  switch (provider) {
+    case 'openai':
+      return await callOpenAI(apiKey, prompt);
+    case 'gemini':
+      return await callGemini(apiKey, prompt);
+    case 'anthropic':
+      return await callAnthropic(apiKey, prompt);
+    default:
+      return {
+        success: false,
+        error: `Unsupported AI provider: ${provider}`,
+      };
+  }
+}
+
+/**
+ * Make AI API call with automatic failover across all credentials
+ * Tries credentials in priority order, automatically switching providers if needed
+ */
+async function makeAIApiCallWithFailover(prompt: string): Promise<any> {
+  const { AICredentialService } = await import('@serenity/core');
+  const { sqliteService } = await import('@serenity/database');
+  const { getDecryptedApiKey } = await import('./aiCredentialHandlers');
+
+  try {
+    // Get all enabled credentials sorted by priority
+    await sqliteService.initialize();
+    const allCredentials = await sqliteService.ai!.listCredentials(true);
+
+    // Filter by availability (respecting cooldowns)
+    const { AICredentialService: CredService } = await import('@serenity/core');
+    const credentials = allCredentials.map(row => ({
+      id: row.id,
+      provider: row.provider as any,
+      name: row.name,
+      modelPreference: row.model_preference || undefined,
+      enabled: row.enabled === 1,
+      priority: row.priority,
+      lastUsedAt: row.last_used_at || undefined,
+      totalRequests: row.total_requests,
+      totalTokens: row.total_tokens,
+      successCount: row.success_count,
+      errorCount: row.error_count,
+      lastError: row.last_error || undefined,
+      lastErrorAt: row.last_error_at || undefined,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+
+    const availableCredentials = CredService.getAvailableCredentials(credentials);
+
+    if (availableCredentials.length === 0) {
+      logger.error('❌ No available credentials (all disabled or in cooldown)', {
+        component: 'aiAssistantHandlers',
+        operation: 'failoverNoCredentials'
+      });
+      return {
+        success: false,
+        error: 'No available API credentials. Please add at least one API key in Settings.',
+      };
+    }
+
+    logger.info(`🔄 Attempting failover across ${availableCredentials.length} available credentials`, {
+      component: 'aiAssistantHandlers',
+      operation: 'failoverStart',
+      metadata: {
+        credentialsCount: availableCredentials.length,
+        providers: availableCredentials.map(c => `${c.provider}/${c.name}`).join(', ')
+      }
+    });
+
+    let lastError: string | undefined;
+
+    // Try each credential in order
+    for (const credential of availableCredentials) {
+      try {
+        logger.info(`🔑 Trying credential: ${credential.provider}/${credential.name} (priority: ${credential.priority})`, {
+          component: 'aiAssistantHandlers',
+          operation: 'tryingCredential',
+          metadata: {
+            credentialId: credential.id,
+            provider: credential.provider,
+            name: credential.name,
+            successRate: credential.totalRequests > 0
+              ? ((credential.successCount / credential.totalRequests) * 100).toFixed(1) + '%'
+              : 'N/A'
+          }
+        });
+
+        // Get decrypted API key
+        const apiKey = await getDecryptedApiKey(credential.id);
+        if (!apiKey) {
+          logger.warn(`⚠️ Could not decrypt API key for credential ${credential.id}, skipping`, {
+            component: 'aiAssistantHandlers',
+            operation: 'decryptionFailed'
+          });
+          continue;
+        }
+
+        // Make API call with preferred model
+        let result: any;
+        switch (credential.provider) {
+          case 'openai':
+            result = await callOpenAI(apiKey, prompt, credential.modelPreference);
+            break;
+          case 'gemini':
+            result = await callGemini(apiKey, prompt, credential.modelPreference);
+            break;
+          case 'anthropic':
+            result = await callAnthropic(apiKey, prompt, credential.modelPreference);
+            break;
+          default:
+            logger.warn(`⚠️ Unknown provider: ${credential.provider}, skipping`, {
+              component: 'aiAssistantHandlers',
+              operation: 'unknownProvider'
+            });
+            continue;
+        }
+
+        // Check if call succeeded
+        if (result.success) {
+          logger.info(`✅ API call succeeded with ${credential.provider}/${credential.name}`, {
+            component: 'aiAssistantHandlers',
+            operation: 'credentialSuccess',
+            metadata: {
+              credentialId: credential.id,
+              provider: credential.provider,
+              tokensUsed: result.usage?.totalTokens || 0
+            }
+          });
+
+          // Record success
+          AICredentialService.recordSuccess(credential.id);
+          await sqliteService.ai!.recordCredentialSuccess(
+            credential.id,
+            result.usage?.totalTokens || 0
+          );
+
+          // Add credential info to result
+          return {
+            ...result,
+            credentialId: credential.id,
+            credentialName: credential.name,
+            provider: credential.provider
+          };
+        } else {
+          // API call failed, record error and try next
+          const errorMessage = result.error || 'Unknown error';
+          lastError = errorMessage;
+          logger.warn(`❌ API call failed with ${credential.provider}/${credential.name}: ${errorMessage}`, {
+            component: 'aiAssistantHandlers',
+            operation: 'credentialFailed'
+          });
+
+          AICredentialService.recordError(credential.id, errorMessage);
+          await sqliteService.ai!.recordCredentialError(credential.id, errorMessage);
+
+          // Continue to next credential
+          continue;
+        }
+      } catch (error: any) {
+        const errorMessage = error.message || 'Exception during API call';
+        lastError = errorMessage;
+        logger.error(`❌ Exception with ${credential.provider}/${credential.name}: ${errorMessage}`, {
+          component: 'aiAssistantHandlers',
+          operation: 'credentialException'
+        }, error);
+
+        AICredentialService.recordError(credential.id, errorMessage);
+        await sqliteService.ai!.recordCredentialError(credential.id, errorMessage);
+
+        // Continue to next credential
+        continue;
+      }
+    }
+
+    // All credentials failed
+    logger.error('❌ All credentials failed', {
+      component: 'aiAssistantHandlers',
+      operation: 'allCredentialsFailed',
+      metadata: {
+        attemptedCredentials: availableCredentials.length,
+        lastError
+      }
+    });
+
+    return {
+      success: false,
+      error: `All ${availableCredentials.length} API credentials failed. Last error: ${lastError}`,
+    };
+  } catch (error: any) {
+    logger.error('❌ Failover system error:', {
+      component: 'aiAssistantHandlers',
+      operation: 'failoverSystemError'
+    }, error);
+
+    return {
+      success: false,
+      error: `Failover system error: ${error.message}`,
+    };
+  }
+}
+
+/**
+ * Make AI API call with failover support and custom options (for Quick Add and other specialized uses)
+ */
+async function makeAIApiCallWithFailoverCustom(
+  prompt: string,
+  options?: {
+    temperature?: number;
+    maxTokens?: number;
+    systemPrompt?: string;
+  }
+): Promise<any> {
+  const { AICredentialService } = await import('@serenity/core');
+  const { sqliteService } = await import('@serenity/database');
+  const { getDecryptedApiKey } = await import('./aiCredentialHandlers');
+
+  try {
+    // Get all enabled credentials sorted by priority
+    await sqliteService.initialize();
+    const allCredentials = await sqliteService.ai!.listCredentials(true);
+
+    // Filter by availability (respecting cooldowns)
+    const { AICredentialService: CredService } = await import('@serenity/core');
+    const credentials = allCredentials.map(row => ({
+      id: row.id,
+      provider: row.provider as any,
+      name: row.name,
+      modelPreference: row.model_preference || undefined,
+      enabled: row.enabled === 1,
+      priority: row.priority,
+      lastUsedAt: row.last_used_at || undefined,
+      totalRequests: row.total_requests,
+      totalTokens: row.total_tokens,
+      successCount: row.success_count,
+      errorCount: row.error_count,
+      lastError: row.last_error || undefined,
+      lastErrorAt: row.last_error_at || undefined,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+
+    const availableCredentials = CredService.getAvailableCredentials(credentials);
+
+    if (availableCredentials.length === 0) {
+      logger.error('❌ No available credentials (all disabled or in cooldown)', {
+        component: 'aiAssistantHandlers',
+        operation: 'failoverNoCredentials'
+      });
+      return {
+        success: false,
+        error: 'No available API credentials. Please add at least one API key in Settings.',
+      };
+    }
+
+    logger.info(`🔄 Attempting failover across ${availableCredentials.length} available credentials`, {
+      component: 'aiAssistantHandlers',
+      operation: 'failoverStart',
+      metadata: {
+        credentialsCount: availableCredentials.length,
+        providers: availableCredentials.map(c => `${c.provider}/${c.name}`).join(', ')
+      }
+    });
+
+    let lastError: string | undefined;
+
+    // Try each credential in order
+    for (const credential of availableCredentials) {
+      try {
+        logger.info(`🔑 Trying credential: ${credential.provider}/${credential.name} (priority: ${credential.priority})`, {
+          component: 'aiAssistantHandlers',
+          operation: 'tryingCredential',
+          metadata: {
+            credentialId: credential.id,
+            provider: credential.provider,
+            name: credential.name,
+            successRate: credential.totalRequests > 0
+              ? ((credential.successCount / credential.totalRequests) * 100).toFixed(1) + '%'
+              : 'N/A'
+          }
+        });
+
+        // Get decrypted API key
+        const apiKey = await getDecryptedApiKey(credential.id);
+        if (!apiKey) {
+          logger.warn(`⚠️ Could not decrypt API key for credential ${credential.id}, skipping`, {
+            component: 'aiAssistantHandlers',
+            operation: 'decryptionFailed'
+          });
+          continue;
+        }
+
+        // Make API call with preferred model and custom options
+        let result: any;
+        switch (credential.provider) {
+          case 'openai':
+            result = await callOpenAI(apiKey, prompt, credential.modelPreference, options);
+            break;
+          case 'gemini':
+            result = await callGemini(apiKey, prompt, credential.modelPreference, options);
+            break;
+          case 'anthropic':
+            result = await callAnthropic(apiKey, prompt, credential.modelPreference, options);
+            break;
+          default:
+            logger.warn(`⚠️ Unknown provider: ${credential.provider}, skipping`, {
+              component: 'aiAssistantHandlers',
+              operation: 'unknownProvider'
+            });
+            continue;
+        }
+
+        // Check if call succeeded
+        if (result.success) {
+          logger.info(`✅ API call succeeded with ${credential.provider}/${credential.name}`, {
+            component: 'aiAssistantHandlers',
+            operation: 'credentialSuccess',
+            metadata: {
+              credentialId: credential.id,
+              provider: credential.provider,
+              tokensUsed: result.usage?.totalTokens || result.usage?.total_tokens || 0
+            }
+          });
+
+          // Record success
+          AICredentialService.recordSuccess(credential.id);
+          const totalTokens = result.usage?.totalTokens || result.usage?.total_tokens || 0;
+          await sqliteService.ai!.recordCredentialSuccess(
+            credential.id,
+            totalTokens
+          );
+
+          // Add credential info to result
+          return {
+            ...result,
+            credentialId: credential.id,
+            credentialName: credential.name,
+            provider: credential.provider
+          };
+        } else {
+          // API call failed, record error and try next
+          const errorMessage = result.error || 'Unknown error';
+          lastError = errorMessage;
+          logger.warn(`❌ API call failed with ${credential.provider}/${credential.name}: ${errorMessage}`, {
+            component: 'aiAssistantHandlers',
+            operation: 'credentialFailed'
+          });
+
+          AICredentialService.recordError(credential.id, errorMessage);
+          await sqliteService.ai!.recordCredentialError(credential.id, errorMessage);
+
+          // Continue to next credential
+          continue;
+        }
+      } catch (error: any) {
+        const errorMessage = error.message || 'Exception during API call';
+        lastError = errorMessage;
+        logger.error(`❌ Exception with ${credential.provider}/${credential.name}: ${errorMessage}`, {
+          component: 'aiAssistantHandlers',
+          operation: 'credentialException'
+        }, error);
+
+        AICredentialService.recordError(credential.id, errorMessage);
+        await sqliteService.ai!.recordCredentialError(credential.id, errorMessage);
+
+        // Continue to next credential
+        continue;
+      }
+    }
+
+    // All credentials failed
+    logger.error('❌ All credentials failed', {
+      component: 'aiAssistantHandlers',
+      operation: 'allCredentialsFailed',
+      metadata: {
+        attemptedCredentials: availableCredentials.length,
+        lastError
+      }
+    });
+
+    return {
+      success: false,
+      error: `All ${availableCredentials.length} API credentials failed. Last error: ${lastError}`,
+    };
+  } catch (error: any) {
+    logger.error('❌ Failover system error:', {
+      component: 'aiAssistantHandlers',
+      operation: 'failoverSystemError'
+    }, error);
+
+    return {
+      success: false,
+      error: `Failover system error: ${error.message}`,
+    };
+  }
+}
+
+/**
+ * Export the failover function for use by other handlers (e.g., summaryHandlers)
+ */
+export { makeAIApiCallWithFailover };
+
+/**
+ * Register AI Assistant IPC handlers
+ */
+export function registerAIAssistantHandlers(): void {
+  logger.info('🧠 Registering AI Assistant IPC handlers...', { component: 'Aiassistanthandlers', operation: 'registerAIAssistantHandlers' });
+
+  // Set API Key
+  ipcMain.handle('ai-assistant:set-api-key', async (event, provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => {
+    try {
+      const p = ProviderSchema.safeParse(provider);
+      if (!p.success) {
+        return { success: false, error: 'Invalid provider' };
+      }
+      if (typeof apiKey !== 'string' || apiKey.trim().length === 0) {
+        return { success: false, error: 'API key must be a non-empty string' };
+      }
+      logger.info(`🔑 Setting API key for ${provider}...`, { component: 'Aiassistanthandlers', operation: 'execute' });
+      
+      // Enhanced format validation
+      const formatValidation = validateApiKey(provider, apiKey);
+      if (!formatValidation.valid) {
+        return { success: false, error: formatValidation.error };
+      }
+
+      const trimmedKey = apiKey.trim();
+
+      // Test API key permissions
+      logger.info(`🧪 Testing API key permissions for ${provider}...`, { component: 'Aiassistanthandlers', operation: 'execute' });
+      const permissionValidation = await validateApiKeyPermissions(provider, trimmedKey);
+      if (!permissionValidation.valid) {
+        return { success: false, error: permissionValidation.error };
+      }
+
+      // Get existing keys and update
+      const existingKeys = getApiKeys();
+      existingKeys[provider] = trimmedKey;
+      
+      // Store encrypted
+      storeApiKeys(existingKeys);
+
+      // Ensure active provider is persisted (renderer may also do this, but we persist here for reliability)
+      try {
+        const current = await getCurrentAISettings();
+        const updated: AISettings = {
+          ...current,
+          activeProvider: provider,
+        };
+        saveAISettings(updated);
+        await persistAISettingsToDatabase(updated);
+        logger.info('⚙️ Active provider persisted during set-api-key:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: provider } });
+      } catch (e) {
+        logger.error('⚠️ Failed to persist activeProvider during set-api-key:', { component: 'Aiassistanthandlers', operation: 'catch' }, e as Error);
+      }
+
+      // Store model info if detected for any provider
+      if (permissionValidation.modelInfo) {
+        const existingModelInfo = getModelInfo();
+        existingModelInfo[provider] = permissionValidation.modelInfo;
+        storeModelInfo(existingModelInfo);
+        logger.info(`🔍 Detected ${provider} model: ${permissionValidation.modelInfo.version}`, { component: 'Aiassistanthandlers', operation: 'if' });
+        // Make a tiny usage-capturing call to surface token usage on setup
+        const testPrompt = 'Respond with only: {"setup":"ok"}';
+        const testResult = await makeAIApiCall(provider, testPrompt);
+        logger.info('📊 Setup usage (with model info):', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { usage: testResult.usage } });
+        logger.info(`✅ API key for ${provider} set and validated successfully`, { component: 'Aiassistanthandlers', operation: 'validate' });
+        return { success: true, modelInfo: permissionValidation.modelInfo, usage: normalizeUsage(testResult.usage) };
+      }
+
+      // Even if no model info, still do a tiny usage-capturing call
+      const testPrompt = 'Respond with only: {"setup":"ok"}';
+      const testResult = await makeAIApiCall(provider, testPrompt);
+      logger.info('📊 Setup usage (no model info):', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { usage: testResult.usage } });
+      logger.info(`✅ API key for ${provider} set and validated successfully`, { component: 'Aiassistanthandlers', operation: 'validate' });
+      return { success: true, usage: normalizeUsage(testResult.usage) };
+    } catch (error) {
+      logger.error(`❌ Failed to set API key for ${provider}:`, { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to set API key' 
+      };
+    }
+  });
+
+  // Test API Key
+  ipcMain.handle('ai-assistant:test-api-key', async (event, provider: 'openai' | 'gemini' | 'anthropic') => {
+    try {
+      const p = ProviderSchema.safeParse(provider);
+      if (!p.success) return { success: false, error: 'Invalid provider' };
+      logger.info(`🧪 Testing API key for ${provider}...`, { component: 'Aiassistanthandlers', operation: 'execute' });
+      
+      // Make a simple test call
+      const testPrompt = 'Say "Hello, this is a test" in JSON format: {"message": "Hello, this is a test"}';
+      const result = await makeAIApiCall(provider, testPrompt);
+
+      if (result.success) {
+        logger.info(`✅ API key for ${provider} is valid`, { component: 'Aiassistanthandlers', operation: 'if' });
+        return { success: true };
+      } else {
+        logger.info(`❌ API key for ${provider} test failed: ${result.error}`, { component: 'Aiassistanthandlers', operation: 'if' });
+        return { success: false, error: result.error };
+      }
+    } catch (error) {
+      logger.error(`❌ API key test failed for ${provider}:`, { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'API key test failed' 
+      };
+    }
+  });
+
+  /**
+   * Apply intelligent data limiting for analysis to prevent token overflow and ensure quality insights
+   */
+  function applyDataLimitsForAnalysis(tasks: any[], journalEntries: any[]): { limitedTasks: any[], limitedJournalEntries: any[] } {
+    // Define limits based on typical token usage per item
+    const MAX_TASKS = 50;        // ~1000-1500 tokens for preprocessing 50 tasks
+    const MAX_JOURNAL_ENTRIES = 30;  // ~1200-1800 tokens for preprocessing 30 entries
+
+    let limitedTasks = tasks;
+    let limitedJournalEntries = journalEntries;
+
+    // Intelligent task sampling: prioritize recent, high-priority, and incomplete tasks
+    if (tasks.length > MAX_TASKS) {
+      logger.info(`📊 Applying intelligent task sampling: ${tasks.length} → ${MAX_TASKS} tasks`, { component: 'Aiassistanthandlers', operation: 'if' });
+
+      // Sort tasks by priority and recency for better analysis
+      const sortedTasks = [...tasks].sort((a, b) => {
+        // Priority weighting: high=3, medium=2, low=1
+        const priorityWeight: { [key: string]: number } = { high: 3, medium: 2, low: 1 };
+        const aWeight = priorityWeight[a.priority as string] || 1;
+        const bWeight = priorityWeight[b.priority as string] || 1;
+
+        // Combine priority and recency (more weight to priority)
+        const aPriorityScore = aWeight * 2;
+        const bPriorityScore = bWeight * 2;
+
+        // Recent tasks get bonus points (within 30 days)
+        const now = new Date().getTime();
+        const aRecency = a.createdAt ? Math.max(0, 30 - Math.floor((now - new Date(a.createdAt).getTime()) / (24 * 60 * 60 * 1000))) : 0;
+        const bRecency = b.createdAt ? Math.max(0, 30 - Math.floor((now - new Date(b.createdAt).getTime()) / (24 * 60 * 60 * 1000))) : 0;
+
+        // Incomplete tasks get slight bonus
+        const aIncompleteBonus = !a.completed ? 5 : 0;
+        const bIncompleteBonus = !b.completed ? 5 : 0;
+
+        const aScore = aPriorityScore + aRecency + aIncompleteBonus;
+        const bScore = bPriorityScore + bRecency + bIncompleteBonus;
+
+        return bScore - aScore; // Higher score first
+      });
+
+      // Take top tasks, ensuring we include some from different categories
+      limitedTasks = sortedTasks.slice(0, MAX_TASKS);
+    }
+
+    // Intelligent journal sampling: prioritize recent entries and those with tags
+    if (journalEntries.length > MAX_JOURNAL_ENTRIES) {
+      logger.info(`📝 Applying intelligent journal sampling: ${journalEntries.length} → ${MAX_JOURNAL_ENTRIES} entries`, { component: 'Aiassistanthandlers', operation: 'if' });
+
+      // Sort journal entries by recency and content richness
+      const sortedEntries = [...journalEntries].sort((a, b) => {
+        // Recency score (within 60 days)
+        const now = new Date().getTime();
+        const aRecency = a.date ? Math.max(0, 60 - Math.floor((now - new Date(a.date).getTime()) / (24 * 60 * 60 * 1000))) : 0;
+        const bRecency = b.date ? Math.max(0, 60 - Math.floor((now - new Date(b.date).getTime()) / (24 * 60 * 60 * 1000))) : 0;
+
+        // Content richness (longer entries, entries with tags)
+        const aRichness = (a.content ? a.content.length / 100 : 0) + (a.tags?.length || 0) * 2;
+        const bRichness = (b.content ? b.content.length / 100 : 0) + (b.tags?.length || 0) * 2;
+
+        // Pinned entries get priority
+        const aPinnedBonus = a.pinned ? 10 : 0;
+        const bPinnedBonus = b.pinned ? 10 : 0;
+
+        const aScore = aRecency + Math.min(aRichness, 10) + aPinnedBonus;
+        const bScore = bRecency + Math.min(bRichness, 10) + bPinnedBonus;
+
+        return bScore - aScore; // Higher score first
+      });
+
+      limitedJournalEntries = sortedEntries.slice(0, MAX_JOURNAL_ENTRIES);
+    }
+
+    return { limitedTasks, limitedJournalEntries };
+  }
+
+  // Analyze Data
+  ipcMain.handle('ai-assistant:analyze-data', async (event, options: {
+    provider: 'openai' | 'gemini' | 'anthropic';
+    dataTypes: string[];
+    forceReAnalyze?: boolean; // deprecated, use analysisMode instead
+    analysisMode?: 'incremental' | 'window' | 'full';
+    timeWindow?: { start: string; end: string };
+    tasks?: any[];
+    journalEntries?: any[];
+    analysisTracker?: any;
+  }) => {
+    try {
+      const valid = AnalyzeOptionsSchema.safeParse(options);
+      if (!valid.success) {
+        return { success: false, error: 'Invalid analyze-data options' };
+      }
+      logger.info(`🔍 Analyzing data with ${options.provider}...`, { component: 'Aiassistanthandlers', operation: 'if' });
+      
+      // Import AI Assistant Service (use package export to support both CJS and ESM)
+      const { AIAssistantService } = await import('@serenity/core');
+      
+      // Get data from options or fetch from database
+      let tasks = options.tasks || [];
+      let journalEntries = options.journalEntries || [];
+      
+      // If no data provided, fetch from database
+      if (tasks.length === 0 || journalEntries.length === 0) {
+        try {
+          if (options.dataTypes.includes('tasks')) {
+            const { queryTasksIPC } = await import('./taskHandlers');
+            const taskResult = await queryTasksIPC();
+            if (taskResult.success) {
+              tasks = taskResult.data || [];
+              logger.info(`📊 Fetched ${tasks.length} tasks from database`, { component: 'Aiassistanthandlers', operation: 'if' });
+            }
+          }
+          
+          if (options.dataTypes.includes('journal')) {
+            const { queryJournalEntriesIPC } = await import('./journalHandlers');
+            const journalResult = await queryJournalEntriesIPC();
+            if (journalResult.success) {
+              journalEntries = journalResult.data || [];
+              logger.info(`📝 Fetched ${journalEntries.length} journal entries from database`, { component: 'Aiassistanthandlers', operation: 'execute' });
+            }
+          }
+        } catch (dbError) {
+          logger.error('⚠️ Failed to fetch data from database:', { component: 'Aiassistanthandlers', operation: 'catch' }, dbError as Error);
+        }
+      }
+      
+      // Determine analysis mode (support backward compatibility with forceReAnalyze)
+      const analysisMode = options.analysisMode || (options.forceReAnalyze ? 'full' : 'incremental');
+
+      logger.info(`📋 Analysis mode: ${analysisMode}`, {
+        component: 'Aiassistanthandlers',
+        operation: 'analysisMode',
+        metadata: {
+          mode: analysisMode,
+          hasTimeWindow: !!options.timeWindow,
+          hasTracker: !!options.analysisTracker
+        }
+      });
+
+      // Filter data based on analysis mode
+      let analyzeTasks = tasks;
+      let analyzeJournalEntries = journalEntries;
+
+      switch (analysisMode) {
+        case 'incremental':
+          // Only analyze new/updated data since last analysis
+          if (options.analysisTracker) {
+            logger.info(`🔍 Incremental mode: Filtering data based on analysis tracker...`, {
+              component: 'Aiassistanthandlers',
+              operation: 'incrementalMode'
+            });
+            const filtered = AIAssistantService.filterUnanalyzedData(
+              tasks,
+              journalEntries,
+              options.analysisTracker
+            );
+            analyzeTasks = filtered.newTasks;
+            analyzeJournalEntries = filtered.newJournalEntries;
+
+            logger.info(`📊 Incremental filtering complete: ${analyzeTasks.length} new tasks, ${analyzeJournalEntries.length} new journal entries`, {
+              component: 'Aiassistanthandlers',
+              operation: 'incrementalComplete',
+              metadata: {
+                newTasks: analyzeTasks.length,
+                newJournals: analyzeJournalEntries.length,
+                previouslyAnalyzedTasks: options.analysisTracker.totalTasksAnalyzed || 0,
+                previouslyAnalyzedJournals: options.analysisTracker.totalJournalEntriesAnalyzed || 0
+              }
+            });
+          } else {
+            logger.info(`⚠️ Incremental mode requested but no tracker found, analyzing all data`, {
+              component: 'Aiassistanthandlers',
+              operation: 'incrementalNoTracker'
+            });
+          }
+          break;
+
+        case 'window':
+          // Analyze data within specific time range
+          if (options.timeWindow) {
+            const startDate = new Date(options.timeWindow.start);
+            const endDate = new Date(options.timeWindow.end);
+
+            logger.info(`📅 Window mode: Filtering data between ${options.timeWindow.start} and ${options.timeWindow.end}`, {
+              component: 'Aiassistanthandlers',
+              operation: 'windowMode',
+              metadata: {
+                startDate: options.timeWindow.start,
+                endDate: options.timeWindow.end
+              }
+            });
+
+            // Filter tasks within time window
+            analyzeTasks = tasks.filter((task: any) => {
+              const taskDate = new Date(task.updatedAt || task.createdAt);
+              return taskDate >= startDate && taskDate <= endDate;
+            });
+
+            // Filter journal entries within time window
+            analyzeJournalEntries = journalEntries.filter((entry: any) => {
+              const entryDate = new Date(entry.createdAt || entry.date);
+              return entryDate >= startDate && entryDate <= endDate;
+            });
+
+            logger.info(`📊 Window filtering complete: ${analyzeTasks.length} tasks, ${analyzeJournalEntries.length} journal entries`, {
+              component: 'Aiassistanthandlers',
+              operation: 'windowComplete',
+              metadata: {
+                tasksInWindow: analyzeTasks.length,
+                journalsInWindow: analyzeJournalEntries.length,
+                totalTasks: tasks.length,
+                totalJournals: journalEntries.length
+              }
+            });
+          } else {
+            logger.warn(`⚠️ Window mode requested but no timeWindow provided, falling back to all data`, {
+              component: 'Aiassistanthandlers',
+              operation: 'windowNoTimeWindow'
+            });
+          }
+          break;
+
+        case 'full':
+          // Analyze all data (re-analyze everything)
+          logger.info(`🔄 Full mode: Re-analyzing all ${tasks.length} tasks and ${journalEntries.length} journal entries`, {
+            component: 'Aiassistanthandlers',
+            operation: 'fullMode',
+            metadata: {
+              totalTasks: tasks.length,
+              totalJournals: journalEntries.length
+            }
+          });
+          // analyzeTasks and analyzeJournalEntries already set to all tasks/journals
+          break;
+
+        default:
+          logger.warn(`⚠️ Unknown analysis mode: ${analysisMode}, defaulting to incremental`, {
+            component: 'Aiassistanthandlers',
+            operation: 'unknownMode'
+          });
+      }
+      
+      // Check if we have data to analyze
+      if (analyzeTasks.length === 0 && analyzeJournalEntries.length === 0) {
+        logger.info(`✅ No new data to analyze - all data has been processed`, { component: 'Aiassistanthandlers', operation: 'if' });
+        return {
+          success: true,
+          insights: [],
+          processedData: options.analysisTracker || {},
+          message: 'No new data to analyze'
+        };
+      }
+
+      // ===== ENHANCED AI ANALYSIS PIPELINE =====
+      logger.info('🚀 Starting enhanced AI analysis pipeline', { component: 'Aiassistanthandlers', operation: 'pipeline' });
+
+      // Import enhanced services with detailed logging
+      logger.info('📦 Importing enhanced services from @serenity/core...', { component: 'Aiassistanthandlers', operation: 'import' });
+      const coreModule = await import('@serenity/core');
+      logger.info('✅ Core module imported successfully', {
+        component: 'Aiassistanthandlers',
+        operation: 'import',
+        metadata: {
+          availableExports: Object.keys(coreModule).filter(key => key.includes('Service')).join(', ')
+        }
+      });
+
+      const {
+        AIPreprocessingService,
+        PromptEngineeringService,
+        InsightQualityService,
+        UserProfileService
+      } = coreModule;
+
+      logger.info('🔍 Service availability check:', {
+        component: 'Aiassistanthandlers',
+        operation: 'serviceCheck',
+        metadata: {
+          AIPreprocessingService: typeof AIPreprocessingService,
+          PromptEngineeringService: typeof PromptEngineeringService,
+          InsightQualityService: typeof InsightQualityService,
+          UserProfileService: typeof UserProfileService
+        }
+      });
+
+      // Step 1: Build user profile for context
+      logger.info('👤 Step 1: Building user profile for personalized context...', { component: 'Aiassistanthandlers', operation: 'profile-start' });
+      let userProfile = null;
+      try {
+        // Fetch goals for profile building
+        let goals: any[] = [];
+        logger.info('📊 Fetching user goals for profile building...', { component: 'Aiassistanthandlers', operation: 'goals-fetch' });
+        try {
+          const { queryGoalsIPC } = await import('./goalsHandlers');
+          const goalsResult = await queryGoalsIPC();
+          if (goalsResult.success) {
+            goals = goalsResult.data || [];
+            logger.info(`✅ Fetched ${goals.length} goals`, { component: 'Aiassistanthandlers', operation: 'goals-success' });
+          } else {
+            logger.warn('⚠️ No goals found or goals query failed', { component: 'Aiassistanthandlers', operation: 'goals-warning' });
+          }
+        } catch (goalsError) {
+          logger.error('❌ Error fetching goals:', { component: 'Aiassistanthandlers', operation: 'goals-error' }, goalsError as Error);
+        }
+
+        logger.info('🔨 Building user profile...', {
+          component: 'Aiassistanthandlers',
+          operation: 'profile-build',
+          metadata: {
+            inputTasksCount: tasks.length,
+            inputJournalEntriesCount: journalEntries.length,
+            inputGoalsCount: goals.length
+          }
+        });
+
+        userProfile = UserProfileService.buildProfile({
+          tasks: tasks,
+          journalEntries: journalEntries,
+          goals: goals,
+        });
+
+        logger.info('✅ User profile built successfully', {
+          component: 'Aiassistanthandlers',
+          operation: 'profile-success',
+          metadata: {
+            workStyle: userProfile.workStyle,
+            focusAreas: userProfile.focusAreas.slice(0, 3).join(', '),
+            activeGoals: userProfile.activeGoals.length,
+            commonTags: userProfile.commonTags.slice(0, 5).map(t => `${t.tag} (${t.frequency})`).join(', '),
+            communicationPreference: userProfile.communicationPreference
+          }
+        });
+      } catch (profileError) {
+        logger.error('❌ Failed to build user profile, continuing without context:', {
+          component: 'Aiassistanthandlers',
+          operation: 'profile-error'
+        }, profileError as Error);
+      }
+
+      // Step 2: Apply intelligent data limiting
+      const { limitedTasks, limitedJournalEntries } = applyDataLimitsForAnalysis(analyzeTasks, analyzeJournalEntries);
+      logger.info(`📊 Data limiting: ${analyzeTasks.length} → ${limitedTasks.length} tasks, ${analyzeJournalEntries.length} → ${limitedJournalEntries.length} journal entries`, { 
+        component: 'Aiassistanthandlers', 
+        operation: 'limiting' 
+      });
+
+      // Step 3: Smart preprocessing with quality scoring
+      logger.info('🔄 Step 3: Smart preprocessing with quality scoring...', {
+        component: 'Aiassistanthandlers',
+        operation: 'preprocess-start',
+        metadata: {
+          inputTasks: limitedTasks.length,
+          inputJournalEntries: limitedJournalEntries.length
+        }
+      });
+
+      logger.info('📝 Preprocessing tasks...', { component: 'Aiassistanthandlers', operation: 'preprocess-tasks' });
+      const preprocessedTasks = AIPreprocessingService.preprocessTasks(limitedTasks);
+      logger.info(`✅ Tasks preprocessed: ${preprocessedTasks.length} tasks`, {
+        component: 'Aiassistanthandlers',
+        operation: 'preprocess-tasks-success',
+        metadata: {
+          sampleTask: preprocessedTasks.length > 0 ? {
+            id: preprocessedTasks[0].id,
+            title: preprocessedTasks[0].title,
+            hasDescription: !!preprocessedTasks[0].description,
+            tagsCount: preprocessedTasks[0].tags?.length || 0
+          } : null
+        }
+      });
+
+      logger.info('📖 Preprocessing journal entries...', { component: 'Aiassistanthandlers', operation: 'preprocess-journal' });
+      const preprocessedJournalEntries = AIPreprocessingService.preprocessJournalEntries(limitedJournalEntries);
+      logger.info(`✅ Journal entries preprocessed: ${preprocessedJournalEntries.length} entries`, {
+        component: 'Aiassistanthandlers',
+        operation: 'preprocess-journal-success',
+        metadata: {
+          sampleEntry: preprocessedJournalEntries.length > 0 ? {
+            id: preprocessedJournalEntries[0].id,
+            hasContent: !!preprocessedJournalEntries[0].content,
+            tagsCount: preprocessedJournalEntries[0].tags?.length || 0,
+            mood: preprocessedJournalEntries[0].mood
+          } : null
+        }
+      });
+
+      logger.info('📊 Preparing data summary...', { component: 'Aiassistanthandlers', operation: 'data-summary' });
+      const dataSummary = AIPreprocessingService.prepareDataSummary(preprocessedTasks, preprocessedJournalEntries);
+      logger.info('✅ Data summary prepared', {
+        component: 'Aiassistanthandlers',
+        operation: 'data-summary-success',
+        metadata: {
+          summary: dataSummary
+        }
+      });
+
+      // Step 4: Generate enhanced prompts with context
+      logger.info('🎯 Step 4: Generating enhanced prompts with context...', { component: 'Aiassistanthandlers', operation: 'prompt-start' });
+
+      const promptContext = userProfile ? {
+        userGoals: userProfile.activeGoals,
+        focusAreas: userProfile.focusAreas,
+        workStyle: userProfile.workStyle,
+        currentPriorities: userProfile.commonTags.slice(0, 3).map(t => t.tag),
+        userPreferences: {
+          communicationStyle: userProfile.communicationPreference,
+          preferredCategories: userProfile.insightPreferences.preferredCategories,
+        }
+      } : undefined;
+
+      logger.info('📋 Prompt context prepared', {
+        component: 'Aiassistanthandlers',
+        operation: 'prompt-context',
+        metadata: {
+          hasUserProfile: !!userProfile,
+          userGoalsCount: userProfile?.activeGoals.length || 0,
+          focusAreasCount: userProfile?.focusAreas.length || 0,
+          workStyle: userProfile?.workStyle || 'unknown'
+        }
+      });
+
+      // Fetch previous insights for novelty scoring
+      let previousInsights: Array<{ type: string; title: string; description: string }> = [];
+      logger.info('🔍 Fetching previous insights for novelty scoring...', { component: 'Aiassistanthandlers', operation: 'previous-insights' });
+      try {
+        const { sqliteService } = await import('@serenity/database');
+        await sqliteService.initialize();
+        const recentInsightsData = await sqliteService.getRecentAIInsights(20);
+        previousInsights = recentInsightsData.map((i: any) => ({
+          type: i.type,
+          title: i.title,
+          description: i.description,
+        }));
+        logger.info(`✅ Fetched ${previousInsights.length} previous insights`, {
+          component: 'Aiassistanthandlers',
+          operation: 'previous-insights-success'
+        });
+      } catch (insightsError) {
+        logger.warn('⚠️ Could not fetch previous insights', {
+          component: 'Aiassistanthandlers',
+          operation: 'previous-insights-warning'
+        });
+      }
+
+      // Fetch previous analysis summaries for context continuity
+      let previousSummaries: Array<{
+        created_at: string;
+        summary_text: string;
+        key_themes: string;
+        tracked_patterns: string;
+      }> = [];
+      logger.info('📚 Fetching previous analysis summaries for context continuity...', {
+        component: 'Aiassistanthandlers',
+        operation: 'previous-summaries'
+      });
+      try {
+        const { sqliteService } = await import('@serenity/database');
+        await sqliteService.initialize();
+        const recentSummaries = await sqliteService.getRecentAnalysisSummaries(2); // Get last 2 summaries
+        previousSummaries = recentSummaries.map((s: any) => ({
+          created_at: s.created_at,
+          summary_text: s.summary_text,
+          key_themes: s.key_themes,
+          tracked_patterns: s.tracked_patterns
+        }));
+        logger.info(`✅ Fetched ${previousSummaries.length} previous analysis summaries`, {
+          component: 'Aiassistanthandlers',
+          operation: 'previous-summaries-success',
+          metadata: {
+            summariesCount: previousSummaries.length,
+            oldestSummary: previousSummaries.length > 0 ? previousSummaries[previousSummaries.length - 1].created_at : null
+          }
+        });
+      } catch (summariesError) {
+        logger.warn('⚠️ Could not fetch previous analysis summaries', {
+          component: 'Aiassistanthandlers',
+          operation: 'previous-summaries-warning'
+        });
+      }
+
+      if (previousInsights.length > 0 && promptContext) {
+        (promptContext as any).previousInsights = previousInsights;
+      }
+
+      if (previousSummaries.length > 0 && promptContext) {
+        (promptContext as any).previousAnalyses = previousSummaries;
+      }
+
+      logger.info('🔨 Generating enhanced prompt...', { component: 'Aiassistanthandlers', operation: 'prompt-generate' });
+      const enhancedPrompt = PromptEngineeringService.generateInsightPrompt({
+        tasks: preprocessedTasks,
+        journalEntries: preprocessedJournalEntries,
+        dataTypes: options.dataTypes,
+        context: promptContext,
+        dataSummary: dataSummary,
+      });
+
+      logger.info(`✅ Enhanced prompt generated`, {
+        component: 'Aiassistanthandlers',
+        operation: 'prompt-success',
+        metadata: {
+          promptLength: enhancedPrompt.length,
+          promptPreview: enhancedPrompt.substring(0, 200) + '...',
+          estimatedTokens: Math.ceil(enhancedPrompt.length / 4)
+        }
+      });
+
+      // Step 5: Make AI API call with automatic failover
+      logger.info(`🤖 Step 5: Calling AI API with failover support...`, {
+        component: 'Aiassistanthandlers',
+        operation: 'api-call-start',
+        metadata: {
+          promptLength: enhancedPrompt.length,
+          estimatedTokens: Math.ceil(enhancedPrompt.length / 4)
+        }
+      });
+
+      const result = await makeAIApiCallWithFailover(enhancedPrompt);
+
+      logger.info(`✅ AI API call completed`, {
+        component: 'Aiassistanthandlers',
+        operation: 'api-call-complete',
+        metadata: {
+          success: result.success,
+          provider: result.provider || 'unknown',
+          credentialName: result.credentialName || 'unknown',
+          hasContent: !!result.content,
+          contentLength: result.content?.length || 0
+        }
+      });
+      
+      let rawInsights = [];
+      let usageTotals = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+
+      if (result.success && result.content) {
+        logger.info('📥 Processing AI response...', { component: 'Aiassistanthandlers', operation: 'response-process' });
+
+        // Log the raw response for debugging
+        logger.info('📄 Raw AI response:', {
+          component: 'Aiassistanthandlers',
+          operation: 'response-raw',
+          metadata: {
+            provider: result.provider || 'unknown',
+            credentialName: result.credentialName || 'unknown',
+            responseLength: result.content.length,
+            responsePreview: result.content.substring(0, 500) + (result.content.length > 500 ? '...' : ''),
+            fullResponse: result.content
+          }
+        });
+
+        logger.info('🔍 Parsing insights from AI response...', { component: 'Aiassistanthandlers', operation: 'parse-insights' });
+        rawInsights = AIAssistantService.parseInsightsResponse(result.content);
+
+        logger.info(`✅ Parsed ${rawInsights.length} insights from response`, {
+          component: 'Aiassistanthandlers',
+          operation: 'parse-success',
+          metadata: {
+            insightsCount: rawInsights.length,
+            insightTypes: rawInsights.map(i => i.type).join(', '),
+            sampleInsights: rawInsights.slice(0, 3).map(i => ({
+              type: i.type,
+              title: i.title,
+              confidence: i.confidence
+            }))
+          }
+        });
+
+        // Set correct source provider (from the actual provider that succeeded)
+        rawInsights.forEach(insight => {
+          insight.source = result.provider || options.provider;
+        });
+
+        const u = normalizeUsage(result.usage);
+        usageTotals = u;
+
+        logger.info('📊 Token usage statistics:', {
+          component: 'Aiassistanthandlers',
+          operation: 'usage',
+          metadata: {
+            promptTokens: usageTotals.promptTokens,
+            completionTokens: usageTotals.completionTokens,
+            totalTokens: usageTotals.totalTokens
+          }
+        });
+      } else {
+        logger.error(`❌ AI API call failed`, {
+          component: 'Aiassistanthandlers',
+          operation: 'api-error',
+          metadata: {
+            provider: options.provider,
+            error: result.error,
+            hasContent: !!result.content,
+            fullResult: result
+          }
+        });
+        throw new Error(result.error || 'AI API call failed');
+      }
+
+      // Step 6: Quality processing - score, filter, deduplicate, rank
+      logger.info('✨ Step 6: Quality processing - scoring, filtering, deduplicating...', { component: 'Aiassistanthandlers', operation: 'quality-start' });
+
+      const qualityProcessingContext = {
+        previousInsights: previousInsights as any, // Type cast for now - full AIInsight structure not needed for quality check
+        focusAreas: userProfile?.focusAreas,
+        recentCategories: userProfile?.insightPreferences.preferredCategories,
+        minimumQuality: 0.5, // Adjust based on needs
+      };
+
+      logger.info('🔍 Quality processing context:', {
+        component: 'Aiassistanthandlers',
+        operation: 'quality-context',
+        metadata: {
+          previousInsightsCount: previousInsights.length,
+          focusAreasCount: userProfile?.focusAreas.length || 0,
+          minimumQuality: 0.5
+        }
+      });
+
+      const allInsights = InsightQualityService.processInsights(
+        rawInsights,
+        qualityProcessingContext
+      );
+
+      const filteredCount = rawInsights.length - allInsights.length;
+      logger.info(`✅ Quality pipeline complete`, {
+        component: 'Aiassistanthandlers',
+        operation: 'quality-complete',
+        metadata: {
+          originalInsights: rawInsights.length,
+          qualityInsights: allInsights.length,
+          filteredOut: filteredCount,
+          filterRate: rawInsights.length > 0 ? `${((filteredCount / rawInsights.length) * 100).toFixed(1)}%` : '0%',
+          finalInsightTypes: allInsights.map(i => i.type).join(', ')
+        }
+      });
+
+      // Create analysis summary for tracking
+      logger.info('📊 Creating analysis summary for tracking...', { component: 'Aiassistanthandlers', operation: 'summary' });
+      const analysisSummary = AIAssistantService.createAnalysisSummary(
+        analyzeTasks,
+        analyzeJournalEntries
+      );
+
+      logger.info('✅ Analysis summary created', {
+        component: 'Aiassistanthandlers',
+        operation: 'summary-complete',
+        metadata: {
+          processedTasksCount: analysisSummary.processedTaskIds.length,
+          processedJournalEntriesCount: analysisSummary.processedJournalIds.length
+        }
+      });
+
+      // Final comprehensive summary
+      logger.info('🎉 ===== DATA ANALYSIS COMPLETE =====', {
+        component: 'Aiassistanthandlers',
+        operation: 'analysis-complete',
+        metadata: {
+          provider: options.provider,
+          inputTasks: tasks.length,
+          inputJournalEntries: journalEntries.length,
+          analyzedTasks: analyzeTasks.length,
+          analyzedJournalEntries: analyzeJournalEntries.length,
+          limitedTasks: limitedTasks.length,
+          limitedJournalEntries: limitedJournalEntries.length,
+          promptLength: enhancedPrompt.length,
+          estimatedPromptTokens: Math.ceil(enhancedPrompt.length / 4),
+          responseLength: result.content?.length || 0,
+          rawInsightsCount: rawInsights.length,
+          qualityInsightsCount: allInsights.length,
+          filteredInsightsCount: filteredCount,
+          promptTokens: usageTotals.promptTokens,
+          completionTokens: usageTotals.completionTokens,
+          totalTokens: usageTotals.totalTokens,
+          hasUserProfile: !!userProfile,
+          previousInsightsUsed: previousInsights.length
+        }
+      });
+      // Persist insights and usage to SQLite for durability
+      try {
+        const { sqliteService } = await import('@serenity/database');
+        await sqliteService.initialize();
+        if (allInsights.length > 0) {
+          await sqliteService.addAIInsights(
+            allInsights.map((insight: any) => ({
+              provider: options.provider,
+              type: insight.type,
+              title: insight.title,
+              description: insight.description,
+              confidence: insight.confidence ?? 0.5,
+              category: insight.category,
+              actionable: !!insight.actionable,
+              metadata: insight.metadata || {},
+            }))
+          );
+          logger.info(`💾 Persisted ${allInsights.length} AI insights to database`, { component: 'Aiassistanthandlers', operation: 'execute' });
+          try {
+            const sample = allInsights.slice(0,3).map((i: any) => ({ title: i.title, type: i.type, confidence: i.confidence }));
+            logger.info('🧪 Persisted insights sample (first 3):', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: sample } });
+          } catch {}
+        }
+
+        // Generate and store analysis summary for context continuity
+        if (allInsights.length > 0) {
+          logger.info('📝 Generating analysis summary for context continuity...', {
+            component: 'Aiassistanthandlers',
+            operation: 'generatingSummary'
+          });
+
+          const analysisSummary = AIAssistantService.generateAnalysisSummary({
+            insights: allInsights,
+            tasksAnalyzed: analyzeTasks.length,
+            journalsAnalyzed: analyzeJournalEntries.length,
+            userProfile: userProfile ? {
+              focusAreas: userProfile.focusAreas,
+              activeGoals: userProfile.activeGoals,
+              commonTags: userProfile.commonTags
+            } : undefined
+          });
+
+          const summaryId = await sqliteService.addAnalysisSummary(analysisSummary);
+
+          logger.info('✅ Analysis summary stored successfully', {
+            component: 'Aiassistanthandlers',
+            operation: 'summaryStored',
+            metadata: {
+              summaryId,
+              themes: analysisSummary.key_themes.length,
+              patterns: analysisSummary.tracked_patterns.length
+            }
+          });
+        }
+
+        // Usage will be persisted via Redux middleware when fulfilled action is dispatched
+      } catch (persistError) {
+        logger.error('⚠️ Failed to persist AI insights to database:', { component: 'Aiassistanthandlers', operation: 'catch' }, persistError as Error);
+      }
+
+      return {
+        success: true,
+        insights: allInsights,
+        processedData: analysisSummary,
+        usage: usageTotals,
+      };
+    } catch (error) {
+      logger.error('❌ Data analysis failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Data analysis failed' 
+      };
+    }
+  });
+
+  // Generate Recap
+  ipcMain.handle('ai-assistant:generate-recap', async (event, options: {
+    provider: 'openai' | 'gemini' | 'anthropic';
+    type: 'weekly' | 'monthly';
+    period: { start: string; end: string };
+    tasks?: any[];
+    journalEntries?: any[];
+  }) => {
+    try {
+      const valid = RecapOptionsSchema.safeParse(options);
+      if (!valid.success) return { success: false, error: 'Invalid recap options' };
+      logger.info(`📝 Generating ${options.type} recap with ${options.provider}...`, { component: 'Aiassistanthandlers', operation: 'execute' });
+      
+      // Import AI Assistant Service (use package export to support both CJS and ESM)
+      const { AIAssistantService } = await import('@serenity/core');
+      
+      // Get data from options or fetch from database
+      let tasks = options.tasks || [];
+      let journalEntries = options.journalEntries || [];
+      
+      // If no data provided, fetch from database for the specified period
+      if (tasks.length === 0 || journalEntries.length === 0) {
+        try {
+          // Fetch tasks
+          const { queryTasksIPC } = await import('./taskHandlers');
+          const taskResult = await queryTasksIPC();
+          if (taskResult.success) {
+            tasks = (taskResult.data || []).filter((task: any) => {
+              const taskDate = new Date(task.createdAt || task.updatedAt);
+              const startDate = new Date(options.period.start);
+              const endDate = new Date(options.period.end);
+              return taskDate >= startDate && taskDate <= endDate;
+            });
+          }
+          
+          // Fetch journal entries
+          const { queryJournalEntriesIPC } = await import('./journalHandlers');
+          const journalResult = await queryJournalEntriesIPC();
+          if (journalResult.success) {
+            journalEntries = (journalResult.data || []).filter((entry: any) => {
+              const entryDate = new Date(entry.createdAt);
+              const startDate = new Date(options.period.start);
+              const endDate = new Date(options.period.end);
+              return entryDate >= startDate && entryDate <= endDate;
+            });
+          }
+        } catch (dbError) {
+          logger.error('⚠️ Failed to fetch data from database for recap:', { component: 'Aiassistanthandlers', operation: 'catch' }, dbError as Error);
+        }
+      }
+      
+      // Check if we have data for the period
+      if (tasks.length === 0 && journalEntries.length === 0) {
+        return {
+          success: false,
+          error: `No data found for the ${options.type} period from ${options.period.start} to ${options.period.end}`
+        };
+      }
+      
+      // Preprocess data for AI analysis
+      const preprocessedTasks = AIAssistantService.preprocessTasks(tasks);
+      const preprocessedJournalEntries = AIAssistantService.preprocessJournalEntries(journalEntries);
+      
+      // Generate recap prompt
+      const prompt = AIAssistantService.generateRecapPrompts({
+        type: options.type,
+        period: options.period,
+        tasks: preprocessedTasks,
+        journalEntries: preprocessedJournalEntries,
+      });
+      
+      // Generate recap with AI provider
+      logger.info(`🤖 Generating ${options.type} recap with ${options.provider}...`, { component: 'Aiassistanthandlers', operation: 'execute' });
+      const result = await makeAIApiCall(options.provider, prompt);
+      
+      if (result.success && result.content) {
+        const recap = AIAssistantService.parseRecapResponse(
+          result.content,
+          options.type,
+          options.period
+        );
+        
+        if (recap) {
+          // Set correct source provider
+          recap.source = options.provider;
+          
+          logger.info(`✅ ${options.type} recap generated successfully`, { component: 'Aiassistanthandlers', operation: 'if' });
+          // Persist recap and usage to SQLite for durability
+          try {
+            const { sqliteService } = await import('@serenity/database');
+            await sqliteService.initialize();
+            await sqliteService.addAIRecap({
+              provider: options.provider,
+              type: recap.type,
+              title: recap.title,
+              summary: recap.summary,
+              highlights: recap.highlights,
+              challenges: recap.challenges,
+              recommendations: recap.recommendations,
+              period: recap.period,
+              metadata: recap.metadata || {},
+            });
+            logger.info('💾 Persisted AI recap to database', { component: 'Aiassistanthandlers', operation: 'execute' });
+            try {
+              logger.info('🧪 Recap persisted summary:', { component: 'Aiassistanthandlers', operation: 'execute', metadata: { title: recap.title, type: recap.type, period: recap.period } });
+            } catch {}
+            // Usage will be persisted via Redux middleware when fulfilled action is dispatched
+          } catch (persistError) {
+            logger.error('⚠️ Failed to persist AI recap to database:', { component: 'Aiassistanthandlers', operation: 'catch' }, persistError as Error);
+          }
+
+          return {
+            success: true,
+            recap,
+            usage: normalizeUsage(result.usage),
+          };
+        } else {
+          logger.error('❌ Failed to parse recap response', { component: 'Aiassistanthandlers', operation: 'execute' });
+          return {
+            success: false,
+            error: 'Failed to parse AI response for recap'
+          };
+        }
+      } else {
+        logger.error('❌ AI recap generation failed:', { component: 'Aiassistanthandlers', operation: 'execute' }, result.error);
+        return { success: false, error: result.error };
+      }
+    } catch (error) {
+      logger.error('❌ Recap generation failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Recap generation failed' 
+      };
+    }
+  });
+
+  // Get AI Settings
+  ipcMain.handle('ai-assistant:get-settings', async (event) => {
+    try {
+      logger.info('🔍 [get-settings] AI Assistant settings request received', { component: 'Aiassistanthandlers', operation: 'execute' });
+
+      // Prefer DB if present, fallback to file defaults
+      const dbSettings = await loadAISettingsFromDatabase();
+      logger.info('🔍 [get-settings] Database settings loaded:', {  component: 'Aiassistanthandlers', operation: 'load' , metadata: { value: dbSettings } });
+      logger.info(`🔍 [get-settings] Database activeProvider: ${dbSettings?.activeProvider}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+
+      const fileSettings = loadAISettings();
+      logger.info('🔍 [get-settings] File settings loaded:', {  component: 'Aiassistanthandlers', operation: 'load' , metadata: { value: fileSettings } });
+      logger.info(`🔍 [get-settings] File activeProvider: ${fileSettings?.activeProvider}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+
+      const settings = dbSettings || fileSettings;
+      logger.info('🔍 [get-settings] Final settings chosen:', {  component: 'Aiassistanthandlers', operation: 'execute' , metadata: { value: settings } });
+      logger.info(`🔍 [get-settings] Final activeProvider: ${settings?.activeProvider}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+
+      const apiKeys = getApiKeys();
+      let modelInfo = getModelInfo();
+      
+      // Check which providers have API keys without exposing the keys
+      const providersWithKeys = {
+        openai: !!apiKeys.openai,
+        gemini: !!apiKeys.gemini,
+        anthropic: !!apiKeys.anthropic,
+      };
+
+      // Backfill model info if missing but API key exists (runs only on settings load)
+      try {
+        const providers: Array<'openai' | 'gemini' | 'anthropic'> = ['openai', 'gemini', 'anthropic'];
+        for (const p of providers) {
+          if (providersWithKeys[p] && (!modelInfo || !modelInfo[p])) {
+            const key = (apiKeys as any)[p];
+            const r = await validateApiKeyPermissions(p, key as string);
+            if (r.valid && r.modelInfo) {
+              const existing = getModelInfo();
+              existing[p] = r.modelInfo;
+              storeModelInfo(existing);
+              modelInfo = existing;
+              logger.info(`🔍 Backfilled ${p} model info: ${r.modelInfo.version}`, { component: 'Aiassistanthandlers', operation: 'if' });
+            }
+          }
+        }
+      } catch (e) {
+        logger.error('⚠️ Model info backfill failed:', { component: 'Aiassistanthandlers', operation: 'catch' }, e as Error);
+      }
+
+      logger.info('✅ AI Assistant settings loaded successfully', { component: 'Aiassistanthandlers', operation: 'catch' });
+      return { 
+        success: true, 
+        settings: {
+          ...settings,
+          providersWithKeys,
+          modelInfo,
+        }
+      };
+    } catch (error) {
+      logger.error('❌ Failed to load AI Assistant settings:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to load settings' 
+      };
+    }
+  });
+
+  // Save AI Settings
+  ipcMain.handle('ai-assistant:save-settings', async (event, settings: AISettings) => {
+    try {
+      const valid = AISettingsSchema.safeParse(settings);
+      if (!valid.success) return { success: false, error: 'Invalid AI settings' };
+      logger.info('⚙️ Saving AI Assistant settings...', { component: 'Aiassistanthandlers', operation: 'save' });
+      // Merge with currently persisted settings to avoid wiping fields (e.g., activeProvider)
+      const current = await getCurrentAISettings();
+
+      // Filter out undefined values from incoming settings to avoid overwriting with undefined
+      // Note: null is allowed and will clear the value explicitly
+      const filteredSettings: Partial<AISettings> = {};
+      for (const key in settings) {
+        if (settings.hasOwnProperty(key)) {
+          const value = (settings as any)[key];
+          // Include the value if it's not undefined (null is OK for explicit clearing)
+          if (value !== undefined) {
+            (filteredSettings as any)[key] = value;
+          }
+        }
+      }
+
+      const merged: AISettings = {
+        ...current,
+        ...filteredSettings,
+      };
+      // Loop guard: skip if content unchanged in last 5s
+      const signature = JSON.stringify(merged);
+      const now = Date.now();
+      if (lastSavedSettingsSignature === signature && now - lastSavedAtMs < 5000) {
+        return { success: true, skipped: true };
+      }
+      logger.info('⚙️ Merged settings to persist:', {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: merged } });
+      saveAISettings(merged);
+      await persistAISettingsToDatabase(merged);
+      lastSavedSettingsSignature = signature;
+      lastSavedAtMs = now;
+      logger.info('✅ AI Assistant settings saved successfully', { component: 'Aiassistanthandlers', operation: 'save' });
+      return { success: true };
+    } catch (error) {
+      logger.error('❌ Failed to save AI Assistant settings:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to save settings' 
+      };
+    }
+  });
+
+  // List persisted AI insights
+  ipcMain.handle('ai-assistant:list-insights', async () => {
+    try {
+      logger.info('🔎 Fetching AI insights from SQLite...', { component: 'Aiassistanthandlers', operation: 'fetch' });
+      const { sqliteService } = await import('@serenity/database');
+      await sqliteService.initialize();
+      const rows = await sqliteService.listAIInsights(500);
+      logger.info(`✅ Retrieved ${rows?.length || 0} AI insights from SQLite`, { component: 'Aiassistanthandlers', operation: 'execute' });
+      if (rows && rows.length > 0) {
+        const sample = rows.slice(0, 3).map(r => ({ id: r.id, title: r.title, type: r.type, created_at: r.created_at }));
+        logger.info('🧪 Insights sample (first 3):', {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: sample } });
+      }
+      return { success: true, data: rows };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to list insights' };
+    }
+  });
+
+  // List persisted AI recaps
+  ipcMain.handle('ai-assistant:list-recaps', async () => {
+    try {
+      logger.info('🔎 Fetching AI recaps from SQLite...', { component: 'Aiassistanthandlers', operation: 'fetch' });
+      const { sqliteService } = await import('@serenity/database');
+      await sqliteService.initialize();
+      const rows = await sqliteService.listAIRecaps(200);
+      logger.info(`✅ Retrieved ${rows?.length || 0} AI recaps from SQLite`, { component: 'Aiassistanthandlers', operation: 'execute' });
+      if (rows && rows.length > 0) {
+        const sample = rows.slice(0, 3).map(r => ({ id: r.id, title: r.title, type: r.type, created_at: r.created_at }));
+        logger.info('🧪 Recaps sample (first 3):', {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: sample } });
+      }
+      return { success: true, data: rows };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to list recaps' };
+    }
+  });
+
+  // List persisted AI usage
+  ipcMain.handle('ai-assistant:list-usage', async () => {
+    try {
+      const { sqliteService } = await import('@serenity/database');
+      await sqliteService.initialize();
+      logger.info('🔎 Fetching AI token usage from SQLite...', { component: 'Aiassistanthandlers', operation: 'fetch' });
+      const rows = await sqliteService.listAIUsage(500);
+      logger.info(`✅ Retrieved ${rows?.length || 0} AI usage rows from SQLite`, { component: 'Aiassistanthandlers', operation: 'execute' });
+      if (rows && rows.length > 0) {
+        const sample = rows.slice(0, 3);
+        logger.info('🧪 Usage sample (first 3):', {  component: 'Aiassistanthandlers', operation: 'if' , metadata: { value: sample } });
+      }
+      return { success: true, data: rows };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to list usage' };
+    }
+  });
+
+  // Persist insights from renderer (used when renderer falls back to local analysis)
+  ipcMain.handle('ai-assistant:save-insights', async (_event, payload: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; insights: any[] }) => {
+    try {
+      const { sqliteService } = await import('@serenity/database');
+      await sqliteService.initialize();
+      const rows = (payload.insights || []).map(i => ({
+        provider: (payload.provider as any) || 'local',
+        type: i.type,
+        title: i.title,
+        description: i.description,
+        confidence: i.confidence ?? 0.5,
+        category: i.category,
+        actionable: !!i.actionable,
+        metadata: i.metadata || {},
+      }));
+      if (rows.length > 0) {
+        logger.info(`💾 Saving ${rows.length} insights via IPC to SQLite...`, { component: 'Aiassistanthandlers', operation: 'if' });
+        await sqliteService.addAIInsights(rows as any);
+        logger.info('✅ Insights saved via IPC', { component: 'Aiassistanthandlers', operation: 'if' });
+      }
+      return { success: true };
+    } catch (error) {
+      logger.error('❌ Failed to save insights via IPC:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to save insights' };
+    }
+  });
+
+  // Persist usage from renderer
+  ipcMain.handle('ai-assistant:save-usage', async (_event, payload: { provider: 'openai' | 'gemini' | 'anthropic' | 'local'; operation: 'analyze' | 'recap' | 'quickadd' | 'summary'; promptTokens: number; completionTokens: number; totalTokens: number; timestamp?: string }) => {
+    try {
+      const { sqliteService } = await import('@serenity/database');
+      await sqliteService.initialize();
+      logger.info('💾 Saving usage via IPC:', {  component: 'Aiassistanthandlers', operation: 'save' , metadata: { value: payload } });
+      await sqliteService.addAIUsage([{ ...payload } as any]);
+      logger.info('✅ Usage saved via IPC', { component: 'Aiassistanthandlers', operation: 'save' });
+      return { success: true };
+    } catch (error) {
+      logger.error('❌ Failed to save usage via IPC:', { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to save usage' };
+    }
+  });
+
+  // List available models for a provider
+  ipcMain.handle('ai-assistant:list-models', async (event, provider: 'openai' | 'gemini' | 'anthropic') => {
+    try {
+      const p = ProviderSchema.safeParse(provider);
+      if (!p.success) return { success: false, error: 'Invalid provider' };
+      const list = await listAvailableModels(provider);
+      return { success: true, models: list };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to list models' };
+    }
+  });
+
+  // Check if provider has API key
+  ipcMain.handle('ai-assistant:has-api-key', async (event, provider: 'openai' | 'gemini' | 'anthropic') => {
+    try {
+      const p = ProviderSchema.safeParse(provider);
+      if (!p.success) return { success: false, error: 'Invalid provider' };
+      const apiKeys = getApiKeys();
+      const hasKey = !!apiKeys[provider];
+      logger.info(`🔍 Provider ${provider} has API key: ${hasKey}`, { component: 'Aiassistanthandlers', operation: 'execute' });
+      return { success: true, hasKey };
+    } catch (error) {
+      logger.error(`❌ Failed to check API key for ${provider}:`, { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to check API key' 
+      };
+    }
+  });
+
+  // Remove API Key
+  ipcMain.handle('ai-assistant:remove-api-key', async (event, provider: 'openai' | 'gemini' | 'anthropic') => {
+    try {
+      const p = ProviderSchema.safeParse(provider);
+      if (!p.success) return { success: false, error: 'Invalid provider' };
+      logger.info(`🗑️ Removing API key for ${provider}...`, { component: 'Aiassistanthandlers', operation: 'execute' });
+
+      const existingKeys = getApiKeys();
+      delete existingKeys[provider];
+      storeApiKeys(existingKeys);
+
+      // Also clear stored model info for this provider
+      const existingModelInfo = getModelInfo();
+      if (existingModelInfo && existingModelInfo[provider]) {
+        delete existingModelInfo[provider];
+        storeModelInfo(existingModelInfo);
+        logger.info(`🧹 Cleared stored model info for ${provider}`, { component: 'Aiassistanthandlers', operation: 'if' });
+      }
+
+      // If this provider was active, clear selection in settings and persist
+      const currentSettings = await getCurrentAISettings();
+      if (currentSettings.activeProvider === provider) {
+        const updated = { ...currentSettings, activeProvider: undefined };
+        saveAISettings(updated);
+        await persistAISettingsToDatabase(updated);
+        logger.info(`🔄 Cleared active provider selection (${provider})`, { component: 'Aiassistanthandlers', operation: 'if' });
+      }
+
+      logger.info(`✅ API key for ${provider} removed successfully`, { component: 'Aiassistanthandlers', operation: 'execute' });
+      return { success: true };
+    } catch (error) {
+      logger.error(`❌ Failed to remove API key for ${provider}:`, { component: 'Aiassistanthandlers', operation: 'catch' }, error as Error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to remove API key' 
+      };
+    }
+  });
+
+  // Quick Add (LLM) — parse natural language into Task or Journal structure
+  ipcMain.handle('ai-assistant:quick-add', async (_event, payload: { text: string; provider?: 'openai' | 'gemini' | 'anthropic'; debug?: boolean }) => {
+    const text = (payload?.text || '').trim();
+    if (!text) return { success: false, error: 'Empty input' };
+
+    try {
+      const debug = !!payload?.debug;
+
+      logger.info(`🤖 [QuickAdd] Starting Quick Add for text: "${text.slice(0, 50)}..."`, {
+        component: 'aiAssistantHandlers',
+        operation: 'quickAdd'
+      });
+
+      // Get current date for prompt context
+      const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+
+      // Build the instruction prompt for JSON extraction
+      const instruction = `You are an intelligent assistant for an application called "Serenity Notes". Your job is to analyze the user's input and convert it into a structured JSON object. Do not respond with conversational text, only the JSON object.
+
+The current date is: **${currentDate}**.
+
+The JSON object must have two top-level keys:
+1. "intent": Can be either "CREATE_TASK" or "CREATE_JOURNAL".
+2. "data": An object containing the extracted information.
+
+### JSON Schema
+- For "CREATE_TASK", the "data" object can contain:
+    - "title": (string) The name of the task.
+    - "dueDate": (string, ISO 8601 format YYYY-MM-DD) The calculated due date.
+    - "priority": (string) Can be "low", "medium", or "high". Defaults to null if not mentioned.
+    - "tags": (array of strings) Any tags mentioned, without the '#' symbol.
+    - "project": (string) Project name if mentioned, otherwise null.
+- For "CREATE_JOURNAL", the "data" object will contain:
+    - "content": (string) The full text of the journal entry.
+    - "tags": (array of strings) Any tags mentioned, without the '#' symbol.
+
+### Examples
+
+**User Input:** Remind me to call the accountant tomorrow #finance
+**Your Output:**
+{
+  "intent": "CREATE_TASK",
+  "data": {
+    "title": "Call the accountant",
+    "dueDate": "${new Date(Date.now() + 24*60*60*1000).toISOString().split('T')[0]}",
+    "priority": null,
+    "tags": ["finance"],
+    "project": null
+  }
+}
+
+**User Input:** add "Finalize the presentation slides" to my list for this Friday, it's very important
+**Your Output:**
+{
+  "intent": "CREATE_TASK",
+  "data": {
+    "title": "Finalize the presentation slides",
+    "dueDate": "2025-09-15",
+    "priority": "high",
+    "tags": [],
+    "project": null
+  }
+}
+
+**User Input:** Journal: Today was a long day. We finally kicked off the new project and I'm feeling optimistic about the direction we're heading. #work
+**Your Output:**
+{
+  "intent": "CREATE_JOURNAL",
+  "data": {
+    "content": "Today was a long day. We finally kicked off the new project and I'm feeling optimistic about the direction we're heading.",
+    "tags": ["work"]
+  }
+}
+
+**User Input:** Buy groceries for project dinner party tomorrow #shopping
+**Your Output:**
+{
+  "intent": "CREATE_TASK",
+  "data": {
+    "title": "Buy groceries",
+    "dueDate": "${new Date(Date.now() + 24*60*60*1000).toISOString().split('T')[0]}",
+    "priority": null,
+    "tags": ["shopping"],
+    "project": "dinner party"
+  }
+}
+
+---
+
+**User Input:** ${text}
+**Your Output:**`;
+
+      logger.info(`🎯 [QuickAdd] Calling AI with custom parameters (temperature: 0.2, maxTokens: 1000)`, {
+        component: 'aiAssistantHandlers',
+        operation: 'quickAdd'
+      });
+
+      // Call AI with multi-credential failover and custom options for JSON extraction
+      const result = await makeAIApiCallWithFailoverCustom(instruction, {
+        temperature: 0.2, // Lower temperature for more deterministic JSON output
+        maxTokens: 1000,
+        systemPrompt: '' // Instruction already contains the system context
+      });
+
+      if (!result.success) {
+        logger.error(`❌ [QuickAdd] AI call failed: ${result.error}`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd'
+        });
+        return {
+          success: false,
+          error: result.error,
+          debug: debug ? { error: result.error } : undefined
+        };
+      }
+
+      const content = result.content || '';
+      logger.info(`📥 [QuickAdd] Received response (${content.length} chars)`, {
+        component: 'aiAssistantHandlers',
+        operation: 'quickAdd'
+      });
+
+      // Parse JSON response with fallback mechanisms
+      let parsed: any = null;
+      let parseMethod = '';
+
+      try {
+        // Try direct JSON parse
+        logger.info(`🔍 [QuickAdd] Attempting direct JSON.parse...`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd'
+        });
+        parsed = JSON.parse(content.trim());
+        parseMethod = 'direct';
+        logger.info(`✅ [QuickAdd] Direct JSON.parse succeeded`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd'
+        });
+      } catch (directError) {
+        logger.info(`❌ [QuickAdd] Direct JSON.parse failed, trying markdown extraction...`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd'
+        });
+
+        // Try to extract from markdown code blocks
+        const markdownMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (markdownMatch && markdownMatch[1]) {
+          try {
+            parsed = JSON.parse(markdownMatch[1].trim());
+            parseMethod = 'markdown';
+            logger.info(`✅ [QuickAdd] Markdown JSON.parse succeeded`, {
+              component: 'aiAssistantHandlers',
+              operation: 'quickAdd'
+            });
+          } catch (markdownError) {
+            logger.warn(`❌ [QuickAdd] Markdown JSON.parse failed`, {
+              component: 'aiAssistantHandlers',
+              operation: 'quickAdd'
+            });
+          }
+        }
+
+        // Fallback to regex extraction
+        if (!parsed) {
+          logger.info(`🔍 [QuickAdd] Attempting regex extraction...`, {
+            component: 'aiAssistantHandlers',
+            operation: 'quickAdd'
+          });
+          const m = content.match(/\{[\s\S]*\}/);
+          if (m) {
+            try {
+              parsed = JSON.parse(m[0]);
+              parseMethod = 'regex';
+              logger.info(`✅ [QuickAdd] Regex JSON.parse succeeded`, {
+                component: 'aiAssistantHandlers',
+                operation: 'quickAdd'
+              });
+            } catch (regexError) {
+              logger.error(`❌ [QuickAdd] Regex JSON.parse failed`, {
+                component: 'aiAssistantHandlers',
+                operation: 'quickAdd'
+              });
+            }
+          }
+        }
+      }
+
+      // Validate parsed structure
+      if (!parsed) {
+        logger.error(`❌ [QuickAdd] Failed to parse JSON response (all methods failed)`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd'
+        });
+        return {
+          success: false,
+          error: 'Failed to parse JSON response from AI',
+          debug: debug ? { contentSample: content?.slice?.(0, 500) } : undefined
+        };
+      }
+
+      if (!parsed.intent || !parsed.data) {
+        logger.error(`❌ [QuickAdd] Invalid response structure. Expected {intent, data}, got:`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd',
+          metadata: { parsed }
+        });
+        return {
+          success: false,
+          error: 'Malformed AI response structure',
+          debug: debug ? { parsed, contentSample: content?.slice?.(0, 500) } : undefined
+        };
+      }
+
+      logger.info(`✅ [QuickAdd] Successfully parsed (method: ${parseMethod}):`, {
+        component: 'aiAssistantHandlers',
+        operation: 'quickAdd',
+        metadata: { parsed }
+      });
+
+      // Convert to legacy format for backwards compatibility
+      const legacyResult = {
+        kind: parsed.intent === 'CREATE_TASK' ? 'task' : 'journal',
+        title: parsed.data.title || null,
+        description: parsed.data.content || null,
+        tags: parsed.data.tags || [],
+        priority: parsed.data.priority || null,
+        dueDate: parsed.data.dueDate || null,
+        project: parsed.data.project || null
+      };
+
+      logger.info(`🔄 [QuickAdd] Converted to legacy format:`, {
+        component: 'aiAssistantHandlers',
+        operation: 'quickAdd',
+        metadata: { legacyResult }
+      });
+
+      // Record usage tokens (already handled by makeAIApiCallWithFailoverCustom, but also record for quickadd operation)
+      try {
+        const usage = result.usage || result.rawData?.usage || {};
+        const normalized = normalizeUsage(usage);
+
+        if (normalized.totalTokens > 0) {
+          const usageEntry = {
+            provider: result.provider as 'openai' | 'gemini' | 'anthropic',
+            operation: 'quickadd' as const,
+            promptTokens: normalized.promptTokens,
+            completionTokens: normalized.completionTokens,
+            totalTokens: normalized.totalTokens,
+            timestamp: new Date().toISOString(),
+          };
+
+          logger.info(`💾 [QuickAdd] Recording usage:`, {
+            component: 'aiAssistantHandlers',
+            operation: 'quickAdd',
+            metadata: { usageEntry }
+          });
+
+          const { sqliteService } = await import('@serenity/database');
+          await sqliteService.initialize();
+          await sqliteService.addAIUsage([usageEntry]);
+
+          logger.info(`✅ [QuickAdd] Usage saved to database`, {
+            component: 'aiAssistantHandlers',
+            operation: 'quickAdd'
+          });
+        }
+      } catch (usageError) {
+        logger.error(`⚠️ [QuickAdd] Failed to save usage:`, {
+          component: 'aiAssistantHandlers',
+          operation: 'quickAdd'
+        }, usageError as Error);
+      }
+
+      return {
+        success: true,
+        data: legacyResult,
+        debug: debug ? {
+          provider: result.provider,
+          credentialName: result.credentialName,
+          parseMethod,
+          contentSample: content?.slice?.(0, 500)
+        } : undefined
+      };
+    } catch (error) {
+      logger.error('[QuickAdd] Unexpected error:', {
+        component: 'aiAssistantHandlers',
+        operation: 'quickAdd'
+      }, error as Error);
+      return {
+        success: false,
+        error: (error as Error)?.message || 'Unexpected error during Quick Add'
+      };
+    }
+  });
+
+  logger.info('✅ AI Assistant IPC handlers registered successfully', { component: 'Aiassistanthandlers', operation: 'register' });
+}
+
+/**
+ * Unregister AI Assistant IPC handlers
+ */
+export function unregisterAIAssistantHandlers(): void {
+  logger.info('🧠 Unregistering AI Assistant IPC handlers...', { component: 'Aiassistanthandlers', operation: 'unregister' });
+  
+  ipcMain.removeHandler('ai-assistant:set-api-key');
+  ipcMain.removeHandler('ai-assistant:test-api-key');
+  ipcMain.removeHandler('ai-assistant:analyze-data');
+  ipcMain.removeHandler('ai-assistant:generate-recap');
+  ipcMain.removeHandler('ai-assistant:get-settings');
+  ipcMain.removeHandler('ai-assistant:save-settings');
+  ipcMain.removeHandler('ai-assistant:has-api-key');
+  ipcMain.removeHandler('ai-assistant:remove-api-key');
+  
+  // Clear encrypted keys from memory
+  encryptedApiKeys = null;
+  encryptedModelInfo = null;
+  
+  logger.info('✅ AI Assistant IPC handlers unregistered', { component: 'Aiassistanthandlers', operation: 'execute' });
+}

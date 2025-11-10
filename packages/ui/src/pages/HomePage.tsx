@@ -36,8 +36,7 @@ export const HomePage: React.FC = () => {
   useEffect(() => {
     logger.debug('Loading AI settings via platformService', {
       component: 'HomePage',
-      operation: 'loadAISettings',
-      platform: platformService.platformType
+      operation: 'loadAISettings'
     });
 
     (async () => {
@@ -60,14 +59,14 @@ export const HomePage: React.FC = () => {
         }
 
         const provider = settingsResult.settings.activeProvider;
-        const providersWithKeys = settingsResult.settings.providersWithKeys;
+        const providersWithKeys = settingsResult.settings.providersWithKeys || {};
         logger.trace('Providers with keys', {
           component: 'HomePage',
           operation: 'loadAISettings',
           metadata: { providersWithKeys }
         });
 
-        const hasKey = provider ? !!providersWithKeys?.[provider] : false;
+        const hasKey = provider ? !!(providersWithKeys as Record<string, boolean>)[provider] : false;
 
         if (provider && hasKey) {
           logger.info('Setting activeProvider', {
@@ -81,7 +80,7 @@ export const HomePage: React.FC = () => {
             component: 'HomePage',
             operation: 'loadAISettings'
           });
-          const firstWithKey = (['openai', 'gemini', 'anthropic'] as const).find(p => providersWithKeys?.[p]);
+          const firstWithKey = (['openai', 'gemini', 'anthropic'] as const).find(p => (providersWithKeys as Record<string, boolean>)[p]);
 
           if (firstWithKey) {
             logger.info('Auto-setting activeProvider', {

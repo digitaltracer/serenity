@@ -69,8 +69,8 @@ export const TodayPage: React.FC = () => {
         description: editTaskDescription,
         priority: editTaskPriority,
         tags: editTaskTags,
-        dueDate: editTaskDueDate?.toISOString(),
-        updatedAt: new Date().toISOString(),
+        dueDate: editTaskDueDate || undefined,
+        updatedAt: new Date(),
       };
 
       dispatch(updateTask(taskData));

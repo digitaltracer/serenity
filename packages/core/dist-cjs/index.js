@@ -20,6 +20,8 @@ __exportStar(require("./types"), exports);
 __exportStar(require("./utils"), exports);
 __exportStar(require("./validation"), exports);
 __exportStar(require("./database/DatabaseManager"), exports);
+// Export platform abstraction layer for cross-platform compatibility
+__exportStar(require("./platform"), exports);
 // Export secure session manager for secure password handling
 var secureSessionManager_1 = require("./utils/secureSessionManager");
 Object.defineProperty(exports, "secureSessionManager", { enumerable: true, get: function () { return secureSessionManager_1.secureSessionManager; } });

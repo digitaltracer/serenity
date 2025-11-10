@@ -5,6 +5,10 @@
  * These interfaces are implemented by both Electron and Web adapters.
  */
 
+// Import existing types from core to avoid duplication
+import type { AISettings, DatabaseStats } from '../types/ipc';
+import type { DatabaseConfig } from '../types/database';
+
 // ============================================================================
 // AI Service Types
 // ============================================================================
@@ -34,11 +38,6 @@ export interface AIQuickAddResult {
   };
 }
 
-export interface AISettings {
-  activeProvider: string | null;
-  providersWithKeys: Record<string, boolean>;
-}
-
 export interface AISettingsResult {
   success: boolean;
   settings?: AISettings;
@@ -66,22 +65,8 @@ export interface AIGenerateSummaryOptions {
 // Database Service Types
 // ============================================================================
 
-export interface DatabaseConfig {
-  type: 'sqlite' | 'postgresql';
-  host?: string;
-  port?: number;
-  database?: string;
-  username?: string;
-  password?: string;
-}
-
-export interface DatabaseStats {
-  totalTasks: number;
-  totalProjects: number;
-  totalJournalEntries: number;
-  databaseSize: string;
-  lastBackup?: string;
-}
+// Re-export imported types for convenience
+export type { AISettings, DatabaseConfig, DatabaseStats };
 
 // ============================================================================
 // Integration Service Types

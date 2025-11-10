@@ -2,6 +2,7 @@ export * from './types';
 export * from './utils';
 export * from './validation';
 export * from './database/DatabaseManager';
+export * from './platform';
 export { secureSessionManager } from './utils/secureSessionManager';
 export * from './hooks/useKeyboardShortcuts';
 export * from './hooks/useDragDrop';

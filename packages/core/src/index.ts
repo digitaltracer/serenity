@@ -4,6 +4,8 @@ export * from './types';
 export * from './utils';
 export * from './validation';
 export * from './database/DatabaseManager';
+// Export platform abstraction layer for cross-platform compatibility
+export * from './platform';
 // Export secure session manager for secure password handling
 export { secureSessionManager } from './utils/secureSessionManager';
 export * from './hooks/useKeyboardShortcuts';

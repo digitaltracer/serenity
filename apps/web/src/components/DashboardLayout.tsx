@@ -40,7 +40,12 @@ import {
   ListChecks,
   PanelLeft,
   PanelLeftClose,
-  Square
+  Square,
+  Target,
+  Brain,
+  Sparkles,
+  Globe,
+  Database
 } from 'lucide-react'
 
 interface DashboardLayoutProps {
@@ -102,7 +107,9 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     { path: '/actionhub', label: 'ActionHub', icon: CheckSquare },
     { path: '/today', label: 'Today', icon: Calendar },
     { path: '/journal', label: 'Journal', icon: BookOpen },
-    { path: '/analytics', label: 'Analytics', icon: BarChart3 },
+    { path: '/goals', label: 'Goals', icon: Target },
+    { path: '/insights', label: 'Insights', icon: Brain },
+    { path: '/summary', label: 'AI Summaries', icon: Sparkles },
   ]
 
   const isActive = (path: string) => pathname === path
@@ -223,7 +230,21 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
           )}
         </SidebarContent>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+          <SidebarItem
+            icon={<Globe className="w-5 h-5" />}
+            active={isActive('/integrations')}
+            onClick={() => router.push('/integrations')}
+          >
+            {!sidebarCollapsed && 'Integrations'}
+          </SidebarItem>
+          <SidebarItem
+            icon={<Database className="w-5 h-5" />}
+            active={isActive('/database')}
+            onClick={() => router.push('/database')}
+          >
+            {!sidebarCollapsed && 'Database'}
+          </SidebarItem>
           <SidebarItem
             icon={<Settings className="w-5 h-5" />}
             active={isActive('/settings')}

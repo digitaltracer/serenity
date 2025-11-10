@@ -3,7 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button } from '@serenity/ui'
-import { CheckSquare, BookOpen, FolderOpen, BarChart3 } from 'lucide-react'
+import { CheckSquare, BookOpen, FolderOpen, Sparkles, Lightbulb, Target } from 'lucide-react'
 
 export default function HomePage() {
   const features = [
@@ -12,28 +12,30 @@ export default function HomePage() {
       description: 'Efficiently manage tasks, projects, and priorities with a customizable workflow.',
       icon: CheckSquare,
       route: '/actionhub',
-      color: 'text-blue-500',
     },
     {
       title: 'Journal',
       description: 'Capture thoughts, ideas, and reflections with a private, secure journaling system.',
       icon: BookOpen,
       route: '/journal',
-      color: 'text-green-500',
     },
     {
       title: 'Projects',
       description: 'Organize related tasks into projects with visual progress tracking.',
       icon: FolderOpen,
       route: '/actionhub',
-      color: 'text-purple-500',
     },
     {
-      title: 'Analytics',
-      description: 'Gain insights into your productivity patterns and achievements.',
-      icon: BarChart3,
-      route: '/analytics',
-      color: 'text-orange-500',
+      title: 'AI Summaries',
+      description: 'Generate AI-powered summaries of your tasks and journal entries by date range.',
+      icon: Sparkles,
+      route: '/summary',
+    },
+    {
+      title: 'Insights Hub',
+      description: 'AI-powered insights, analytics, and personalized recommendations.',
+      icon: Lightbulb,
+      route: '/insights',
     },
   ]
 
@@ -58,15 +60,17 @@ export default function HomePage() {
           const Icon = feature.icon
           return (
             <Link key={feature.title} href={feature.route}>
-              <Card className="cursor-pointer hover:shadow-lg transition-shadow bg-white dark:bg-gray-800 h-full">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg bg-gray-100 dark:bg-gray-700 ${feature.color}`}>
-                      <Icon className="w-6 h-6" />
+              <Card className="group relative overflow-hidden border border-border/60 bg-card/80 backdrop-blur transition-all duration-300 cursor-pointer hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg h-full">
+                <CardHeader className="relative z-10 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/5 text-primary transition-colors duration-300 group-hover:bg-primary/10">
+                      <Icon className="h-6 w-6" />
                     </div>
-                    <CardTitle className="text-gray-900 dark:text-gray-100">{feature.title}</CardTitle>
+                    <CardTitle className="text-2xl">{feature.title}</CardTitle>
                   </div>
-                  <CardDescription className="text-gray-600 dark:text-gray-400">{feature.description}</CardDescription>
+                  <CardDescription className="text-base leading-relaxed text-muted-foreground">
+                    {feature.description}
+                  </CardDescription>
                 </CardHeader>
               </Card>
             </Link>

@@ -178,3 +178,35 @@ DROP TRIGGER IF EXISTS update_accounts_updated_at ON accounts;
 CREATE TRIGGER update_accounts_updated_at
     BEFORE UPDATE ON accounts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- AI SUMMARIES TABLE
+-- ============================================================================
+-- Stores AI-generated summaries of tasks and journal entries
+CREATE TABLE IF NOT EXISTS summaries (
+    id TEXT PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    summary_type VARCHAR(20) NOT NULL CHECK(summary_type IN ('tasks', 'journal', 'combined')),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    word_count INTEGER,
+    metadata JSONB DEFAULT '{}',
+    provider VARCHAR(20) NOT NULL CHECK (provider IN ('openai', 'gemini', 'anthropic', 'local')),
+    prompt_tokens INTEGER DEFAULT 0,
+    completion_tokens INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_summaries_user_id ON summaries(user_id);
+CREATE INDEX IF NOT EXISTS idx_summaries_type ON summaries(summary_type);
+CREATE INDEX IF NOT EXISTS idx_summaries_date_range ON summaries(start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_summaries_created ON summaries(created_at DESC);
+
+DROP TRIGGER IF EXISTS update_summaries_updated_at ON summaries;
+CREATE TRIGGER update_summaries_updated_at
+    BEFORE UPDATE ON summaries
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

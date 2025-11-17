@@ -210,3 +210,32 @@ DROP TRIGGER IF EXISTS update_summaries_updated_at ON summaries;
 CREATE TRIGGER update_summaries_updated_at
     BEFORE UPDATE ON summaries
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+
+-- ============================================================================
+-- INTEGRATIONS TABLE
+-- ============================================================================
+-- Stores OAuth tokens and sync status for external integrations
+CREATE TABLE IF NOT EXISTS integrations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider VARCHAR(50) NOT NULL CHECK (provider IN ('google_calendar', 'github', 'slack', 'notion')),
+    access_token TEXT,
+    refresh_token TEXT,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    enabled BOOLEAN DEFAULT TRUE,
+    last_sync_at TIMESTAMP WITH TIME ZONE,
+    sync_config JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, provider)
+);
+
+CREATE INDEX IF NOT EXISTS idx_integrations_user_id ON integrations(user_id);
+CREATE INDEX IF NOT EXISTS idx_integrations_provider ON integrations(provider);
+CREATE INDEX IF NOT EXISTS idx_integrations_enabled ON integrations(enabled) WHERE enabled = true;
+
+DROP TRIGGER IF EXISTS update_integrations_updated_at ON integrations;
+CREATE TRIGGER update_integrations_updated_at
+    BEFORE UPDATE ON integrations
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

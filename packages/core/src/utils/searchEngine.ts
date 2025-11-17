@@ -47,7 +47,7 @@ export interface DateRange {
   end?: Date;
 }
 
-export type ContentType = 'tasks' | 'journal' | 'projects';
+export type ContentType = 'tasks' | 'journal' | 'projects' | 'goals';
 
 export type SortOption = 
   | 'relevance'

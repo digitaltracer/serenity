@@ -38,6 +38,31 @@ const initialState = {
 exports.performSearch = (0, toolkit_1.createAsyncThunk)('search/performSearch', async ({ tasks, journalEntries, projects, query }, { rejectWithValue }) => {
     try {
         const startTime = performance.now();
+        // Check if we're in web environment (no window.electronAPI)
+        const isWeb = typeof window !== 'undefined' && !window.electronAPI;
+        if (isWeb && query.text.trim()) {
+            // Use API for web environment
+            const response = await fetch(`/api/search?q=${encodeURIComponent(query.text)}&types=${query.filters.contentTypes.join(',')}&limit=50`);
+            if (!response.ok) {
+                throw new Error('Search API failed');
+            }
+            const data = await response.json();
+            const searchTime = performance.now() - startTime;
+            // Transform API results to match SearchResult format
+            const transformedResults = data.results.map((item) => ({
+                item,
+                type: item.type,
+                score: item.score || 1.0,
+                highlights: [],
+                matchedFields: item.matchedFields || []
+            }));
+            return {
+                results: transformedResults,
+                searchTime,
+                resultCount: transformedResults.length,
+            };
+        }
+        // Desktop environment or empty query - use local search
         const allResults = [];
         // Search tasks
         if (query.filters.contentTypes.includes('tasks')) {

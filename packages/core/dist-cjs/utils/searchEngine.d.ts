@@ -32,7 +32,7 @@ export interface DateRange {
     start?: Date;
     end?: Date;
 }
-export type ContentType = 'tasks' | 'journal' | 'projects';
+export type ContentType = 'tasks' | 'journal' | 'projects' | 'goals';
 export type SortOption = 'relevance' | 'dateCreated' | 'dateUpdated' | 'dueDate' | 'priority' | 'title' | 'wordCount';
 export interface SearchResult<T = any> {
     item: T;

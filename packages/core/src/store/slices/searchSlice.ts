@@ -75,11 +75,11 @@ const initialState: SearchState = {
 export const performSearch = createAsyncThunk(
   'search/performSearch',
   async (
-    { 
-      tasks, 
-      journalEntries, 
-      projects, 
-      query 
+    {
+      tasks,
+      journalEntries,
+      projects,
+      query
     }: {
       tasks: Task[];
       journalEntries: JournalEntry[];
@@ -90,27 +90,60 @@ export const performSearch = createAsyncThunk(
   ) => {
     try {
       const startTime = performance.now();
-      
+
+      // Check if we're in web environment (no window.electronAPI)
+      const isWeb = typeof window !== 'undefined' && !(window as any).electronAPI;
+
+      if (isWeb && query.text.trim()) {
+        // Use API for web environment
+        const response = await fetch(
+          `/api/search?q=${encodeURIComponent(query.text)}&types=${query.filters.contentTypes.join(',')}&limit=50`
+        );
+
+        if (!response.ok) {
+          throw new Error('Search API failed');
+        }
+
+        const data = await response.json();
+        const searchTime = performance.now() - startTime;
+
+        // Transform API results to match SearchResult format
+        const transformedResults: SearchResult[] = data.results.map((item: any) => ({
+          item,
+          type: item.type,
+          score: item.score || 1.0,
+          highlights: [],
+          matchedFields: item.matchedFields || []
+        }));
+
+        return {
+          results: transformedResults,
+          searchTime,
+          resultCount: transformedResults.length,
+        };
+      }
+
+      // Desktop environment or empty query - use local search
       const allResults: SearchResult[] = [];
-      
+
       // Search tasks
       if (query.filters.contentTypes.includes('tasks')) {
         const taskResults = searchEngine.search(tasks, query, 'tasks');
         allResults.push(...taskResults);
       }
-      
+
       // Search journal entries
       if (query.filters.contentTypes.includes('journal')) {
         const journalResults = searchEngine.search(journalEntries, query, 'journal');
         allResults.push(...journalResults);
       }
-      
+
       // Search projects
       if (query.filters.contentTypes.includes('projects')) {
         const projectResults = searchEngine.search(projects, query, 'projects');
         allResults.push(...projectResults);
       }
-      
+
       // Sort combined results by relevance
       const sortedResults = allResults.sort((a, b) => {
         if (query.sortBy === 'relevance') {
@@ -119,9 +152,9 @@ export const performSearch = createAsyncThunk(
         // Other sorting handled within individual searches
         return 0;
       });
-      
+
       const searchTime = performance.now() - startTime;
-      
+
       return {
         results: sortedResults,
         searchTime,

@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { db } from '@/lib/db/postgres'
 import { EncryptionSetup } from '@/components/auth/EncryptionSetup'
 
+export const dynamic = 'force-dynamic'
+
 export default async function SetupEncryptionPage() {
   const session = await auth()
 

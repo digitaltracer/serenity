@@ -2,6 +2,8 @@ import { auth } from '@/lib/auth/config'
 import { redirect } from 'next/navigation'
 import { OAuthButtons } from '@/components/auth/OAuthButtons'
 
+export const dynamic = 'force-dynamic'
+
 export default async function LoginPage() {
   // If user is already signed in, redirect to encryption setup or home
   const session = await auth()

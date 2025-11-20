@@ -8,6 +8,8 @@ import { auth } from '@/lib/auth/config'
 import { db } from '@/lib/db/postgres'
 import { z } from 'zod'
 
+export const dynamic = 'force-dynamic'
+
 const GenerateSummarySchema = z.object({
   startDate: z.string(),
   endDate: z.string(),

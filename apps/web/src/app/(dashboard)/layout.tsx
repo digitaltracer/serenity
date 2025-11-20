@@ -2,6 +2,8 @@ import { auth } from '@/lib/auth/config'
 import { redirect } from 'next/navigation'
 import { DashboardLayout } from '@/components/DashboardLayout'
 
+export const dynamic = 'force-dynamic'
+
 export default async function Layout({
   children,
 }: {

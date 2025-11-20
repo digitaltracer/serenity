@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
 import { db } from '@/lib/db/postgres'
 
+export const dynamic = 'force-dynamic'
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }

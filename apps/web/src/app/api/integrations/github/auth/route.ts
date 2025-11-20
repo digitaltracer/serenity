@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
 import { db } from '@/lib/db/postgres'
 
+export const dynamic = 'force-dynamic'
+
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET
 const GITHUB_REDIRECT_URI = process.env.NEXTAUTH_URL + '/api/integrations/github/callback'

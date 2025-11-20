@@ -7,6 +7,8 @@ import { auth } from '@/lib/auth/config'
 import { db } from '@/lib/db/postgres'
 import { z } from 'zod'
 
+export const dynamic = 'force-dynamic'
+
 const UpdateTaskSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional().nullable(),

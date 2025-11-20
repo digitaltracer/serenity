@@ -9,6 +9,8 @@ import { db } from '@/lib/db/postgres'
 import { hashPassword, generateSalt } from '@/lib/encryption/server-crypto'
 import { z } from 'zod'
 
+export const dynamic = 'force-dynamic'
+
 const SetupEncryptionSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   passwordConfirm: z.string(),

@@ -1,6 +1,8 @@
 import { auth } from '@/lib/auth/config'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 export default async function LandingPage() {
   const session = await auth()
 

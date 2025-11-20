@@ -19,7 +19,8 @@ import {
   TrendingUpIcon,
   CalendarIcon,
   StarIcon,
-  MoreHorizontalIcon
+  MoreHorizontalIcon,
+  TargetIcon
 } from 'lucide-react';
 import {
   RootState,
@@ -64,12 +65,14 @@ const contentTypeIcons = {
   tasks: CheckSquareIcon,
   journal: BookOpenIcon,
   projects: FolderIcon,
+  goals: TargetIcon,
 };
 
 const contentTypeLabels = {
   tasks: 'Tasks',
   journal: 'Journal',
   projects: 'Projects',
+  goals: 'Goals',
 };
 
 export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({

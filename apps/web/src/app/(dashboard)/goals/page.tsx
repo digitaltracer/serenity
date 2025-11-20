@@ -1,5 +1,7 @@
 'use client'
 
-import { GoalsPage } from '@serenity/ui'
+export const dynamic = 'force-dynamic'
+
+import { GoalsPage } from '@serenity/ui/pages'
 
 export default GoalsPage

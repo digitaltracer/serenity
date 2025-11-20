@@ -1,5 +1,7 @@
 'use client'
 
-import { SummaryPage } from '@serenity/ui'
+export const dynamic = 'force-dynamic'
+
+import { SummaryPage } from '@serenity/ui/pages'
 
 export default SummaryPage

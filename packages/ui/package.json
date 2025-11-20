@@ -10,6 +10,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.js"
+    },
+    "./pages": {
+      "types": "./dist/pages/index.d.ts",
+      "import": "./dist/pages/index.js",
+      "require": "./dist/pages/index.js"
+    },
+    "./routing": {
+      "types": "./dist/routing/index.d.ts",
+      "import": "./dist/routing/index.js",
+      "require": "./dist/routing/index.js"
     }
   },
   "scripts": {
@@ -34,6 +44,7 @@
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0",
     "react-quill": "^2.0.0",
+    "react-router-dom": "^7.9.6",
     "recharts": "^3.3.0",
     "tailwind-merge": "^1.14.0"
   },

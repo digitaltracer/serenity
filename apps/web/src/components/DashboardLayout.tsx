@@ -120,13 +120,13 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
 
   const handleSearchResultClick = (result: SearchResult) => {
     // Navigate to the appropriate page based on result type
-    if (result.type === 'task') {
+    if (result.type === 'tasks') {
       router.push('/actionhub')
     } else if (result.type === 'journal') {
       router.push('/journal')
-    } else if (result.type === 'project') {
+    } else if (result.type === 'projects') {
       router.push('/actionhub')
-    } else if (result.type === 'goal') {
+    } else if (result.type === 'goals') {
       router.push('/goals')
     }
     dispatch(closeGlobalSearch())
@@ -339,7 +339,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
       <GlobalSearchModal
         isOpen={isGlobalSearchOpen}
         onClose={() => dispatch(closeGlobalSearch())}
-        onResultClick={handleSearchResultClick}
+        onSelectResult={handleSearchResultClick}
       />
     </div>
   )

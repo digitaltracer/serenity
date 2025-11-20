@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigation, Link } from '../routing';
+import { Link } from '../routing';
 import {
   Card,
   CardHeader,
@@ -20,7 +20,6 @@ import { CheckSquare, BookOpen, FolderOpen, Lightbulb, Loader2, Sparkles } from 
  * Works across desktop (Electron) and web (Next.js) platforms using platformService
  */
 export const HomePage: React.FC = () => {
-  const navigation = useNavigation();
   const dispatch = useDispatch();
   const { showSuccess, showError } = useToast();
   const [quickText, setQuickText] = useState('');

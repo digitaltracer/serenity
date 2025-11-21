@@ -2,10 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@serenity/core', '@serenity/ui', '@serenity/database'],
-  // Disable ESLint during build (run separately with npm run lint)
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   experimental: {
     serverActions: {
       allowedOrigins: ['localhost:3000'],

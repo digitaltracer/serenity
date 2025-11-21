@@ -149,7 +149,20 @@ async function callAIProvider(
 /**
  * Parse JSON response from AI with fallback mechanisms
  */
-function parseAIResponse(content: string): any | null {
+interface ParsedAIResponse {
+  intent?: string;
+  data?: {
+    title?: string;
+    content?: string;
+    tags?: string[];
+    priority?: "low" | "medium" | "high";
+    dueDate?: string;
+    project?: string;
+  };
+}
+
+
+function parseAIResponse(content: string): ParsedAIResponse | null {
   // Try direct JSON parse
   try {
     return JSON.parse(content.trim());

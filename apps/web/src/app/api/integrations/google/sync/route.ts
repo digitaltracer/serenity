@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 /**
  * Sync Google Calendar events
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
 /**
  * Get sync status
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user?.id) {

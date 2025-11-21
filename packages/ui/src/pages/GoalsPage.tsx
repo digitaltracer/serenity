@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react';
 import { Card, CardContent } from '../components';
 import { Target } from 'lucide-react';

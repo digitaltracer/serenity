@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components';
 import { Brain, Lightbulb, TrendingUp, Sparkles, BarChart3, Target } from 'lucide-react';

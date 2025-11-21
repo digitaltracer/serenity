@@ -2,6 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@serenity/core', '@serenity/ui', '@serenity/database'],
+  // Disable ESLint during build (run separately with npm run lint)
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   experimental: {
     serverActions: {
       allowedOrigins: ['localhost:3000'],
@@ -11,10 +15,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Turbopack config (Next.js 16+)
-  // Empty config to use defaults - Turbopack automatically handles server/client separation
-  turbopack: {},
-  // Webpack config (for --webpack builds only)
   webpack: (config, { isServer }) => {
     // Exclude Node.js modules from client bundle
     if (!isServer) {

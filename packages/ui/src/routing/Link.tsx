@@ -1,4 +1,6 @@
-import React from 'react';
+'use client'
+
+import React, { useMemo } from 'react';
 
 /**
  * Universal Link component that works across Next.js and React Router
@@ -27,26 +29,46 @@ export const Link: React.FC<UniversalLinkProps> = ({
   const path = href || to || '/';
 
   // Check if we're in Next.js environment
-  const isNextJS = typeof window !== 'undefined'
-    ? typeof (window as any).__NEXT_DATA__ !== 'undefined'
-    : false;
+  const isNextJS = typeof window !== 'undefined' && typeof (window as any).__NEXT_DATA__ !== 'undefined';
 
-  if (isNextJS) {
-    // Use Next.js Link
-    // Dynamic import to avoid bundling Next.js in desktop app
-    const NextLink = require('next/link').default;
-    return (
-      <NextLink href={path} {...props}>
-        {children}
-      </NextLink>
-    );
-  }
+  // Memoize the component to avoid re-requiring on every render
+  const LinkComponent = useMemo(() => {
+    if (isNextJS) {
+      // Use Next.js Link
+      try {
+        const NextLink = require('next/link').default;
+        return ({ href, children, ...props }: any) => (
+          <NextLink href={href} {...props}>
+            {children}
+          </NextLink>
+        );
+      } catch (e) {
+        // Fallback to anchor tag if Next.js Link not available
+        return ({ href, children, ...props }: any) => (
+          <a href={href} {...props}>
+            {children}
+          </a>
+        );
+      }
+    } else {
+      // Use React Router Link
+      try {
+        const RouterLink = require('react-router-dom').Link;
+        return ({ href, children, ...props }: any) => (
+          <RouterLink to={href} {...props}>
+            {children}
+          </RouterLink>
+        );
+      } catch (e) {
+        // Fallback to anchor tag if React Router not available
+        return ({ href, children, ...props }: any) => (
+          <a href={href} {...props}>
+            {children}
+          </a>
+        );
+      }
+    }
+  }, [isNextJS]);
 
-  // Use React Router Link
-  const RouterLink = require('react-router-dom').Link;
-  return (
-    <RouterLink to={path} {...props}>
-      {children}
-    </RouterLink>
-  );
+  return <LinkComponent href={path} {...props}>{children}</LinkComponent>;
 };

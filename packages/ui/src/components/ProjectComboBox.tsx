@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '../utils/cn';
 import { ChevronDown, Check, Plus, Folder } from 'lucide-react';

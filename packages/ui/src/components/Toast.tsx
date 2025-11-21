@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle, AlertCircle, XCircle, X } from 'lucide-react';

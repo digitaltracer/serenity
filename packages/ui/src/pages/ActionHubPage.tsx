@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, selectCompactMode, RecurringPattern } from '@serenity/core';

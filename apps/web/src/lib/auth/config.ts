@@ -21,6 +21,7 @@ declare module 'next-auth' {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true, // Allow any host (required for production deployments)
   adapter: PostgresAdapter(),
   providers: [
     Google({

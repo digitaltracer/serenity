@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useRef, useEffect } from 'react';
 import DOMPurify from 'dompurify';
 import { cn } from '../utils/cn';

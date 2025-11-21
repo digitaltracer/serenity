@@ -1,3 +1,5 @@
+'use client'
+
 /**
  * Time Range Picker Component
  * Allows users to select custom date ranges for analytics filtering

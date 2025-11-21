@@ -1,3 +1,5 @@
+'use client'
+
 /**
  * Bulk Operations Toolbar
  * Provides bulk actions for selected items

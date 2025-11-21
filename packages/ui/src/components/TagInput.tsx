@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { selectAllUsedTags } from '@serenity/core';

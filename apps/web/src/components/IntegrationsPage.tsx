@@ -35,6 +35,12 @@ export function IntegrationsPage() {
   const [connecting, setConnecting] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // Mark as mounted after hydration
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Fetch integrations status
   const fetchIntegrations = useCallback(async () => {
@@ -55,8 +61,10 @@ export function IntegrationsPage() {
     fetchIntegrations()
   }, [fetchIntegrations])
 
-  // Handle OAuth callback URL params
+  // Handle OAuth callback URL params - only after component is mounted
   useEffect(() => {
+    if (!mounted) return
+
     const params = new URLSearchParams(window.location.search)
     const success = params.get('success')
     const urlError = params.get('error')
@@ -85,7 +93,7 @@ export function IntegrationsPage() {
       // Clear URL params
       window.history.replaceState({}, document.title, '/integrations')
     }
-  }, [fetchIntegrations])
+  }, [mounted, fetchIntegrations])
 
   const connectGoogle = async () => {
     setConnecting('google')

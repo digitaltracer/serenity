@@ -29,19 +29,19 @@ import { Layout } from './components/Layout';
 import { ThemeProvider } from './components/ThemeProvider';
 import { KeyboardShortcutsProvider } from './components/KeyboardShortcutsProvider';
 
-// Lazy load all page components from shared @serenity/ui package
-const HomePage = lazy(() => import('@serenity/ui').then(module => ({ default: module.HomePage })));
-const TodayPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.TodayPage })));
-const ActionHubPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.ActionHubPage })));
-const JournalPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.JournalPage })));
-const GoalsPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.GoalsPage })));
-const AnalyticsPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.AnalyticsPage })));
-const InsightsPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.InsightsPage })));
-const InsightsHubPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.InsightsHubPage })));
-const SettingsPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.SettingsPage })));
-const DatabasePage = lazy(() => import('@serenity/ui').then(module => ({ default: module.DatabasePage })));
-const IntegrationsPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.IntegrationsPage })));
-const SummaryPage = lazy(() => import('@serenity/ui').then(module => ({ default: module.SummaryPage })));
+// Lazy load all page components from shared @serenity/ui/pages subpath
+const HomePage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.HomePage })));
+const TodayPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.TodayPage })));
+const ActionHubPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.ActionHubPage })));
+const JournalPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.JournalPage })));
+const GoalsPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.GoalsPage })));
+const AnalyticsPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.AnalyticsPage })));
+const InsightsPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.InsightsPage })));
+const InsightsHubPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.InsightsHubPage })));
+const SettingsPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.SettingsPage })));
+const DatabasePage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.DatabasePage })));
+const IntegrationsPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.IntegrationsPage })));
+const SummaryPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.SummaryPage })));
 
 // Loading fallback component for route transitions
 function RouteLoadingFallback() {

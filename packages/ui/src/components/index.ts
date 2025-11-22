@@ -79,5 +79,7 @@ export * from './charts';
 export * from './insights';
 // Integrations
 export * from './integrations';
+// Summaries
+export * from './summaries';
 // Error handling components
 export * from './ErrorBoundary';

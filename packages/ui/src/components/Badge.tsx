@@ -5,11 +5,12 @@
 
 import React from 'react';
 
-interface BadgeProps {
+export interface BadgeProps {
   children: React.ReactNode;
   variant?: 'default' | 'secondary' | 'destructive' | 'warning' | 'success' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  onClick?: () => void;
 }
 
 export const Badge: React.FC<BadgeProps> = ({
@@ -17,8 +18,10 @@ export const Badge: React.FC<BadgeProps> = ({
   variant = 'default',
   size = 'md',
   className = '',
+  onClick,
 }) => {
   const baseClasses = 'inline-flex items-center font-medium rounded-full max-w-full';
+  const interactiveClasses = onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : '';
   
   const sizeClasses = {
     sm: 'px-2 py-0.5 text-xs',
@@ -39,11 +42,16 @@ export const Badge: React.FC<BadgeProps> = ({
     <span
       className={`
         ${baseClasses}
+        ${interactiveClasses}
         ${sizeClasses[size]}
         ${variantClasses[variant]}
         ${className}
       `}
       title={typeof children === 'string' ? children : undefined}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
     >
       <span className="truncate">
         {children}

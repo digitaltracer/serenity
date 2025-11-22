@@ -77,5 +77,7 @@ export * from './AIProviderCredentialManager';
 export * from './charts';
 // Insights
 export * from './insights';
+// Integrations
+export * from './integrations';
 // Error handling components
 export * from './ErrorBoundary';

@@ -15,6 +15,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP WITH TIME ZONE;
 -- AI Provider settings
 ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_provider VARCHAR(50);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_api_key_encrypted TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_gemini_key_encrypted TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_anthropic_key_encrypted TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_settings JSONB DEFAULT '{}';
 
 -- User encryption password (hashed with bcrypt)
 -- Required for end-to-end encryption of sensitive data
@@ -243,3 +246,22 @@ DROP TRIGGER IF EXISTS update_integrations_updated_at ON integrations;
 CREATE TRIGGER update_integrations_updated_at
     BEFORE UPDATE ON integrations
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- AI USAGE TABLE EXTENSIONS
+-- ============================================================================
+-- The base schema has ai_usage table but without user_id and with 'timestamp' instead of 'created_at'
+-- Add user_id column for web app compatibility
+ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+-- Update created_at from timestamp if it exists and is null
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ai_usage' AND column_name = 'timestamp') THEN
+        UPDATE ai_usage SET created_at = timestamp WHERE created_at IS NULL AND timestamp IS NOT NULL;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_ai_usage_user_id ON ai_usage(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_created_at ON ai_usage(created_at);

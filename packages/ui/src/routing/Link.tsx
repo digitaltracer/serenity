@@ -1,9 +1,12 @@
 'use client'
 
-import React, { useMemo } from 'react';
+import React from 'react';
 
 /**
  * Universal Link component that works across Next.js and React Router
+ *
+ * SSR-safe: On server-side, renders a plain <a> tag
+ * Client-side: Detects environment and uses appropriate router
  *
  * Usage:
  * <Link href="/path">Text</Link>  // Works in both Next.js and React Router
@@ -20,55 +23,69 @@ interface UniversalLinkProps {
   rel?: string;
 }
 
+/**
+ * Detect if we're in an Electron environment (client-side only)
+ * Electron uses React Router, Next.js uses next/link
+ */
+const isElectronClient = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return typeof (window as any).electronAPI !== 'undefined';
+};
+
 export const Link: React.FC<UniversalLinkProps> = ({
   href,
   to,
   children,
-  ...props
+  className,
+  onClick,
+  target,
+  rel,
 }) => {
   const path = href || to || '/';
 
-  // Check if we're in Next.js environment
-  const isNextJS = typeof window !== 'undefined' && typeof (window as any).__NEXT_DATA__ !== 'undefined';
+  // Server-side: Always render plain <a> tag (SSR-safe)
+  if (typeof window === 'undefined') {
+    return (
+      <a href={path} className={className} onClick={onClick} target={target} rel={rel}>
+        {children}
+      </a>
+    );
+  }
 
-  // Memoize the component to avoid re-requiring on every render
-  const LinkComponent = useMemo(() => {
-    if (isNextJS) {
-      // Use Next.js Link
-      try {
-        const NextLink = require('next/link').default;
-        return ({ href, children, ...props }: any) => (
-          <NextLink href={href} {...props}>
-            {children}
-          </NextLink>
-        );
-      } catch (e) {
-        // Fallback to anchor tag if Next.js Link not available
-        return ({ href, children, ...props }: any) => (
-          <a href={href} {...props}>
-            {children}
-          </a>
-        );
-      }
-    } else {
-      // Use React Router Link
-      try {
-        const RouterLink = require('react-router-dom').Link;
-        return ({ href, children, ...props }: any) => (
-          <RouterLink to={href} {...props}>
-            {children}
-          </RouterLink>
-        );
-      } catch (e) {
-        // Fallback to anchor tag if React Router not available
-        return ({ href, children, ...props }: any) => (
-          <a href={href} {...props}>
-            {children}
-          </a>
-        );
-      }
+  // Client-side: Check environment
+  if (isElectronClient()) {
+    // Electron desktop app - use React Router
+    try {
+      const RouterLink = require('react-router-dom').Link;
+      return (
+        <RouterLink to={path} className={className} onClick={onClick} target={target} rel={rel}>
+          {children}
+        </RouterLink>
+      );
+    } catch {
+      // Fallback to anchor tag
+      return (
+        <a href={path} className={className} onClick={onClick} target={target} rel={rel}>
+          {children}
+        </a>
+      );
     }
-  }, [isNextJS]);
+  }
 
-  return <LinkComponent href={path} {...props}>{children}</LinkComponent>;
+  // Next.js web app - use next/link
+  try {
+    const NextLink = require('next/link').default;
+    return (
+      <NextLink href={path} className={className} onClick={onClick} target={target} rel={rel}>
+        {children}
+      </NextLink>
+    );
+  } catch {
+    // Fallback to anchor tag
+    return (
+      <a href={path} className={className} onClick={onClick} target={target} rel={rel}>
+        {children}
+      </a>
+    );
+  }
 };

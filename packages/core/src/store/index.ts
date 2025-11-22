@@ -133,6 +133,13 @@ export {
   fetchSummaries,
   deleteSummary,
   exportSummary,
+  // Sync actions (for web API integration)
+  setSummaries,
+  addSummary,
+  removeSummary,
+  setSummariesLoading,
+  setSummariesGenerating,
+  setSummariesError,
   // Actions
   setFilter,
   setGenerationProgress,

@@ -1,7 +1,7 @@
 "use strict";
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.selectFilteredSummaries = exports.selectGenerationProgress = exports.selectSummariesFilters = exports.selectSummariesError = exports.selectSummariesGenerating = exports.selectSummariesLoading = exports.selectSummaries = exports.clearError = exports.setGenerationProgress = exports.setFilter = exports.exportSummary = exports.deleteSummary = exports.fetchSummaries = exports.generateSummary = void 0;
+exports.selectFilteredSummaries = exports.selectGenerationProgress = exports.selectSummariesFilters = exports.selectSummariesError = exports.selectSummariesGenerating = exports.selectSummariesLoading = exports.selectSummaries = exports.setSummariesError = exports.setSummariesGenerating = exports.setSummariesLoading = exports.removeSummary = exports.addSummary = exports.setSummaries = exports.clearError = exports.setGenerationProgress = exports.setFilter = exports.exportSummary = exports.deleteSummary = exports.fetchSummaries = exports.generateSummary = void 0;
 const toolkit_1 = require("@reduxjs/toolkit");
 const logger_1 = require("../../utils/logger");
 const initialState = {
@@ -134,6 +134,29 @@ const summariesSlice = (0, toolkit_1.createSlice)({
         clearError: (state) => {
             state.error = null;
         },
+        // Sync actions for web app API integration
+        setSummaries: (state, action) => {
+            state.summaries = action.payload;
+        },
+        addSummary: (state, action) => {
+            state.summaries.unshift(action.payload);
+            state.lastGenerated = new Date().toISOString();
+        },
+        removeSummary: (state, action) => {
+            state.summaries = state.summaries.filter(s => s.id !== action.payload);
+        },
+        setSummariesLoading: (state, action) => {
+            state.loading = action.payload;
+        },
+        setSummariesGenerating: (state, action) => {
+            state.generating = action.payload;
+            if (!action.payload) {
+                state.generationProgress = 0;
+            }
+        },
+        setSummariesError: (state, action) => {
+            state.error = action.payload;
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -196,7 +219,7 @@ const summariesSlice = (0, toolkit_1.createSlice)({
         });
     },
 });
-_a = summariesSlice.actions, exports.setFilter = _a.setFilter, exports.setGenerationProgress = _a.setGenerationProgress, exports.clearError = _a.clearError;
+_a = summariesSlice.actions, exports.setFilter = _a.setFilter, exports.setGenerationProgress = _a.setGenerationProgress, exports.clearError = _a.clearError, exports.setSummaries = _a.setSummaries, exports.addSummary = _a.addSummary, exports.removeSummary = _a.removeSummary, exports.setSummariesLoading = _a.setSummariesLoading, exports.setSummariesGenerating = _a.setSummariesGenerating, exports.setSummariesError = _a.setSummariesError;
 exports.default = summariesSlice.reducer;
 // Selectors
 const selectSummaries = (state) => state.summaries.summaries;

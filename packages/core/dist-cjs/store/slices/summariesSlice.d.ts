@@ -99,7 +99,7 @@ export declare const exportSummary: import("@reduxjs/toolkit").AsyncThunk<any, s
 export declare const setFilter: import("@reduxjs/toolkit").ActionCreatorWithPayload<{
     category?: "all" | "tasks" | "journal" | "combined";
     sortBy?: "recent" | "oldest";
-}, "summaries/setFilter">, setGenerationProgress: import("@reduxjs/toolkit").ActionCreatorWithPayload<number, "summaries/setGenerationProgress">, clearError: import("@reduxjs/toolkit").ActionCreatorWithoutPayload<"summaries/clearError">;
+}, "summaries/setFilter">, setGenerationProgress: import("@reduxjs/toolkit").ActionCreatorWithPayload<number, "summaries/setGenerationProgress">, clearError: import("@reduxjs/toolkit").ActionCreatorWithoutPayload<"summaries/clearError">, setSummaries: import("@reduxjs/toolkit").ActionCreatorWithPayload<Summary[], "summaries/setSummaries">, addSummary: import("@reduxjs/toolkit").ActionCreatorWithPayload<Summary, "summaries/addSummary">, removeSummary: import("@reduxjs/toolkit").ActionCreatorWithPayload<string, "summaries/removeSummary">, setSummariesLoading: import("@reduxjs/toolkit").ActionCreatorWithPayload<boolean, "summaries/setSummariesLoading">, setSummariesGenerating: import("@reduxjs/toolkit").ActionCreatorWithPayload<boolean, "summaries/setSummariesGenerating">, setSummariesError: import("@reduxjs/toolkit").ActionCreatorWithPayload<string | null, "summaries/setSummariesError">;
 declare const _default: import("redux").Reducer<SummariesState>;
 export default _default;
 export declare const selectSummaries: (state: {

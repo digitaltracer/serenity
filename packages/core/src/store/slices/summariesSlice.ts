@@ -203,6 +203,35 @@ const summariesSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+
+    // Sync actions for web app API integration
+    setSummaries: (state, action: PayloadAction<Summary[]>) => {
+      state.summaries = action.payload;
+    },
+
+    addSummary: (state, action: PayloadAction<Summary>) => {
+      state.summaries.unshift(action.payload);
+      state.lastGenerated = new Date().toISOString();
+    },
+
+    removeSummary: (state, action: PayloadAction<string>) => {
+      state.summaries = state.summaries.filter(s => s.id !== action.payload);
+    },
+
+    setSummariesLoading: (state, action: PayloadAction<boolean>) => {
+      state.loading = action.payload;
+    },
+
+    setSummariesGenerating: (state, action: PayloadAction<boolean>) => {
+      state.generating = action.payload;
+      if (!action.payload) {
+        state.generationProgress = 0;
+      }
+    },
+
+    setSummariesError: (state, action: PayloadAction<string | null>) => {
+      state.error = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -269,7 +298,17 @@ const summariesSlice = createSlice({
   },
 });
 
-export const { setFilter, setGenerationProgress, clearError } = summariesSlice.actions;
+export const {
+  setFilter,
+  setGenerationProgress,
+  clearError,
+  setSummaries,
+  addSummary,
+  removeSummary,
+  setSummariesLoading,
+  setSummariesGenerating,
+  setSummariesError,
+} = summariesSlice.actions;
 export default summariesSlice.reducer;
 
 // Selectors

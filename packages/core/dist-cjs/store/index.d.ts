@@ -22,6 +22,6 @@ export { fetchDashboardData, fetchInsights, dismissInsight, rateInsight, markIns
 export { default as insightsReducer } from './slices/insightsSlice';
 export * from './slices/goalsSlice';
 export type { Summary, SummariesState } from './slices/summariesSlice';
-export { generateSummary, fetchSummaries, deleteSummary, exportSummary, setFilter, setGenerationProgress, clearError, selectSummaries, selectSummariesLoading, selectSummariesGenerating, selectSummariesError, selectSummariesFilters, selectGenerationProgress, selectFilteredSummaries, } from './slices/summariesSlice';
+export { generateSummary, fetchSummaries, deleteSummary, exportSummary, setSummaries, addSummary, removeSummary, setSummariesLoading, setSummariesGenerating, setSummariesError, setFilter, setGenerationProgress, clearError, selectSummaries, selectSummariesLoading, selectSummariesGenerating, selectSummariesError, selectSummariesFilters, selectGenerationProgress, selectFilteredSummaries, } from './slices/summariesSlice';
 export { default as summariesReducer } from './slices/summariesSlice';
 export * from './slices/sampleData';

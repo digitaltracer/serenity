@@ -12,6 +12,10 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP WITH TIME ZONE;
 
+-- AI Provider settings
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_provider VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_api_key_encrypted TEXT;
+
 -- User encryption password (hashed with bcrypt)
 -- Required for end-to-end encryption of sensitive data
 CREATE TABLE IF NOT EXISTS user_encryption_keys (

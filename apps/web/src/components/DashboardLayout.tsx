@@ -1,7 +1,8 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSelector, useDispatch } from 'react-redux'
 import {
@@ -83,6 +84,23 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
   const isGlobalSearchOpen = useSelector(selectIsGlobalSearchOpen)
   const pathname = usePathname()
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Resolve the actual theme (handle 'system' preference)
+  const resolvedTheme = useMemo(() => {
+    if (!mounted) return 'light' // Default for SSR
+    if (currentTheme === 'system') {
+      if (typeof window !== 'undefined' && window.matchMedia) {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+      }
+      return 'light'
+    }
+    return currentTheme
+  }, [currentTheme, mounted])
 
   const toggleSidebar = () => {
     dispatch(setSidebarCollapsed(!sidebarCollapsed))
@@ -168,9 +186,14 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
         <SidebarHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 justify-center w-full">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">S</span>
-              </div>
+              <Image
+                src={resolvedTheme === 'dark' ? '/logo-dark.png' : '/logo-light.png'}
+                alt="Serenity Notes Logo"
+                width={32}
+                height={32}
+                className="w-8 h-8"
+                priority
+              />
               {!sidebarCollapsed && (
                 <h1 className="font-semibold text-gray-900 dark:text-gray-100">
                   Serenity Notes

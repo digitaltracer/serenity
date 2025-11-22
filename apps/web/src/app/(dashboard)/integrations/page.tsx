@@ -1,7 +1,5 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
-import { IntegrationsPage } from '@serenity/ui/pages'
+import { IntegrationsPage } from '@/components/IntegrationsPage'
 
 export default IntegrationsPage

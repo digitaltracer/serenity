@@ -1,10 +1,9 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 /**
- * Next.js wrapper for shared SettingsPage component
+ * Web-specific Settings Page
+ * Uses a custom component that excludes database configuration (desktop-only feature)
  */
-import { SettingsPage } from '@serenity/ui/pages'
+import { SettingsPage } from '@/components/SettingsPage'
 
 export default SettingsPage

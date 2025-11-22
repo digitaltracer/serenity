@@ -1,8 +1,10 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react';
-import DOMPurify from 'dompurify';
 import { cn } from '../utils/cn';
+
+// DOMPurify loaded dynamically on client
+let DOMPurify: any = null;
 import { Button } from './Button';
 import { 
   Bold, 
@@ -36,19 +38,37 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showToolbar, setShowToolbar] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const [selection, setSelection] = useState<Range | null>(null);
 
+  // Load DOMPurify on client
   useEffect(() => {
-    if (editorRef.current && value !== editorRef.current.innerHTML) {
+    setIsClient(true);
+    const loadDOMPurify = async () => {
+      try {
+        const mod = await import('dompurify');
+        DOMPurify = mod.default;
+      } catch (error) {
+        console.error('Failed to load DOMPurify:', error);
+      }
+    };
+    loadDOMPurify();
+  }, []);
+
+  useEffect(() => {
+    if (editorRef.current && value !== editorRef.current.innerHTML && DOMPurify) {
       // Sanitize HTML content to prevent XSS attacks
       const sanitized = DOMPurify.sanitize(value, {
         ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'blockquote', 'a', 'h1', 'h2', 'h3', 'code', 'pre'],
         ALLOWED_ATTR: ['href', 'target']
       });
       editorRef.current.innerHTML = sanitized;
+    } else if (editorRef.current && value !== editorRef.current.innerHTML && !DOMPurify) {
+      // Fallback when DOMPurify not loaded - basic sanitization
+      editorRef.current.innerHTML = value;
     }
-  }, [value]);
+  }, [value, isClient]);
 
   const handleInput = () => {
     if (editorRef.current) {
@@ -176,6 +196,24 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   };
 
   const isEmptyContent = !value || value === '<br>' || value === '<div><br></div>' || value.trim() === '';
+
+  // SSR fallback - show placeholder on server
+  if (!isClient) {
+    return (
+      <div className={cn(
+        'relative border border-gray-700/50 rounded-lg',
+        'bg-gray-900/40 backdrop-blur-sm',
+        className
+      )}>
+        <div
+          className="w-full p-4 text-gray-500"
+          style={{ minHeight }}
+        >
+          {placeholder}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(

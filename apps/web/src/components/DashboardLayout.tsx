@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSelector, useDispatch } from 'react-redux'
 import {
@@ -185,14 +186,14 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
               {navigationItems.map((item) => {
                 const Icon = item.icon
                 return (
-                  <SidebarItem
-                    key={item.path}
-                    icon={<Icon className="w-5 h-5" />}
-                    active={isActive(item.path)}
-                    onClick={() => router.push(item.path)}
-                  >
-                    {item.label}
-                  </SidebarItem>
+                  <Link key={item.path} href={item.path} prefetch={true}>
+                    <SidebarItem
+                      icon={<Icon className="w-5 h-5" />}
+                      active={isActive(item.path)}
+                    >
+                      {item.label}
+                    </SidebarItem>
+                  </Link>
                 )
               })}
             </SidebarSection>
@@ -208,12 +209,12 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
               {navigationItems.map((item) => {
                 const Icon = item.icon
                 return (
-                  <SidebarItem
-                    key={item.path}
-                    icon={<Icon className="w-5 h-5" />}
-                    active={isActive(item.path)}
-                    onClick={() => router.push(item.path)}
-                  />
+                  <Link key={item.path} href={item.path} prefetch={true}>
+                    <SidebarItem
+                      icon={<Icon className="w-5 h-5" />}
+                      active={isActive(item.path)}
+                    />
+                  </Link>
                 )
               })}
             </div>
@@ -261,27 +262,30 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
         </SidebarContent>
 
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
-          <SidebarItem
-            icon={<Globe className="w-5 h-5" />}
-            active={isActive('/integrations')}
-            onClick={() => router.push('/integrations')}
-          >
-            {!sidebarCollapsed && 'Integrations'}
-          </SidebarItem>
-          <SidebarItem
-            icon={<Database className="w-5 h-5" />}
-            active={isActive('/database')}
-            onClick={() => router.push('/database')}
-          >
-            {!sidebarCollapsed && 'Database'}
-          </SidebarItem>
-          <SidebarItem
-            icon={<Settings className="w-5 h-5" />}
-            active={isActive('/settings')}
-            onClick={() => router.push('/settings')}
-          >
-            {!sidebarCollapsed && 'Settings'}
-          </SidebarItem>
+          <Link href="/integrations" prefetch={true}>
+            <SidebarItem
+              icon={<Globe className="w-5 h-5" />}
+              active={isActive('/integrations')}
+            >
+              {!sidebarCollapsed && 'Integrations'}
+            </SidebarItem>
+          </Link>
+          <Link href="/database" prefetch={true}>
+            <SidebarItem
+              icon={<Database className="w-5 h-5" />}
+              active={isActive('/database')}
+            >
+              {!sidebarCollapsed && 'Database'}
+            </SidebarItem>
+          </Link>
+          <Link href="/settings" prefetch={true}>
+            <SidebarItem
+              icon={<Settings className="w-5 h-5" />}
+              active={isActive('/settings')}
+            >
+              {!sidebarCollapsed && 'Settings'}
+            </SidebarItem>
+          </Link>
         </div>
       </Sidebar>
 

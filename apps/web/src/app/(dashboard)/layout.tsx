@@ -2,7 +2,8 @@ import { auth } from '@/lib/auth/config'
 import { redirect } from 'next/navigation'
 import { DashboardLayout } from '@/components/DashboardLayout'
 
-export const dynamic = 'force-dynamic'
+// Note: auth() automatically makes this route dynamic
+// No force-dynamic needed - auth check provides security for all dashboard routes
 
 export default async function Layout({
   children,

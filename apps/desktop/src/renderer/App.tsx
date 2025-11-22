@@ -39,9 +39,11 @@ const AnalyticsPage = lazy(() => import('@serenity/ui/pages').then(module => ({ 
 const InsightsPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.InsightsPage })));
 const InsightsHubPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.InsightsHubPage })));
 const SettingsPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.SettingsPage })));
-const DatabasePage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.DatabasePage })));
-const IntegrationsPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.IntegrationsPage })));
 const SummaryPage = lazy(() => import('@serenity/ui/pages').then(module => ({ default: module.SummaryPage })));
+
+// Desktop-specific pages with full implementations (not shared stubs)
+const DatabasePage = lazy(() => import('./pages/DatabasePage').then(module => ({ default: module.DatabasePage })));
+const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage').then(module => ({ default: module.IntegrationsPage })));
 
 // Loading fallback component for route transitions
 function RouteLoadingFallback() {

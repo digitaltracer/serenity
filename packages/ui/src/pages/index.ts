@@ -11,7 +11,7 @@ export { GoalsPage } from './GoalsPage';
 export { AnalyticsPage } from './AnalyticsPage';
 export { InsightsPage } from './InsightsPage';
 export { InsightsHubPage } from './InsightsHubPage';
-export { SettingsPage } from './SettingsPage';
+export { SettingsPage, type SettingsPageProps } from './SettingsPage';
 export { DatabasePage } from './DatabasePage';
 export { IntegrationsPage } from './IntegrationsPage';
 export { SummaryPage } from './SummaryPage';

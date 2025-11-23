@@ -13,8 +13,7 @@ import {
   useToast,
 } from '../components';
 import { useDispatch, useSelector } from 'react-redux';
-import { addTask, addEntry, parseQuickInput, selectActiveProjects, selectAllEntries, logger, platformService } from '@serenity/core';
-import { RootState } from '@serenity/core';
+import { addTask, addEntry, parseQuickInput, selectActiveProjects, logger, platformService } from '@serenity/core';
 import { CheckSquare, BookOpen, FolderOpen, Lightbulb, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
 
 /**
@@ -28,11 +27,6 @@ export const HomePage: React.FC = () => {
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const activeProjects = useSelector(selectActiveProjects);
-  const journalEntries = useSelector(selectAllEntries);
-  const tasks = useSelector((state: RootState) => state.tasks.tasks);
-
-  // Check if user has any existing data
-  const hasExistingData = tasks.length > 0 || journalEntries.length > 0 || activeProjects.length > 0;
 
   useEffect(() => {
     logger.debug('Loading AI settings via platformService', {
@@ -365,29 +359,6 @@ export const HomePage: React.FC = () => {
                   );
                 })}
               </div>
-
-              {!hasExistingData && (
-                <div className="flex justify-center">
-                  <Card className="relative overflow-hidden border border-border/60 bg-card/80 backdrop-blur">
-                    <CardContent className="relative z-10 flex flex-col items-center gap-6 py-10 px-10 text-center">
-                      <h2 className="text-2xl font-semibold text-foreground">
-                        Ready to get started?
-                      </h2>
-                      <p className="max-w-xl text-muted-foreground">
-                        Choose your workflow and begin your journey to enhanced productivity.
-                      </p>
-                      <div className="flex flex-wrap justify-center gap-4">
-                        <Link href="/actionhub">
-                          <Button>Start with Tasks</Button>
-                        </Link>
-                        <Link href="/journal">
-                          <Button variant="secondary">Begin Journaling</Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
             </section>
           </div>
         </div>

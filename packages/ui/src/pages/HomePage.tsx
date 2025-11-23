@@ -15,7 +15,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { addTask, addEntry, parseQuickInput, selectActiveProjects, selectAllEntries, logger, platformService } from '@serenity/core';
 import { RootState } from '@serenity/core';
-import { CheckSquare, BookOpen, FolderOpen, Lightbulb, Loader2, Sparkles } from 'lucide-react';
+import { CheckSquare, BookOpen, FolderOpen, Lightbulb, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
 
 /**
  * Shared HomePage component with AI-powered quick-add functionality
@@ -323,6 +323,23 @@ export const HomePage: React.FC = () => {
                   </div>
                 )}
               </div>
+              {!activeProvider && (
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                      AI Provider not configured
+                    </p>
+                    <p className="text-sm text-amber-700 dark:text-amber-300/80">
+                      Natural language processing is limited without an AI provider. Basic keyword detection will be used for task/journal classification. Configure an AI provider in{' '}
+                      <Link href="/settings" className="underline hover:no-underline font-medium">
+                        Settings
+                      </Link>
+                      {' '}to enable smart parsing with automatic tags, priorities, and due dates.
+                    </p>
+                  </div>
+                </div>
+              )}
             </section>
 
             <section className="space-y-10">

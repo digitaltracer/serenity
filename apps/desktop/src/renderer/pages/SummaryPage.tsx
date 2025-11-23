@@ -1,8 +1,5 @@
-import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { Button } from '@serenity/ui';
 import { SummaryPage as SharedSummaryPage } from '@serenity/ui/pages';
-import { ArrowLeft } from 'lucide-react';
 import {
   fetchSummaries,
   generateSummary,
@@ -17,7 +14,6 @@ import {
  */
 export function SummaryPage() {
   const dispatch = useDispatch<AppDispatch>();
-  const navigate = useNavigate();
 
   // Load summaries using Electron API
   const handleLoadSummaries = async () => {
@@ -45,26 +41,12 @@ export function SummaryPage() {
     await dispatch(exportSummary(id));
   };
 
-  // Back button for desktop navigation
-  const headerContent = (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={() => navigate(-1)}
-      className="gap-2"
-    >
-      <ArrowLeft className="w-4 h-4" />
-      Back
-    </Button>
-  );
-
   return (
     <SharedSummaryPage
       onLoadSummaries={handleLoadSummaries}
       onGenerateSummary={handleGenerateSummary}
       onDeleteSummary={handleDeleteSummary}
       onExportSummary={handleExportSummary}
-      headerContent={headerContent}
     />
   );
 }

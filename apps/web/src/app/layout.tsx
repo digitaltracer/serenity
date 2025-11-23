@@ -5,6 +5,12 @@ import { Providers } from './providers'
 export const metadata: Metadata = {
   title: 'Serenity Notes',
   description: 'Your productivity companion with tasks, journal, and AI insights',
+  icons: {
+    icon: [
+      { url: '/logo-flat.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/logo-light.png',
+  },
 }
 
 // Inline script to set theme before first paint (prevents flash of wrong theme)

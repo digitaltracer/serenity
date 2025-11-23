@@ -271,10 +271,10 @@ export const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 h-full bg-background relative overflow-hidden">
+    <div className="flex-1 h-full bg-background relative overflow-y-auto">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.09),transparent_55%)] opacity-40" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,hsl(var(--primary)/0.04),transparent_60%)]" />
-      <div className="relative flex-1 overflow-auto">
+      <div className="relative">
         <div className="px-6 pb-16 pt-12 md:px-10">
           <div className="max-w-6xl mx-auto space-y-16">
             <div className="text-center space-y-8">

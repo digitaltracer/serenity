@@ -62,7 +62,7 @@ import {
   Sparkles,
   Globe,
   Search,
-  Download
+  Info
 } from 'lucide-react'
 
 interface DashboardLayoutProps {
@@ -293,12 +293,12 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
               {!sidebarCollapsed && 'Integrations'}
             </SidebarItem>
           </Link>
-          <Link href="/download" prefetch={true}>
+          <Link href="/about" prefetch={true}>
             <SidebarItem
-              icon={<Download className="w-5 h-5" />}
-              active={isActive('/download')}
+              icon={<Info className="w-5 h-5" />}
+              active={isActive('/about')}
             >
-              {!sidebarCollapsed && 'Download App'}
+              {!sidebarCollapsed && 'About'}
             </SidebarItem>
           </Link>
           <Link href="/settings" prefetch={true}>

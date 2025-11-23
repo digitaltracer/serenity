@@ -4,7 +4,7 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../Card';
 import { Button } from '../Button';
 import { DatePicker } from '../DatePicker';
-import { Calendar, Sparkles, Loader2 } from 'lucide-react';
+import { Calendar, Sparkles, Loader2, AlertTriangle } from 'lucide-react';
 
 export interface SummaryGeneratorCardProps {
   startDate: Date | null;
@@ -12,11 +12,13 @@ export interface SummaryGeneratorCardProps {
   selectedTypes: ('tasks' | 'journal')[];
   generating: boolean;
   error?: string | null;
+  aiProviderConfigured?: boolean;
   onStartDateChange: (date: Date | null) => void;
   onEndDateChange: (date: Date | null) => void;
   onToggleType: (type: 'tasks' | 'journal') => void;
   onQuickPreset: (days: number) => void;
   onGenerate: () => void;
+  onNavigateToSettings?: () => void;
 }
 
 export const SummaryGeneratorCard: React.FC<SummaryGeneratorCardProps> = ({
@@ -25,12 +27,15 @@ export const SummaryGeneratorCard: React.FC<SummaryGeneratorCardProps> = ({
   selectedTypes,
   generating,
   error,
+  aiProviderConfigured = true,
   onStartDateChange,
   onEndDateChange,
   onToggleType,
   onQuickPreset,
   onGenerate,
+  onNavigateToSettings,
 }) => {
+  const isDisabled = !aiProviderConfigured || generating || !startDate || !endDate || selectedTypes.length === 0;
   return (
     <Card>
       <CardHeader>
@@ -122,10 +127,35 @@ export const SummaryGeneratorCard: React.FC<SummaryGeneratorCardProps> = ({
           </div>
         </div>
 
+        {/* AI Provider Warning */}
+        {!aiProviderConfigured && (
+          <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50">
+            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                AI Provider not configured
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-300/80">
+                You need to configure an AI provider to use this feature.{' '}
+                {onNavigateToSettings ? (
+                  <button
+                    onClick={onNavigateToSettings}
+                    className="underline hover:no-underline font-medium"
+                  >
+                    Go to Settings
+                  </button>
+                ) : (
+                  'Please configure one in Settings.'
+                )}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Generate Button */}
         <Button
           onClick={onGenerate}
-          disabled={generating || !startDate || !endDate || selectedTypes.length === 0}
+          disabled={isDisabled}
           className="w-full gap-2"
         >
           {generating ? (

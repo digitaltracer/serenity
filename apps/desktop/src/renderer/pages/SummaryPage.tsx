@@ -1,4 +1,5 @@
 import { useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { SummaryPage as SharedSummaryPage } from '@serenity/ui/pages';
 import {
   fetchSummaries,
@@ -14,6 +15,7 @@ import {
  */
 export function SummaryPage() {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
 
   // Load summaries using Electron API
   const handleLoadSummaries = async () => {
@@ -47,6 +49,7 @@ export function SummaryPage() {
       onGenerateSummary={handleGenerateSummary}
       onDeleteSummary={handleDeleteSummary}
       onExportSummary={handleExportSummary}
+      onNavigateToSettings={() => navigate('/settings')}
     />
   );
 }

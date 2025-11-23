@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useCallback } from 'react'
 import { useDispatch } from 'react-redux'
+import { useRouter } from 'next/navigation'
 import { SummaryPage } from '@serenity/ui/pages'
 import {
   setSummaries,
@@ -37,6 +38,7 @@ interface Summary {
  */
 export default function SummaryPageWrapper() {
   const dispatch = useDispatch<AppDispatch>()
+  const router = useRouter()
 
   // Load summaries from API (called by shared component on mount)
   const handleLoadSummaries = useCallback(async () => {
@@ -173,6 +175,7 @@ ${summary.content}
       onGenerateSummary={handleGenerateSummary}
       onDeleteSummary={handleDeleteSummary}
       onExportSummary={handleExportSummary}
+      onNavigateToSettings={() => router.push('/settings')}
     />
   )
 }

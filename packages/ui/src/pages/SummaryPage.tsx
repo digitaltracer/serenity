@@ -10,6 +10,8 @@ import {
   selectSummariesError,
   selectSummariesFilters,
   setFilter,
+  platformService,
+  logger,
   type AppDispatch,
 } from '@serenity/core';
 import {
@@ -31,6 +33,7 @@ export interface SummaryPageProps {
   }) => Promise<void>;
   onDeleteSummary?: (id: string) => Promise<void>;
   onExportSummary?: (id: string) => Promise<void>;
+  onNavigateToSettings?: () => void;
 
   // Optional header content (e.g., back button for desktop)
   headerContent?: React.ReactNode;
@@ -47,6 +50,7 @@ export const SummaryPage: React.FC<SummaryPageProps> = ({
   onGenerateSummary,
   onDeleteSummary,
   onExportSummary,
+  onNavigateToSettings,
   headerContent,
   children,
 }) => {
@@ -62,6 +66,45 @@ export const SummaryPage: React.FC<SummaryPageProps> = ({
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [selectedTypes, setSelectedTypes] = useState<('tasks' | 'journal')[]>(['tasks', 'journal']);
+
+  // AI provider state
+  const [activeProvider, setActiveProvider] = useState<string | null>(null);
+
+  // Load AI settings to check if provider is configured
+  useEffect(() => {
+    (async () => {
+      try {
+        const settingsResult = await platformService.aiGetSettings();
+
+        if (!settingsResult?.success || !settingsResult.settings) {
+          setActiveProvider(null);
+          return;
+        }
+
+        const provider = settingsResult.settings.activeProvider;
+        const providersWithKeys = settingsResult.settings.providersWithKeys || {};
+        const hasKey = provider ? !!(providersWithKeys as Record<string, boolean>)[provider] : false;
+
+        if (provider && hasKey) {
+          setActiveProvider(provider);
+        } else if (!provider) {
+          // Look for first provider with a key
+          const firstWithKey = (['openai', 'gemini', 'anthropic'] as const).find(
+            p => (providersWithKeys as Record<string, boolean>)[p]
+          );
+          setActiveProvider(firstWithKey || null);
+        } else {
+          setActiveProvider(null);
+        }
+      } catch (err) {
+        logger.error('Error loading AI settings in SummaryPage', {
+          component: 'SummaryPage',
+          operation: 'loadAISettings'
+        }, err as Error);
+        setActiveProvider(null);
+      }
+    })();
+  }, []);
 
   // Load summaries on mount (platform-specific)
   useEffect(() => {
@@ -164,11 +207,13 @@ export const SummaryPage: React.FC<SummaryPageProps> = ({
             selectedTypes={selectedTypes}
             generating={generating}
             error={error}
+            aiProviderConfigured={!!activeProvider}
             onStartDateChange={setStartDate}
             onEndDateChange={setEndDate}
             onToggleType={toggleType}
             onQuickPreset={handleQuickPreset}
             onGenerate={handleGenerateSummary}
+            onNavigateToSettings={onNavigateToSettings}
           />
 
           {/* Summaries List Header */}

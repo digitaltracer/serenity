@@ -22,37 +22,24 @@ const Modal: React.FC<ModalProps> = ({
   className,
   size = 'md',
 }) => {
-  console.log('🎭 ==========================================');
-  console.log('🎭 [Modal] COMPONENT RENDER');
-  console.log('🎭 [Modal] isOpen:', isOpen);
-  console.log('🎭 [Modal] title:', title);
-  console.log('🎭 [Modal] size:', size);
-  console.log('🎭 ==========================================');
-
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
-    console.log('🎬 [Modal] useEffect triggered - isOpen:', isOpen);
-
     if (isOpen) {
-      console.log('🎬 [Modal] Opening modal...');
       setIsVisible(true);
       // Prevent body scrolling
       document.body.style.overflow = 'hidden';
       // Trigger animation after mount
       setTimeout(() => {
-        console.log('🎬 [Modal] Starting animation...');
         setIsAnimating(true);
       }, 10);
     } else {
-      console.log('🎬 [Modal] Closing modal...');
       setIsAnimating(false);
       // Restore body scrolling
       document.body.style.overflow = 'unset';
       // Wait for animation to complete before hiding
       setTimeout(() => {
-        console.log('🎬 [Modal] Hiding modal...');
         setIsVisible(false);
       }, 200);
     }
@@ -85,16 +72,8 @@ const Modal: React.FC<ModalProps> = ({
   };
 
   if (!isVisible) {
-    console.log('🚫 [Modal] EARLY RETURN - isVisible is false');
-    console.log('🚫 [Modal] isOpen:', isOpen);
-    console.log('🚫 [Modal] isVisible:', isVisible);
-    console.log('🚫 [Modal] Modal will NOT render');
     return null;
   }
-
-  console.log('✅ [Modal] RENDERING MODAL');
-  console.log('✅ [Modal] isVisible:', isVisible);
-  console.log('✅ [Modal] isAnimating:', isAnimating);
 
   const sizeClasses = {
     sm: 'max-w-sm',
@@ -104,7 +83,7 @@ const Modal: React.FC<ModalProps> = ({
   };
 
   return (
-    <div 
+    <div
       className={cn(
         "fixed inset-0 z-50 flex items-center justify-center p-4",
         "transition-all duration-200 overflow-y-auto",
@@ -125,7 +104,7 @@ const Modal: React.FC<ModalProps> = ({
           }
         )}
       />
-      
+
       {/* Modal with enhanced glassmorphism */}
       <div
         className={cn(
@@ -163,7 +142,7 @@ const Modal: React.FC<ModalProps> = ({
             </Button>
           </div>
         )}
-        
+
         {/* Content with better spacing and internal scrolling */}
         <div className="p-4 max-h-[65vh] overflow-y-auto">
           {children}

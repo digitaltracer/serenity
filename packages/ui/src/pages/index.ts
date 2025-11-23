@@ -14,4 +14,4 @@ export { InsightsHubPage } from './InsightsHubPage';
 export { SettingsPage, type SettingsPageProps } from './SettingsPage';
 export { DatabasePage } from './DatabasePage';
 export { IntegrationsPage } from './IntegrationsPage';
-export { SummaryPage } from './SummaryPage';
+export { SummaryPage, type SummaryPageProps } from './SummaryPage';

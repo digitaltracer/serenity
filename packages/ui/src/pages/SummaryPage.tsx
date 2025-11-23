@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Sparkles, Loader2 } from 'lucide-react';
 import {
-  fetchSummaries,
   selectFilteredSummaries,
   selectSummariesLoading,
   selectSummariesGenerating,
@@ -24,6 +23,7 @@ import {
 
 export interface SummaryPageProps {
   // Platform-specific callbacks
+  onLoadSummaries?: () => Promise<void>;
   onGenerateSummary?: (params: {
     startDate: string;
     endDate: string;
@@ -43,6 +43,7 @@ export interface SummaryPageProps {
  * Shared SummaryPage component with callback props for platform-specific actions
  */
 export const SummaryPage: React.FC<SummaryPageProps> = ({
+  onLoadSummaries,
   onGenerateSummary,
   onDeleteSummary,
   onExportSummary,
@@ -62,10 +63,12 @@ export const SummaryPage: React.FC<SummaryPageProps> = ({
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [selectedTypes, setSelectedTypes] = useState<('tasks' | 'journal')[]>(['tasks', 'journal']);
 
-  // Fetch summaries on mount
+  // Load summaries on mount (platform-specific)
   useEffect(() => {
-    dispatch(fetchSummaries());
-  }, [dispatch]);
+    if (onLoadSummaries) {
+      onLoadSummaries();
+    }
+  }, [onLoadSummaries]);
 
   // Set default dates (last 7 days)
   useEffect(() => {

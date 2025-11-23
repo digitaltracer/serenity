@@ -4,6 +4,7 @@ import { Button } from '@serenity/ui';
 import { SummaryPage as SharedSummaryPage } from '@serenity/ui/pages';
 import { ArrowLeft } from 'lucide-react';
 import {
+  fetchSummaries,
   generateSummary,
   deleteSummary,
   exportSummary,
@@ -17,6 +18,11 @@ import {
 export function SummaryPage() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+
+  // Load summaries using Electron API
+  const handleLoadSummaries = async () => {
+    await dispatch(fetchSummaries());
+  };
 
   // Platform-specific handlers using Redux thunks
   const handleGenerateSummary = async (params: {
@@ -54,6 +60,7 @@ export function SummaryPage() {
 
   return (
     <SharedSummaryPage
+      onLoadSummaries={handleLoadSummaries}
       onGenerateSummary={handleGenerateSummary}
       onDeleteSummary={handleDeleteSummary}
       onExportSummary={handleExportSummary}

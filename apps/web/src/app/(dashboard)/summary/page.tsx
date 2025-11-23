@@ -2,8 +2,8 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useCallback } from 'react'
+import { useDispatch } from 'react-redux'
 import { SummaryPage } from '@serenity/ui/pages'
 import {
   setSummaries,
@@ -37,31 +37,25 @@ interface Summary {
  */
 export default function SummaryPageWrapper() {
   const dispatch = useDispatch<AppDispatch>()
-  const [isInitialized, setIsInitialized] = useState(false)
 
-  // Fetch summaries on mount
-  useEffect(() => {
-    const fetchSummariesFromApi = async () => {
-      try {
-        dispatch(setSummariesLoading(true))
-        const response = await fetch('/api/summary')
-        const data = await response.json()
+  // Load summaries from API (called by shared component on mount)
+  const handleLoadSummaries = useCallback(async () => {
+    try {
+      dispatch(setSummariesLoading(true))
+      const response = await fetch('/api/summary')
+      const data = await response.json()
 
-        if (data.success && data.summaries) {
-          dispatch(setSummaries(data.summaries))
-        } else if (data.error) {
-          dispatch(setSummariesError(data.error))
-        }
-      } catch (error) {
-        dispatch(setSummariesError('Failed to fetch summaries'))
-        console.error('Error fetching summaries:', error)
-      } finally {
-        dispatch(setSummariesLoading(false))
-        setIsInitialized(true)
+      if (data.success && data.summaries) {
+        dispatch(setSummaries(data.summaries))
+      } else if (data.error) {
+        dispatch(setSummariesError(data.error))
       }
+    } catch (error) {
+      dispatch(setSummariesError('Failed to fetch summaries'))
+      console.error('Error fetching summaries:', error)
+    } finally {
+      dispatch(setSummariesLoading(false))
     }
-
-    fetchSummariesFromApi()
   }, [dispatch])
 
   // Generate summary via API
@@ -175,6 +169,7 @@ ${summary.content}
 
   return (
     <SummaryPage
+      onLoadSummaries={handleLoadSummaries}
       onGenerateSummary={handleGenerateSummary}
       onDeleteSummary={handleDeleteSummary}
       onExportSummary={handleExportSummary}

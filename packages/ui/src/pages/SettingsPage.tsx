@@ -19,7 +19,6 @@ import {
   // Credential management
   selectCredentials,
   selectIsLoadingCredentials,
-  fetchCredentials,
   updateCredential,
   deleteCredential,
   reorderCredentials,
@@ -57,6 +56,9 @@ export interface SettingsPageProps {
   /** Load AI usage data from platform-specific storage */
   onLoadUsage?: () => Promise<{ success: boolean; usage?: any[] }>;
 
+  /** Load credentials from platform-specific storage */
+  onLoadCredentials?: () => Promise<void>;
+
   /** Test an API key before saving */
   onTestCredential?: (provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => Promise<{ valid: boolean; error?: string }>;
 
@@ -79,6 +81,7 @@ export interface SettingsPageProps {
  */
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   onLoadUsage,
+  onLoadCredentials,
   onTestCredential,
   onAddCredential,
   platformSections,
@@ -135,10 +138,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     return () => clearInterval(intervalId);
   }, [loadUsage]);
 
-  // Load credentials on mount
+  // Load credentials on mount (platform-specific)
   React.useEffect(() => {
-    (dispatch as any)(fetchCredentials(false));
-  }, [dispatch]);
+    if (onLoadCredentials) {
+      onLoadCredentials();
+    }
+  }, [onLoadCredentials]);
 
   // Credential Management Handlers
   const handleTestCredential = async (provider: 'openai' | 'gemini' | 'anthropic', apiKey: string) => {
@@ -158,8 +163,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       await onAddCredential(credentialData);
       showSuccess('Credential Added', `Successfully added ${credentialData.provider} credential`);
       setIsAddingCredential(false);
-      // Refresh credentials
-      (dispatch as any)(fetchCredentials(false));
+      // Refresh credentials (platform-specific)
+      if (onLoadCredentials) {
+        onLoadCredentials();
+      }
     } catch (error: any) {
       showError('Add Failed', error.message || 'Failed to add credential');
       throw error;

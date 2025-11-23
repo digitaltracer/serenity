@@ -4,6 +4,7 @@ import {
   selectHasMasterPassword,
   lockApp,
   addCredential,
+  fetchCredentials,
   type AIProviderCredentialInput,
   // Database and privacy imports
   getDatabaseConnection,
@@ -117,6 +118,10 @@ export const SettingsPage: React.FC = () => {
 
   const handleAddCredential = async (credentialData: AIProviderCredentialInput) => {
     await (dispatch as any)(addCredential(credentialData)).unwrap();
+  };
+
+  const handleLoadCredentials = async () => {
+    await (dispatch as any)(fetchCredentials(false));
   };
 
   const handleDatabaseSave = async (config: any) => {
@@ -334,6 +339,7 @@ export const SettingsPage: React.FC = () => {
   return (
     <SharedSettingsPage
       onLoadUsage={handleLoadUsage}
+      onLoadCredentials={handleLoadCredentials}
       onTestCredential={handleTestCredential}
       onAddCredential={handleAddCredential}
       platformSections={platformSections}

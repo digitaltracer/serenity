@@ -61,6 +61,13 @@ export default function SettingsPageWrapper() {
     await (dispatch as any)(addCredential(credentialData)).unwrap()
   }
 
+  // Web credentials are stored server-side, no client-side loading needed
+  const handleLoadCredentials = async () => {
+    // No-op for web - credentials are managed server-side
+    // The Redux store will show an empty list, but that's fine
+    // since the server handles the actual API key storage
+  }
+
   // Web-specific footer note
   const platformNote = (
     <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800">
@@ -73,6 +80,7 @@ export default function SettingsPageWrapper() {
   return (
     <SharedSettingsPage
       onLoadUsage={handleLoadUsage}
+      onLoadCredentials={handleLoadCredentials}
       onTestCredential={handleTestCredential}
       onAddCredential={handleAddCredential}
       platformNote={platformNote}

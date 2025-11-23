@@ -121,16 +121,16 @@ export const GoalsPage: React.FC = () => {
   const activeFiltersCount = getActiveFiltersCount();
 
   return (
-    <div className="flex-1 h-full bg-gray-50 dark:bg-gray-900">
+    <div className="flex-1 h-full bg-background">
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              <h1 className="text-3xl font-bold text-foreground mb-2">
                 Goals & Progress
               </h1>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="text-muted-foreground">
                 Set and track your personal and professional goals
               </p>
             </div>
@@ -148,16 +148,16 @@ export const GoalsPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Target className="w-4 h-4" />
                   Total Goals
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                <div className="text-3xl font-bold text-foreground">
                   {stats.total}
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   goals created
                 </p>
               </CardContent>
@@ -165,7 +165,7 @@ export const GoalsPage: React.FC = () => {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Zap className="w-4 h-4" />
                   Active Goals
                 </CardTitle>
@@ -174,7 +174,7 @@ export const GoalsPage: React.FC = () => {
                 <div className="text-3xl font-bold text-green-600 dark:text-green-400">
                   {stats.active}
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   in progress
                 </p>
               </CardContent>
@@ -182,7 +182,7 @@ export const GoalsPage: React.FC = () => {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Trophy className="w-4 h-4" />
                   Completed
                 </CardTitle>
@@ -191,7 +191,7 @@ export const GoalsPage: React.FC = () => {
                 <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                   {stats.completed}
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   goals achieved
                 </p>
               </CardContent>
@@ -199,7 +199,7 @@ export const GoalsPage: React.FC = () => {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <TrendingUp className="w-4 h-4" />
                   Success Rate
                 </CardTitle>
@@ -208,7 +208,7 @@ export const GoalsPage: React.FC = () => {
                 <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
                   {stats.completionRate}%
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   completion rate
                 </p>
               </CardContent>
@@ -310,13 +310,13 @@ export const GoalsPage: React.FC = () => {
           ) : (
             <Card>
               <CardContent className="text-center py-12">
-                <div className="mx-auto w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                  <Target className="w-6 h-6 text-gray-400" />
+                <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-4">
+                  <Target className="w-6 h-6 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                <h3 className="text-lg font-medium text-foreground mb-2">
                   {safeGoals.length === 0 ? 'No goals yet' : 'No goals match your filters'}
                 </h3>
-                <p className="text-gray-500 dark:text-gray-400 mb-6">
+                <p className="text-muted-foreground mb-6">
                   {safeGoals.length === 0
                     ? 'Create your first goal to start tracking your progress and achieving your objectives.'
                     : 'Try adjusting your filters or create a new goal to get started.'

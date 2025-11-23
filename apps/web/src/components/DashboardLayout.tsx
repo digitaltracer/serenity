@@ -61,7 +61,6 @@ import {
   Brain,
   Sparkles,
   Globe,
-  Database,
   Search
 } from 'lucide-react'
 
@@ -291,14 +290,6 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
               active={isActive('/integrations')}
             >
               {!sidebarCollapsed && 'Integrations'}
-            </SidebarItem>
-          </Link>
-          <Link href="/database" prefetch={true}>
-            <SidebarItem
-              icon={<Database className="w-5 h-5" />}
-              active={isActive('/database')}
-            >
-              {!sidebarCollapsed && 'Database'}
             </SidebarItem>
           </Link>
           <Link href="/settings" prefetch={true}>

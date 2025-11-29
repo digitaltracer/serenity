@@ -19,12 +19,14 @@ Architecture documentation and decisions:
   - ADR-002: AI Insights Context Continuity
   - ADR-003: Turborepo Monorepo Structure
   - ADR-004: Electron IPC Architecture
+  - ADR-005: MCP OAuth Device Flow Authentication
 
 #### ✨ [features/](./features/)
 Feature-specific documentation:
 - **[ai-insights.md](./features/ai-insights.md)** - AI Insights architecture and usage
 - **[database.md](./features/database.md)** - Database schema, migrations, best practices
 - **[ipc-communication.md](./features/ipc-communication.md)** - IPC architecture and patterns
+- **[mcp-authentication.md](./features/mcp-authentication.md)** - MCP OAuth device flow authentication
 
 #### 🌐 [web-app/](./web-app/)
 Web application documentation:

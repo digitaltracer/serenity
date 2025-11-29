@@ -1,7 +1,7 @@
 # Serenity Notes - Implementation Status
 
-**Last Updated**: 2025-10-26
-**Current Branch**: `improv/code-improvements`
+**Last Updated**: 2025-11-29
+**Current Branch**: `feature/mcp`
 **Build Status**: ✅ All packages building successfully
 
 ---
@@ -217,6 +217,53 @@
 
 ---
 
+### ✅ MCP Server Authentication
+**Status**: Fully functional, production-ready
+**Last Updated**: 2025-11-29
+
+- ✅ OAuth 2.0 Device Authorization Grant (RFC 8628)
+- ✅ User-friendly device flow (no manual token extraction)
+- ✅ Long-lived sessions (90 days, revocable)
+- ✅ Session persistence (`~/.serenity/mcp-session.json`)
+- ✅ Web UI for device authorization (`/device`)
+- ✅ Session management UI (`/settings/mcp-sessions`)
+- ✅ Rate limiting (3 codes/hour, 120 polls max)
+- ✅ High-entropy tokens (384 bits)
+- ✅ Audit logging for all auth events
+
+**How It Works**:
+- MCP server displays user-friendly code (e.g., "WXYZ-5678")
+- User visits web app, enters code, clicks "Authorize"
+- MCP server receives 90-day session token
+- Token saved locally and reused on future startups
+- Users can view/revoke active sessions from web UI
+
+**Key Files**:
+- Database: `packages/database/src/schema/mcp-device-flow.sql`
+- Web API:
+  - `apps/web/src/app/api/mcp/device/authorize/route.ts`
+  - `apps/web/src/app/api/mcp/device/status/route.ts`
+  - `apps/web/src/app/api/mcp/device/approve/route.ts`
+  - `apps/web/src/app/api/mcp/sessions/route.ts`
+- Web UI:
+  - `apps/web/src/app/(dashboard)/device/page.tsx`
+  - `apps/web/src/app/(dashboard)/settings/mcp-sessions/page.tsx`
+- MCP Server:
+  - `apps/mcp-server/src/services/DeviceFlowAuthService.ts`
+  - `apps/mcp-server/src/middleware/auth.ts`
+- Utilities:
+  - `apps/web/src/lib/mcp/device-flow-utils.ts`
+  - `apps/web/src/lib/mcp/rate-limiter.ts`
+
+**Documentation**:
+- Feature Guide: `docs/features/mcp-authentication.md`
+- ADR: `docs/architecture/decisions/005-mcp-oauth-device-flow.md`
+- MCP README: `apps/mcp-server/README.md`
+
+**Known Issues**: None
+
+---
+
 ### ✅ Keyboard Shortcuts
 **Status**: Fully functional
 
@@ -292,6 +339,7 @@
 - `ai_insights`, `ai_recaps`, `ai_usage`
 - `analysis_summaries` (new - Oct 2025)
 - `insight_themes` (new - Oct 2025)
+- `mcp_device_codes`, `mcp_sessions` (new - Nov 2025)
 - `secure_settings`, `encrypted_integrations`
 - `db_metadata`
 

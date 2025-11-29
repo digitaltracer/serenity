@@ -122,7 +122,7 @@ Our MCP server:
 
 1. **Serenity web app running** with PostgreSQL database
 2. **Node.js 18+** installed
-3. **Your session token** from the web app
+3. **A Serenity user account** (Google/GitHub/Microsoft login)
 
 ### 1. Install Dependencies
 
@@ -143,6 +143,9 @@ ALLOWED_ORIGINS=http://localhost:3000,https://your-app.com
 
 # Database (same as web app)
 DATABASE_URL=postgresql://user:password@localhost:5432/serenity
+
+# Web App URL (for OAuth device flow)
+WEB_APP_URL=http://localhost:3000
 
 # Rate Limiting
 RATE_LIMIT_REQUESTS=100
@@ -168,7 +171,31 @@ npm run dev
 npm run start
 ```
 
-The server will start on `http://localhost:3001`
+**First-time authentication**: When you start the server for the first time, you'll see:
+
+```
+╔════════════════════════════════════════════════════════════════════╗
+║                  MCP Server Authentication                         ║
+╚════════════════════════════════════════════════════════════════════╝
+
+  To authorize this MCP server:
+
+  1. Visit: http://localhost:3000/device
+  2. Enter code: ABCD-1234
+
+  Or open this URL in your browser:
+  http://localhost:3000/device?code=ABCD-1234
+
+  Waiting for authorization...
+  (Code expires in 10 minutes)
+```
+
+1. Open the URL in your browser
+2. Log in to Serenity (if not already logged in)
+3. Enter the code and click "Authorize"
+4. The MCP server will automatically receive the authorization and start!
+
+Your session is saved to `~/.serenity/mcp-session.json` and will be reused on future startups (valid for 90 days).
 
 ### 5. Test the Server
 
@@ -186,86 +213,95 @@ curl http://localhost:3001/health
 
 ### Overview
 
-The MCP server uses **session-based authentication** that reuses your existing Serenity web app login. No separate credentials needed!
+The MCP server uses **OAuth 2.0 Device Authorization Grant** (like GitHub CLI, Heroku CLI) for user-friendly authentication. No need to manually extract tokens from your browser!
 
 ### Flow Diagram
 
 ```
-┌─────────────────┐
-│  1. User logs   │
-│  into web app   │
-│  (Google/GitHub)│
-└────────┬────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  1. MCP server starts up                                     │
+│  Checks for saved session at ~/.serenity/mcp-session.json   │
+└─────────────────────────┬────────────────────────────────────┘
+                          │
+                          v
+            ┌─────────────┴──────────────┐
+            │ Session found?             │
+            └─────────────┬──────────────┘
+                   No     │      Yes
+         ┌────────────────┴────────────┐
+         v                              v
+┌────────────────────────┐    ┌────────────────────┐
+│  2. Request device     │    │  7. Use existing   │
+│  code from web app     │    │  session token     │
+└────────┬───────────────┘    └────────────────────┘
          │
          v
-┌────────────────────────────────┐
-│  2. NextAuth creates session   │
-│  Stored in PostgreSQL          │
-│  sessions table                │
-└────────┬───────────────────────┘
+┌────────────────────────────────────────────────┐
+│  3. Display user-friendly code (e.g. WXYZ-5678)│
+│  Show verification URL: /device                │
+└────────┬───────────────────────────────────────┘
          │
          v
-┌────────────────────────────────┐
-│  3. User gets session token    │
-│  from browser cookies/storage  │
-└────────┬───────────────────────┘
+┌────────────────────────────────────────────────┐
+│  4. User visits /device, logs in, enters code  │
+│  Clicks "Authorize" to approve the device      │
+└────────┬───────────────────────────────────────┘
          │
          v
-┌────────────────────────────────┐
-│  4. Configure AI assistant     │
-│  with session token as         │
-│  Bearer token                  │
-└────────┬───────────────────────┘
+┌────────────────────────────────────────────────┐
+│  5. MCP server polls for approval status       │
+│  (every 5 seconds)                             │
+└────────┬───────────────────────────────────────┘
          │
          v
-┌────────────────────────────────┐
-│  5. AI makes MCP requests      │
-│  Header: Authorization:        │
-│  Bearer <session-token>        │
-└────────┬───────────────────────┘
-         │
-         v
-┌────────────────────────────────┐
-│  6. MCP server validates       │
-│  token against sessions table  │
-│  If valid: allows access       │
-│  If invalid: returns 401       │
-└────────────────────────────────┘
+┌────────────────────────────────────────────────┐
+│  6. Receives long-lived session token (90 days)│
+│  Saves to ~/.serenity/mcp-session.json         │
+└────────────────────────────────────────────────┘
 ```
 
-### Getting Your Session Token
+### What Happens on Startup?
 
-**Option 1: From Browser DevTools** (Chrome/Firefox)
+**First Time** (no saved session):
+1. MCP server requests a device code from the web app
+2. Displays a user-friendly code (e.g., "WXYZ-5678") and URL
+3. You visit the URL, log in (if needed), and enter the code
+4. Click "Authorize" to approve the device
+5. MCP server receives a 90-day session token
+6. Token is saved to `~/.serenity/mcp-session.json` (mode 0600)
+7. MCP server starts successfully
 
-1. Log into Serenity web app
-2. Open Developer Tools (F12)
-3. Go to **Application** tab → **Cookies**
-4. Find cookie named `next-auth.session-token`
-5. Copy the value - this is your session token
+**Subsequent Starts** (saved session exists):
+1. MCP server loads token from `~/.serenity/mcp-session.json`
+2. Validates token (checks expiration, revocation)
+3. MCP server starts immediately - no user interaction needed!
 
-**Option 2: From Browser Storage** (if using JWT)
+### Session Management
 
-1. Open Developer Tools (F12)
-2. Go to **Application** tab → **Local Storage**
-3. Look for NextAuth session data
-4. Copy the token value
+**Viewing Active Sessions**:
+- Visit `https://serenity.app/settings/mcp-sessions` in the web app
+- See all devices that have authorized MCP access
+- View device name, last used time, created date
+- Revoke any session instantly
 
-**Option 3: From API Request**
+**Session Details**:
+- ✅ Sessions expire after 90 days
+- ✅ Sessions can be revoked from the web app
+- ✅ Each session is tied to a specific device
+- ✅ Tokens are stored with 0600 permissions (owner read/write only)
+- ✅ Invalid/expired/revoked tokens trigger re-authentication
 
-```javascript
-// In browser console while logged into web app
-fetch('/api/auth/session')
-  .then(r => r.json())
-  .then(data => console.log('Session:', data));
-```
+### Security Features
 
-### Session Security
-
-- ✅ Sessions expire after 30 days (NextAuth default)
-- ✅ Server validates expiration on every request
-- ✅ Invalid/expired tokens return 401 Unauthorized
-- ✅ Tokens are stored securely in PostgreSQL
-- ✅ Each user can only access their own data
+- ✅ **OAuth 2.0 RFC 8628 compliant** - Industry-standard device flow
+- ✅ **User-friendly codes** - Format "XXXX-XXXX", no ambiguous characters (0, O, I, 1 removed)
+- ✅ **Short device codes** - Expire in 10 minutes
+- ✅ **Long sessions** - Valid for 90 days (revocable anytime)
+- ✅ **Rate limiting** - 3 device codes/hour per IP, max 120 polls per code
+- ✅ **High entropy tokens** - 64-character random strings (384 bits)
+- ✅ **Separate token space** - MCP sessions isolated from web app sessions
+- ✅ **Audit logging** - All authorization events tracked
+- ✅ **Secure storage** - Session files created with 0600 permissions
 
 ---
 
@@ -390,21 +426,19 @@ sudo systemctl status serenity-mcp
 
 **Prerequisites:**
 - Claude Desktop app installed
-- MCP server running on `http://localhost:3001` (or your server URL)
-- Your session token from Serenity web app
+- Serenity web app running
+- A Serenity user account
 
 **Steps:**
 
-1. **Get your session token** (see [Authentication](#how-authentication-works))
-
-2. **Configure Claude Desktop**
+1. **Configure Claude Desktop**
 
    Open Claude Desktop configuration file:
    - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
    - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
    - **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
-3. **Add MCP server configuration**:
+2. **Add MCP server configuration**:
 
 ```json
 {
@@ -416,31 +450,23 @@ sudo systemctl status serenity-mcp
       ],
       "env": {
         "DATABASE_URL": "postgresql://user:pass@localhost:5432/serenity",
-        "PORT": "3001",
-        "SESSION_TOKEN": "your-session-token-here"
+        "WEB_APP_URL": "http://localhost:3000",
+        "PORT": "3001"
       }
     }
   }
 }
 ```
 
-**Alternative: HTTP Transport** (if running on remote server):
+3. **Restart Claude Desktop**
 
-```json
-{
-  "mcpServers": {
-    "serenity": {
-      "url": "http://localhost:3001/mcp",
-      "transport": "http",
-      "headers": {
-        "Authorization": "Bearer your-session-token-here"
-      }
-    }
-  }
-}
-```
+4. **Authorize the MCP server**:
 
-4. **Restart Claude Desktop**
+   When Claude Desktop starts the MCP server for the first time, you'll see a notification with:
+   - A verification URL (e.g., `http://localhost:3000/device`)
+   - A user-friendly code (e.g., `WXYZ-5678`)
+
+   Simply visit the URL, enter the code, and authorize the device!
 
 5. **Test the connection**:
 
@@ -450,6 +476,8 @@ sudo systemctl status serenity-mcp
    ```
 
    Claude should now be able to access your Serenity data!
+
+**Note**: The MCP server will save your session to `~/.serenity/mcp-session.json`. Future Claude Desktop restarts will use the saved session automatically.
 
 ### Connecting to ChatGPT / OpenAI
 

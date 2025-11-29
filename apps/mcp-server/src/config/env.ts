@@ -7,6 +7,7 @@ export interface ServerConfig {
   port: number;
   nodeEnv: string;
   databaseUrl: string;
+  webAppUrl: string;
   allowedOrigins: string[];
   rateLimitRequests: number;
   rateLimitWindow: number;
@@ -36,6 +37,7 @@ export const config: ServerConfig = {
   port: getEnvNumber('PORT', 3001),
   nodeEnv: getEnv('NODE_ENV', 'development'),
   databaseUrl: getEnv('DATABASE_URL'),
+  webAppUrl: getEnv('WEB_APP_URL', 'http://localhost:3000'),
   allowedOrigins: getEnv('ALLOWED_ORIGINS', 'http://localhost:3000').split(','),
   rateLimitRequests: getEnvNumber('RATE_LIMIT_REQUESTS', 100),
   rateLimitWindow: getEnvNumber('RATE_LIMIT_WINDOW', 60000),

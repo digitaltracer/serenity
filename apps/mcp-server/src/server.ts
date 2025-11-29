@@ -18,6 +18,7 @@ import {
   registerJournalTools,
   registerProjectTools,
   registerGoalTools,
+  registerAITools,
   toolHandlers,
   type UserContext
 } from './tools/index.js';
@@ -51,10 +52,18 @@ app.get('/', (_req: AuthenticatedRequest, res: Response) => {
   res.json({
     name: 'Serenity MCP Server',
     version: '1.0.0',
-    description: 'MCP server for Serenity Notes - manage tasks, journal entries, projects, and goals',
+    description: 'MCP server for Serenity Notes - manage tasks, journal entries, projects, goals, and AI insights',
     endpoints: {
       health: '/health',
       mcp: '/mcp (POST)',
+    },
+    tools: {
+      tasks: 6,
+      journal: 6,
+      projects: 5,
+      goals: 5,
+      ai: 3,
+      total: 25,
     },
     documentation: 'See README.md for usage instructions',
   });
@@ -78,6 +87,7 @@ registerTaskTools(mcpServer);
 registerJournalTools(mcpServer);
 registerProjectTools(mcpServer);
 registerGoalTools(mcpServer);
+registerAITools(mcpServer);
 
 // MCP endpoint with authentication and rate limiting
 app.post('/mcp', mcpRateLimiter, requireAuth, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -396,6 +406,59 @@ app.post('/mcp', mcpRateLimiter, requireAuth, asyncHandler(async (req: Authentic
               goalId: { type: 'string', format: 'uuid' },
             },
             required: ['goalId'],
+          },
+        },
+        // AI tools
+        {
+          name: 'get-insights',
+          description: 'Retrieve AI-generated insights with optional filters',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              category: { type: 'string', enum: ['tasks', 'journal', 'habits', 'goals'] },
+              type: { type: 'string', enum: ['productivity', 'behavior', 'recommendation', 'warning'] },
+              limit: { type: 'number', minimum: 1, maximum: 100, default: 20 },
+              offset: { type: 'number', minimum: 0, default: 0 },
+            },
+          },
+        },
+        {
+          name: 'generate-insights',
+          description: 'Generate new AI insights based on tasks and journal data',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              dataTypes: { type: 'array', items: { type: 'string', enum: ['tasks', 'journal'] }, minItems: 1 },
+              analysisMode: { type: 'string', enum: ['incremental', 'window', 'full'], default: 'incremental' },
+              timeWindow: {
+                type: 'object',
+                properties: {
+                  start: { type: 'string', format: 'date-time' },
+                  end: { type: 'string', format: 'date-time' },
+                },
+                required: ['start', 'end'],
+              },
+            },
+            required: ['dataTypes'],
+          },
+        },
+        {
+          name: 'generate-summary',
+          description: 'Generate a weekly or monthly summary/recap',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              type: { type: 'string', enum: ['weekly', 'monthly'] },
+              period: {
+                type: 'object',
+                properties: {
+                  start: { type: 'string', format: 'date-time' },
+                  end: { type: 'string', format: 'date-time' },
+                },
+                required: ['start', 'end'],
+              },
+            },
+            required: ['type', 'period'],
           },
         },
       ],

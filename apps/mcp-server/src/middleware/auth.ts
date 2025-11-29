@@ -27,7 +27,7 @@ export interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Authenticate request using NextAuth session token
+ * Authenticate request using MCP session token (OAuth Device Flow)
  *
  * @param authHeader - Authorization header value
  * @returns User object if authenticated, null otherwise
@@ -56,23 +56,26 @@ export async function authenticateRequest(
   }
 
   try {
-    // Validate against sessions table in PostgreSQL
+    // Validate against mcp_sessions table in PostgreSQL
     const result = await authAdapter.query(`
       SELECT
         u.id,
         u.email,
         u.name,
         u.image,
-        s.expires
-      FROM sessions s
-      JOIN users u ON s."userId" = u.id
-      WHERE s."sessionToken" = $1
-        AND s.expires > NOW()
+        s.expires_at,
+        s.revoked_at,
+        s.id as session_id
+      FROM mcp_sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.session_token = $1
+        AND s.expires_at > NOW()
+        AND s.revoked_at IS NULL
     `, [sessionToken]);
 
     // No valid session found
     if (result.rows.length === 0) {
-      logger.debug('No valid session found for token', {
+      logger.debug('No valid MCP session found for token', {
         tokenPrefix: sessionToken.substring(0, 10) + '...',
       });
       return null;
@@ -83,10 +86,24 @@ export async function authenticateRequest(
       email: string;
       name: string | null;
       image: string | null;
-      expires: Date;
+      expires_at: Date;
+      revoked_at: Date | null;
+      session_id: string;
     };
 
-    // Update last_login timestamp (fire and forget - don't block response)
+    // Update last_used_at for MCP session (fire and forget - don't block response)
+    authAdapter.query(`
+      UPDATE mcp_sessions
+      SET last_used_at = NOW()
+      WHERE id = $1
+    `, [user.session_id]).catch((err: Error) => {
+      logger.warn('Failed to update MCP session last_used_at', {
+        sessionId: user.session_id,
+        error: err.message,
+      });
+    });
+
+    // Update user updatedAt timestamp (fire and forget)
     authAdapter.query(`
       UPDATE users
       SET "updatedAt" = NOW()
@@ -107,6 +124,7 @@ export async function authenticateRequest(
       'mcp_authenticated',
       JSON.stringify({
         service: 'mcp-server',
+        sessionId: user.session_id,
         timestamp: new Date().toISOString(),
       })
     ]).catch((err: Error) => {
@@ -116,9 +134,10 @@ export async function authenticateRequest(
       });
     });
 
-    logger.info('User authenticated successfully', {
+    logger.info('User authenticated successfully via MCP session', {
       userId: user.id,
       email: user.email,
+      sessionId: user.session_id,
     });
 
     return {
@@ -128,7 +147,7 @@ export async function authenticateRequest(
       image: user.image,
     };
   } catch (error) {
-    logger.error('Error validating session token', {
+    logger.error('Error validating MCP session token', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
@@ -150,7 +169,7 @@ export async function requireAuth(
     const user = await authenticateRequest(req.headers.authorization);
 
     if (!user) {
-      throw new AuthenticationError('Please provide a valid session token from the web app');
+      throw new AuthenticationError('Authentication required. Please authorize your MCP server using the device flow.');
     }
 
     // Attach user to request

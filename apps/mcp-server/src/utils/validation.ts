@@ -308,3 +308,48 @@ export const deleteGoalSchema = z.object({
 });
 
 export type DeleteGoalInput = z.infer<typeof deleteGoalSchema>;
+
+/**
+ * AI insight category and type enums
+ */
+export const insightCategorySchema = z.enum(['tasks', 'journal', 'habits', 'goals']);
+export const insightTypeSchema = z.enum(['productivity', 'behavior', 'recommendation', 'warning']);
+
+/**
+ * Get insights schema
+ */
+export const getInsightsSchema = z.object({
+  category: insightCategorySchema.optional(),
+  type: insightTypeSchema.optional(),
+  limit: z.number().int().min(1).max(100).optional().default(20),
+  offset: z.number().int().min(0).optional().default(0),
+});
+
+export type GetInsightsInput = z.infer<typeof getInsightsSchema>;
+
+/**
+ * Generate insights schema
+ */
+export const generateInsightsSchema = z.object({
+  dataTypes: z.array(z.enum(['tasks', 'journal'])).min(1),
+  analysisMode: z.enum(['incremental', 'window', 'full']).optional().default('incremental'),
+  timeWindow: z.object({
+    start: dateStringSchema,
+    end: dateStringSchema,
+  }).optional(),
+});
+
+export type GenerateInsightsInput = z.infer<typeof generateInsightsSchema>;
+
+/**
+ * Generate summary schema
+ */
+export const generateSummarySchema = z.object({
+  type: z.enum(['weekly', 'monthly']),
+  period: z.object({
+    start: dateStringSchema,
+    end: dateStringSchema,
+  }),
+});
+
+export type GenerateSummaryInput = z.infer<typeof generateSummarySchema>;

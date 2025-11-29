@@ -7,3 +7,4 @@ export { registerTaskTools, toolHandlers, type UserContext, type ToolHandler } f
 export { registerJournalTools } from './journal.js';
 export { registerProjectTools } from './projects.js';
 export { registerGoalTools } from './goals.js';
+export { registerAITools } from './ai.js';

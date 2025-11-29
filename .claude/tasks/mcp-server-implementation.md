@@ -2180,6 +2180,165 @@ This implementation plan provides a comprehensive roadmap for building a product
 
 ---
 
-**Plan Status:** ⏳ Awaiting Review & Approval
+**Plan Status:** 🚧 In Progress - Phase 2 Complete
 **Created By:** Claude Code
 **Date:** November 17, 2025
+**Last Updated:** November 28, 2025
+
+---
+
+## Implementation Progress
+
+### Phase 1: Project Setup ✅ COMPLETED (November 28, 2025)
+
+**Implemented:**
+- ✅ Created `apps/mcp-server/` directory structure with all subdirectories (config, middleware, tools, services, db, utils)
+- ✅ Initialized package.json with MCP SDK (@modelcontextprotocol/sdk v1.0.4) and all required dependencies
+- ✅ Set up TypeScript configuration (tsconfig.json) with strict mode and ES2022 target
+- ✅ Created basic Express server with MCP Server initialization
+- ✅ Set up environment variables (.env.example) with all required configuration
+- ✅ Added mcp-server to Turborepo pipeline (turbo.json)
+- ✅ Added mcp-server to monorepo workspace (root package.json)
+- ✅ Created health check endpoint (`/health`) with server status
+- ✅ Created root info endpoint (`/`) with API documentation
+- ✅ Added .gitignore and README.md
+
+**Deliverables:**
+- Working MCP server skeleton ✅
+- Can import from `@serenity/core` and `@serenity/database` ✅
+- Basic health check endpoint ✅
+- Successfully builds with `npm run build` ✅
+- Successfully starts with `npm run dev` ✅
+
+**Testing Results:**
+```bash
+# Health check
+curl http://localhost:3001/health
+# Response: {"status":"ok","timestamp":"...","service":"serenity-mcp-server","version":"1.0.0"}
+
+# Root endpoint
+curl http://localhost:3001/
+# Response: {"name":"Serenity MCP Server","version":"1.0.0",...}
+```
+
+---
+
+### Phase 2: Authentication ✅ COMPLETED (November 28, 2025)
+
+**Implemented:**
+
+1. **Database Layer (`src/db/index.ts`)**
+   - PostgreSQL connection pool with pg library
+   - Query wrapper with logging and timing
+   - Transaction helper for atomic operations
+   - Health check function
+   - Graceful shutdown handling
+   - Pool event listeners (connect, acquire, remove, error)
+
+2. **Custom Error Classes (`src/utils/errors.ts`)**
+   - Base `AppError` class with status codes and operational flag
+   - `AuthenticationError` (401) - for missing/invalid credentials
+   - `AuthorizationError` (403) - for insufficient permissions
+   - `ValidationError` (400) - for invalid input data
+   - `NotFoundError` (404) - for missing resources
+   - `RateLimitError` (429) - for rate limit violations
+   - `DatabaseError` (500) - for database operation failures
+   - `SessionError` (401) - for invalid/expired sessions
+   - `ConflictError` (409) - for resource conflicts
+   - `isOperationalError()` helper function
+
+3. **Authentication Middleware (`src/middleware/auth.ts`)**
+   - `authenticateRequest()` - validates NextAuth session tokens against PostgreSQL
+   - `requireAuth` - Express middleware that enforces authentication
+   - `optionalAuth` - Express middleware for optional authentication
+   - User interface matching NextAuth schema (id, email, name, image)
+   - AuthenticatedRequest interface extending Express Request
+   - Automatic audit logging on authentication (fire-and-forget)
+   - Last login timestamp update (fire-and-forget)
+
+4. **Rate Limiting Middleware (`src/middleware/rateLimit.ts`)**
+   - `mcpRateLimiter` - 100 requests/minute for MCP endpoints
+   - `healthRateLimiter` - 30 requests/minute for health checks (disabled in dev)
+   - `authRateLimiter` - 10 attempts/15 minutes for authentication attempts
+   - Per-user rate limiting (uses userId if authenticated, IP otherwise)
+   - Comprehensive logging on rate limit violations
+
+5. **Error Handling Middleware (`src/middleware/error.ts`)**
+   - Global error handler with specific error type handling
+   - Zod validation error formatting
+   - Development mode stack trace inclusion
+   - Production mode error message sanitization
+   - 404 handler for undefined routes
+   - `asyncHandler` wrapper for catching async errors
+
+6. **Logger Middleware (`src/middleware/logger.ts`)**
+   - `requestLogger` - logs all incoming requests with timing
+   - Response finish/error event logging
+   - Duration tracking for all requests
+   - Log level based on response status (warn for 4xx/5xx)
+   - `auditLogger` - factory function for creating audit log middleware
+
+7. **Server Integration (`src/server.ts`)**
+   - Integrated all middleware into Express app
+   - Updated CORS to expose rate limit headers
+   - Health check endpoint now includes database health status
+   - MCP endpoint with authentication and rate limiting
+   - Proper middleware ordering (logging → routes → 404 → error handler)
+   - Graceful database shutdown on process termination
+
+8. **Graceful Shutdown (`src/index.ts`)**
+   - Database connection pool cleanup on SIGTERM/SIGINT
+   - Database cleanup on uncaught exceptions and unhandled rejections
+   - Comprehensive error logging before shutdown
+
+**Database Schema Requirements:**
+The authentication system expects the following PostgreSQL tables (NextAuth schema):
+```sql
+-- Users table
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  name TEXT,
+  image TEXT,
+  "updatedAt" TIMESTAMP DEFAULT NOW()
+);
+
+-- Sessions table
+CREATE TABLE sessions (
+  id TEXT PRIMARY KEY,
+  "sessionToken" TEXT NOT NULL UNIQUE,
+  "userId" TEXT NOT NULL REFERENCES users(id),
+  expires TIMESTAMP NOT NULL
+);
+
+-- Audit logs table (optional but recommended)
+CREATE TABLE audit_logs (
+  id SERIAL PRIMARY KEY,
+  "userId" TEXT REFERENCES users(id),
+  action TEXT NOT NULL,
+  metadata JSONB,
+  "createdAt" TIMESTAMP DEFAULT NOW()
+);
+```
+
+**Deliverables:**
+- ✅ Auth middleware that validates NextAuth sessions
+- ✅ Database connection with health checks
+- ✅ Rate limiting (per user and per IP)
+- ✅ Comprehensive error handling
+- ✅ Request/response logging
+- ✅ MCP endpoint with authentication enforcement
+- ✅ Graceful shutdown handling
+- ✅ All TypeScript compilation errors resolved
+
+**Build Status:**
+```bash
+cd apps/mcp-server && npm run build
+# ✅ Successful - no errors
+```
+
+**What's NOT Implemented (Deferred):**
+- Web app API endpoint for providing session tokens (`/api/mcp/session`) - **Reason:** Web app doesn't exist yet in monorepo
+- End-to-end authentication testing - **Reason:** Requires PostgreSQL database setup and NextAuth configuration
+
+**Next Phase:** Phase 3 - Task Tools (requires PostgreSQL database with NextAuth tables)

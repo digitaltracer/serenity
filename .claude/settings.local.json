@@ -76,7 +76,8 @@
       "Bash(gtimeout 15s npm:*)",
       "Bash(NODE_ENV=development npm run electron:*)",
       "Bash(/tmp/aiassist_part1.ts)",
-      "Bash(/tmp/aiassist_part2.ts)"
+      "Bash(/tmp/aiassist_part2.ts)",
+      "Bash(npm -w @serenity/mcp-server run build)"
     ],
     "deny": []
   }

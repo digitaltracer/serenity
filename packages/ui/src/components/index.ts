@@ -1,6 +1,7 @@
 export * from './Button';
 export * from './Input';
 export * from './Card';
+export * from './Alert';
 export * from './Sidebar';
 export * from './TaskCard';
 export * from './ProgressBar';

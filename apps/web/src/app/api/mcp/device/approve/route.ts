@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/config';
+import { auth } from '@/lib/auth/config';
 import { db } from '@/lib/db/postgres';
 import { validateUserCode } from '@/lib/mcp/device-flow-utils';
 
@@ -26,7 +25,7 @@ import { validateUserCode } from '@/lib/mcp/device-flow-utils';
 export async function POST(req: NextRequest) {
   try {
     // Check authentication
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }

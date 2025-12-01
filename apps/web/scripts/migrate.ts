@@ -72,6 +72,23 @@ async function runMigrations() {
       }
     }
 
+    // Run MCP device flow schema
+    const mcpDeviceFlowPath = join(__dirname, '../../../packages/database/src/schema/mcp-device-flow.sql')
+    console.log(`📄 Running MCP device flow schema from: ${mcpDeviceFlowPath}`)
+    const mcpDeviceFlowSql = readFileSync(mcpDeviceFlowPath, 'utf-8')
+
+    try {
+      await pool.query(mcpDeviceFlowSql)
+      console.log('✅ MCP device flow schema applied')
+    } catch (err: any) {
+      // Check if error is because tables already exist
+      if (err.code === '42P07' || err.code === '42710') {
+        console.log('ℹ️  MCP tables already exist, skipping...')
+      } else {
+        throw err
+      }
+    }
+
     console.log('✅ Migration completed successfully!')
 
     // Show table count

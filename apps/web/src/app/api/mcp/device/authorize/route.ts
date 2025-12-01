@@ -14,6 +14,9 @@ import {
 } from '@/lib/mcp/device-flow-utils';
 import { rateLimitDeviceAuth } from '@/lib/mcp/rate-limiter';
 
+// Force dynamic rendering (API routes should not be statically generated)
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   // Rate limiting: max 3 requests per IP per hour
   const rateLimitResult = await rateLimitDeviceAuth(req);

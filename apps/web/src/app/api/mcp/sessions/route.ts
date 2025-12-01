@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { db } from '@/lib/db/postgres';
 
+// Force dynamic rendering (API routes should not be statically generated)
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/mcp/sessions
  *

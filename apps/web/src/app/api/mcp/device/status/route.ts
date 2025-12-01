@@ -3,6 +3,9 @@ import { db } from '@/lib/db/postgres';
 import { generateMCPSessionToken } from '@/lib/mcp/device-flow-utils';
 import { shouldRateLimitPolling } from '@/lib/mcp/rate-limiter';
 
+// Force dynamic rendering (API routes should not be statically generated)
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/mcp/device/status
  *

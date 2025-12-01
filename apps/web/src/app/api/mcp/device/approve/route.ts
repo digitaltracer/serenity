@@ -3,6 +3,9 @@ import { auth } from '@/lib/auth/config';
 import { db } from '@/lib/db/postgres';
 import { validateUserCode } from '@/lib/mcp/device-flow-utils';
 
+// Force dynamic rendering (API routes should not be statically generated)
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/mcp/device/approve
  *

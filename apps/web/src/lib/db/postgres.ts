@@ -92,6 +92,11 @@ export const db = {
   },
 }
 
+// Helper function to get the pool instance
+export function getPostgresPool(): Pool {
+  return DatabasePool.getInstance()
+}
+
 // Helper function to test database connection
 export async function testDatabaseConnection(): Promise<boolean> {
   try {

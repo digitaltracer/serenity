@@ -112,11 +112,36 @@ const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttribu
 const CardContent = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, children, ...props }, ref) => {
     const compactMode = useSelector(selectCompactMode);
-    
+
     return (
       <div
         ref={ref}
         className={cn(
+          // Compact mode responsive padding
+          {
+            'p-8 pt-6': !compactMode,
+            'p-6 pt-4': compactMode,
+          },
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
+);
+
+const CardFooter = React.forwardRef<HTMLDivElement, CardProps>(
+  ({ className, children, ...props }, ref) => {
+    const compactMode = useSelector(selectCompactMode);
+
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          'flex items-center',
+          'border-t border-border',
           // Compact mode responsive padding
           {
             'p-8 pt-6': !compactMode,
@@ -137,5 +162,6 @@ CardHeader.displayName = 'CardHeader';
 CardTitle.displayName = 'CardTitle';
 CardDescription.displayName = 'CardDescription';
 CardContent.displayName = 'CardContent';
+CardFooter.displayName = 'CardFooter';
 
-export { Card, CardHeader, CardTitle, CardDescription, CardContent };
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter };

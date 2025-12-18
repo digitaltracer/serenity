@@ -27,7 +27,8 @@ export interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Authenticate request using MCP session token (OAuth Device Flow)
+ * Authenticate request using MCP access token (OAuth 2.0)
+ * Supports both OAuth redirect flow and device flow
  *
  * @param authHeader - Authorization header value
  * @returns User object if authenticated, null otherwise
@@ -47,11 +48,11 @@ export async function authenticateRequest(
     return null;
   }
 
-  // Extract session token
-  const sessionToken = authHeader.substring(7); // Remove 'Bearer '
+  // Extract access token
+  const accessToken = authHeader.substring(7); // Remove 'Bearer '
 
-  if (!sessionToken || sessionToken.length === 0) {
-    logger.debug('Session token is empty');
+  if (!accessToken || accessToken.length === 0) {
+    logger.debug('Access token is empty');
     return null;
   }
 
@@ -63,20 +64,19 @@ export async function authenticateRequest(
         u.email,
         u.name,
         u.image,
-        s.expires_at,
+        s.access_token_expires_at,
         s.revoked_at,
         s.id as session_id
       FROM mcp_sessions s
       JOIN users u ON s.user_id = u.id
-      WHERE s.session_token = $1
-        AND s.expires_at > NOW()
+      WHERE s.access_token = $1
         AND s.revoked_at IS NULL
-    `, [sessionToken]);
+    `, [accessToken]);
 
     // No valid session found
     if (result.rows.length === 0) {
-      logger.debug('No valid MCP session found for token', {
-        tokenPrefix: sessionToken.substring(0, 10) + '...',
+      logger.debug('No valid MCP session found for access token', {
+        tokenPrefix: accessToken.substring(0, 10) + '...',
       });
       return null;
     }
@@ -86,10 +86,19 @@ export async function authenticateRequest(
       email: string;
       name: string | null;
       image: string | null;
-      expires_at: Date;
+      access_token_expires_at: Date;
       revoked_at: Date | null;
       session_id: string;
     };
+
+    // Check if access token is expired
+    if (new Date(user.access_token_expires_at) <= new Date()) {
+      logger.debug('Access token expired', {
+        sessionId: user.session_id,
+        expiresAt: user.access_token_expires_at,
+      });
+      return null; // Client should refresh using refresh token
+    }
 
     // Update last_used_at for MCP session (fire and forget - don't block response)
     authAdapter.query(`

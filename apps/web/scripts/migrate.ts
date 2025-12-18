@@ -89,6 +89,25 @@ async function runMigrations() {
       }
     }
 
+    // Run MCP OAuth migration (adds refresh tokens and OAuth flow)
+    const mcpOAuthPath = join(__dirname, '../../../packages/database/src/schema/mcp-oauth.sql')
+    console.log(`📄 Running MCP OAuth migration from: ${mcpOAuthPath}`)
+    const mcpOAuthSql = readFileSync(mcpOAuthPath, 'utf-8')
+
+    try {
+      await pool.query(mcpOAuthSql)
+      console.log('✅ MCP OAuth migration applied')
+      console.log('⚠️  NOTE: All existing MCP sessions have been invalidated')
+      console.log('💡 Users must re-authenticate through web app settings or device flow')
+    } catch (err: any) {
+      // Check if error is because columns already exist
+      if (err.code === '42701' || err.code === '42P07') {
+        console.log('ℹ️  MCP OAuth schema already applied, skipping...')
+      } else {
+        throw err
+      }
+    }
+
     console.log('✅ Migration completed successfully!')
 
     // Show table count

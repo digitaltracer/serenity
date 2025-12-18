@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/postgres';
-import { generateMCPSessionToken } from '@/lib/mcp/device-flow-utils';
 import { shouldRateLimitPolling } from '@/lib/mcp/rate-limiter';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  getAccessTokenExpiration,
+  getRefreshTokenExpiration
+} from '@/lib/mcp/oauth-utils';
 
 // Force dynamic rendering (API routes should not be statically generated)
 export const dynamic = 'force-dynamic';
@@ -17,7 +22,7 @@ export const dynamic = 'force-dynamic';
  *
  * Returns:
  * - 200: { status: "pending" } - Still waiting for user approval
- * - 200: { status: "approved", access_token, token_type: "Bearer", expires_in } - Approved, token created
+ * - 200: { status: "approved", access_token, refresh_token, token_type: "Bearer", expires_in, refresh_expires_in } - Approved, tokens created
  * - 400: { error: "expired_token" } - Device code expired (>10 min)
  * - 400: { error: "access_denied" } - User denied the request
  * - 429: { error: "slow_down" } - Too many polls (>120)
@@ -93,54 +98,69 @@ export async function GET(req: NextRequest) {
       case 'approved':
         // Check if session already created (prevent duplicate sessions on repeated polls)
         const existingSession = await db.query(
-          `SELECT session_token, expires_at
+          `SELECT access_token, refresh_token, access_token_expires_at, refresh_token_expires_at
            FROM mcp_sessions
            WHERE user_id = $1
              AND device_fingerprint = $2
              AND revoked_at IS NULL
-             AND expires_at > NOW()
+             AND refresh_token_expires_at > NOW()
            ORDER BY created_at DESC
            LIMIT 1`,
           [deviceRecord.user_id, deviceRecord.device_fingerprint || null]
         );
 
-        let sessionToken: string;
-        let expiresIn: number;
+        let accessToken: string;
+        let refreshToken: string;
+        let accessExpiresIn: number;
+        let refreshExpiresIn: number;
 
         if (existingSession.rows.length > 0) {
-          // Return existing session
-          sessionToken = existingSession.rows[0].session_token;
-          const expiresAt = new Date(existingSession.rows[0].expires_at);
-          expiresIn = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
+          // Return existing session tokens
+          accessToken = existingSession.rows[0].access_token;
+          refreshToken = existingSession.rows[0].refresh_token;
+
+          const accessExpiresAt = new Date(existingSession.rows[0].access_token_expires_at);
+          const refreshExpiresAt = new Date(existingSession.rows[0].refresh_token_expires_at);
+
+          accessExpiresIn = Math.max(0, Math.floor((accessExpiresAt.getTime() - Date.now()) / 1000));
+          refreshExpiresIn = Math.max(0, Math.floor((refreshExpiresAt.getTime() - Date.now()) / 1000));
         } else {
-          // Create new MCP session
-          sessionToken = generateMCPSessionToken();
-          const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
-          expiresIn = 90 * 24 * 60 * 60; // 90 days in seconds
+          // Create new MCP session with both access and refresh tokens
+          accessToken = generateAccessToken();
+          refreshToken = generateRefreshToken();
+          const accessExpiresAt = getAccessTokenExpiration(); // 1 hour
+          const refreshExpiresAt = getRefreshTokenExpiration(); // 90 days
+
+          accessExpiresIn = 3600; // 1 hour in seconds
+          refreshExpiresIn = 7776000; // 90 days in seconds
 
           await db.query(
             `INSERT INTO mcp_sessions (
-              session_token, user_id, device_name, device_fingerprint,
-              scopes, expires_at, last_used_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+              access_token, refresh_token, user_id, device_name, device_fingerprint,
+              scopes, access_token_expires_at, refresh_token_expires_at, last_used_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
             [
-              sessionToken,
+              accessToken,
+              refreshToken,
               deviceRecord.user_id,
               deviceRecord.device_name || null,
               deviceRecord.device_fingerprint || null,
               ['mcp:read', 'mcp:write'], // Default scopes
-              expiresAt,
+              accessExpiresAt,
+              refreshExpiresAt,
             ]
           );
 
-          console.log(`Created MCP session for user ${deviceRecord.user_id}`);
+          console.log(`Created MCP session for user ${deviceRecord.user_id} with access and refresh tokens`);
         }
 
         return NextResponse.json({
           status: 'approved',
-          access_token: sessionToken,
+          access_token: accessToken,
+          refresh_token: refreshToken,
           token_type: 'Bearer',
-          expires_in: expiresIn,
+          expires_in: accessExpiresIn,
+          refresh_expires_in: refreshExpiresIn,
         });
 
       case 'expired':

@@ -28,15 +28,19 @@ interface DeviceAuthResponse {
 interface PollResponse {
   status: 'pending' | 'approved' | 'denied' | 'expired';
   access_token?: string;
+  refresh_token?: string;
   token_type?: string;
   expires_in?: number;
+  refresh_expires_in?: number;
   error?: string;
   error_description?: string;
 }
 
 interface SavedSession {
-  token: string;
-  expiresAt: string;
+  accessToken: string;
+  refreshToken: string;
+  accessExpiresAt: string;
+  refreshExpiresAt: string;
 }
 
 export class DeviceFlowAuthService {
@@ -49,7 +53,7 @@ export class DeviceFlowAuthService {
   }
 
   /**
-   * Full device flow: request code → display to user → poll → return token
+   * Full device flow: request code → display to user → poll → return access token
    */
   async authorize(): Promise<string> {
     // Step 1: Request device code
@@ -58,32 +62,39 @@ export class DeviceFlowAuthService {
     // Step 2: Display to user
     this.displayInstructions(deviceAuth);
 
-    // Step 3: Poll for token
-    const token = await this.pollForToken(deviceAuth.device_code, deviceAuth.interval);
+    // Step 3: Poll for tokens
+    const tokens = await this.pollForToken(deviceAuth.device_code, deviceAuth.interval);
 
-    // Step 4: Save token
-    await this.saveSession(token, deviceAuth.expires_in);
+    // Step 4: Save tokens
+    await this.saveTokens(tokens);
 
-    return token;
+    return tokens.access_token;
   }
 
   /**
    * Load saved session from file
-   * Returns null if no session or session expired
+   * Automatically refreshes access token if expired but refresh token is valid
+   * Returns null if no session or refresh token expired
    */
   async loadSession(): Promise<string | null> {
     try {
       const content = await fs.readFile(this.sessionFilePath, 'utf-8');
       const session: SavedSession = JSON.parse(content);
 
-      // Check expiration
-      if (new Date(session.expiresAt) <= new Date()) {
-        console.log('Saved session expired, need to re-authenticate');
+      // Check if refresh token expired
+      if (new Date(session.refreshExpiresAt) <= new Date()) {
+        console.log('Refresh token expired, need to re-authenticate');
         return null;
       }
 
-      console.log('Loaded saved MCP session');
-      return session.token;
+      // Check if access token expired
+      if (new Date(session.accessExpiresAt) <= new Date()) {
+        console.log('Access token expired, refreshing...');
+        return await this.refreshAccessToken(session.refreshToken);
+      }
+
+      console.log('Loaded saved MCP session (access token valid)');
+      return session.accessToken;
     } catch (error) {
       // File doesn't exist or invalid JSON
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
@@ -94,21 +105,66 @@ export class DeviceFlowAuthService {
   }
 
   /**
-   * Save session token to file with 0600 permissions
+   * Refresh access token using refresh token (with rotation)
+   * Updates both access and refresh tokens
    */
-  async saveSession(token: string, expiresIn: number): Promise<void> {
+  async refreshAccessToken(refreshToken: string): Promise<string> {
+    try {
+      const response = await axios.post(
+        `${this.webAppUrl}/api/oauth/mcp/token`,
+        {
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: 'serenity-desktop',
+        },
+        {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 10000,
+        }
+      );
+
+      const { access_token, refresh_token: new_refresh_token, expires_in, refresh_expires_in } = response.data;
+
+      // Save BOTH new tokens (rotation)
+      const session: SavedSession = {
+        accessToken: access_token,
+        refreshToken: new_refresh_token,
+        accessExpiresAt: new Date(Date.now() + expires_in * 1000).toISOString(),
+        refreshExpiresAt: new Date(Date.now() + refresh_expires_in * 1000).toISOString(),
+      };
+
+      await this.saveTokens(session);
+
+      console.log('✓ Tokens refreshed successfully');
+      return access_token;
+    } catch (error) {
+      console.error('Failed to refresh access token:', error);
+      throw new Error('Token refresh failed. Please re-authenticate.');
+    }
+  }
+
+  /**
+   * Save tokens to file with 0600 permissions
+   */
+  private async saveTokens(tokens: SavedSession | { access_token: string; refresh_token: string; expires_in: number; refresh_expires_in: number }): Promise<void> {
     try {
       // Ensure directory exists
       const dir = path.dirname(this.sessionFilePath);
       await fs.mkdir(dir, { recursive: true, mode: 0o700 });
 
-      // Calculate expiration
-      const expiresAt = new Date(Date.now() + expiresIn * 1000);
+      let session: SavedSession;
 
-      const session: SavedSession = {
-        token,
-        expiresAt: expiresAt.toISOString(),
-      };
+      // Handle both response format and SavedSession format
+      if ('access_token' in tokens) {
+        session = {
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          accessExpiresAt: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+          refreshExpiresAt: new Date(Date.now() + tokens.refresh_expires_in * 1000).toISOString(),
+        };
+      } else {
+        session = tokens;
+      }
 
       // Write file with restrictive permissions
       await fs.writeFile(this.sessionFilePath, JSON.stringify(session, null, 2), {
@@ -157,9 +213,9 @@ export class DeviceFlowAuthService {
   }
 
   /**
-   * Poll for token until approved/denied/expired
+   * Poll for tokens until approved/denied/expired
    */
-  private async pollForToken(deviceCode: string, interval: number): Promise<string> {
+  private async pollForToken(deviceCode: string, interval: number): Promise<{ access_token: string; refresh_token: string; expires_in: number; refresh_expires_in: number }> {
     const startTime = Date.now();
     const maxWaitTime = 10 * 60 * 1000; // 10 minutes
 
@@ -178,9 +234,14 @@ export class DeviceFlowAuthService {
 
         const data = response.data;
 
-        if (data.status === 'approved' && data.access_token) {
+        if (data.status === 'approved' && data.access_token && data.refresh_token) {
           console.log('\n✓ Authorization successful!\n');
-          return data.access_token;
+          return {
+            access_token: data.access_token,
+            refresh_token: data.refresh_token,
+            expires_in: data.expires_in || 3600,
+            refresh_expires_in: data.refresh_expires_in || 7776000,
+          };
         }
 
         if (data.status === 'denied') {

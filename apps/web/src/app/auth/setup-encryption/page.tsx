@@ -1,9 +1,19 @@
 import { auth } from '@/lib/auth/config'
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db/postgres'
 import { EncryptionSetup } from '@/components/auth/EncryptionSetup'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'Setup Encryption',
+  description: 'Set up end-to-end encryption for your Serenity Notes account.',
+  robots: {
+    index: false,
+    follow: false,
+  },
+}
 
 export default async function SetupEncryptionPage() {
   const session = await auth()

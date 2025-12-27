@@ -1,7 +1,3 @@
-/**
- * React Hooks for Drag and Drop Functionality
- * Provides easy-to-use hooks for implementing drag and drop in components
- */
 import { DragItem, DropZone, DropResult } from '../utils/dragDrop';
 /**
  * Hook for making an element draggable

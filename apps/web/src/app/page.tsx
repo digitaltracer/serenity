@@ -1,7 +1,20 @@
 import { auth } from '@/lib/auth/config'
+import type { Metadata } from 'next'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'Serenity Notes - AI-Powered Productivity & Journal App',
+  description:
+    'Boost productivity with Serenity Notes: task management, journaling, AI insights. Privacy-first, end-to-end encrypted, self-hosted. Available for macOS.',
+  openGraph: {
+    title: 'Serenity Notes - AI-Powered Productivity & Journal App',
+    description:
+      'Boost productivity with Serenity Notes: task management, journaling, AI insights. Privacy-first, end-to-end encrypted, self-hosted.',
+    url: 'https://serenitynotes.cloud',
+  },
+}
 
 export default async function LandingPage() {
   const session = await auth()
@@ -13,8 +26,40 @@ export default async function LandingPage() {
 
   const getStartedText = session?.user ? 'Go to Dashboard' : 'Get Started'
 
+  // Structured data for SEO (Schema.org JSON-LD)
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Serenity Notes',
+    applicationCategory: 'ProductivityApplication',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+    },
+    operatingSystem: 'macOS, Web',
+    description:
+      'Privacy-first productivity app combining task management, journaling, and AI-powered insights',
+    featureList: [
+      'Task Management',
+      'Journaling',
+      'AI Insights',
+      'End-to-end Encryption',
+      'Offline Support',
+      'Goal Tracking',
+      'Analytics',
+    ],
+    screenshot: 'https://serenitynotes.cloud/logo-light.png',
+    url: 'https://serenitynotes.cloud',
+    downloadUrl: 'https://github.com/serenity-notes/serenity/releases/latest',
+  }
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-24">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <div className="max-w-2xl text-center space-y-6">
         <h1 className="text-6xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
           Serenity Notes

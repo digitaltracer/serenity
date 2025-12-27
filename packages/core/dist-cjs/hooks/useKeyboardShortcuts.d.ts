@@ -1,7 +1,3 @@
-/**
- * React Hook for Keyboard Shortcuts
- * Provides keyboard shortcut functionality with context awareness
- */
 import { KeyboardShortcut, ShortcutContext } from '../utils/keyboardShortcuts';
 export interface UseKeyboardShortcutsOptions {
     shortcuts: KeyboardShortcut[];

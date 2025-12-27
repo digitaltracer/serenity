@@ -1,3 +1,5 @@
+'use client';
+
 import { useEffect, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { checkAutoLock, updateLastActivity, selectAuth } from '../store/slices/authSlice';

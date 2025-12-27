@@ -1,10 +1,11 @@
 "use strict";
+'use client';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.useListNavigation = exports.useShortcutActions = exports.useContextualKeyboardShortcuts = exports.useGlobalKeyboardShortcuts = exports.useKeyboardShortcuts = void 0;
 /**
  * React Hook for Keyboard Shortcuts
  * Provides keyboard shortcut functionality with context awareness
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.useListNavigation = exports.useShortcutActions = exports.useContextualKeyboardShortcuts = exports.useGlobalKeyboardShortcuts = exports.useKeyboardShortcuts = void 0;
 const react_1 = require("react");
 const react_redux_1 = require("react-redux");
 const logger_1 = require("../utils/logger");

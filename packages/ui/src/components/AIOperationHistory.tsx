@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useMemo } from 'react';
 import { cn } from '../utils/cn';
 import { Filter, ChevronDown, History } from 'lucide-react';

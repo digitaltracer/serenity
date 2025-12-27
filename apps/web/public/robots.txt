@@ -1,0 +1,34 @@
+# robots.txt for Serenity Notes
+# Privacy-first productivity app
+
+User-agent: *
+
+# Allow public pages
+Allow: /
+Allow: /about
+Allow: /login
+
+# Disallow authenticated dashboard routes
+Disallow: /home
+Disallow: /today
+Disallow: /actionhub
+Disallow: /journal
+Disallow: /insights
+Disallow: /analytics
+Disallow: /goals
+Disallow: /summary
+Disallow: /integrations
+Disallow: /settings
+Disallow: /database
+Disallow: /device
+
+# Disallow auth and API routes
+Disallow: /api/
+Disallow: /oauth/
+Disallow: /auth/setup-encryption
+
+# Sitemap location
+Sitemap: https://serenitynotes.cloud/sitemap.xml
+
+# Crawl delay (be polite to server)
+Crawl-delay: 1

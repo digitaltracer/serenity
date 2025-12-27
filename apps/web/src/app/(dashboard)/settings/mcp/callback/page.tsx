@@ -178,7 +178,7 @@ function CallbackContent() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Alert variant="destructive">
+            <Alert variant="error">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
@@ -213,7 +213,7 @@ function CallbackContent() {
         </Card>
 
         {/* Warning */}
-        <Alert variant="destructive">
+        <Alert variant="warning">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             <strong>Important:</strong> Save these tokens now. They won't be shown again for security reasons.

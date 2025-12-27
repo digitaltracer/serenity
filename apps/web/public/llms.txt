@@ -1,0 +1,81 @@
+# Serenity Notes
+
+> Privacy-first productivity app combining task management, journaling, and AI insights
+
+## Description
+
+Serenity Notes is a comprehensive productivity application that helps users manage tasks, track journal entries, and gain AI-powered insights into their productivity patterns. Built with privacy as a core principle, it offers end-to-end encryption, self-hosted deployment options, and offline-first functionality.
+
+## Features
+
+### Core Functionality
+- **Task Management**: Organize tasks with projects, priorities, tags, and due dates. Support for subtasks, recurring tasks, and smart scheduling.
+- **Journaling**: Daily journaling with rich text formatting, mood tracking, and reflection prompts.
+- **AI Insights**: Productivity pattern analysis powered by Anthropic Claude and OpenAI GPT-4. Identifies trends, suggests improvements, and tracks goal progress.
+- **Goal Tracking**: Set and monitor long-term goals with progress visualization and milestone tracking.
+- **Analytics**: Comprehensive productivity metrics with charts and trend analysis.
+
+### Privacy & Security
+- **End-to-end Encryption**: All sensitive data encrypted with user-controlled master password.
+- **Self-hosted**: Deploy on your own infrastructure for complete data control.
+- **Offline-first**: Desktop app works completely offline with local SQLite database.
+- **Zero-knowledge Architecture**: Server never has access to unencrypted user data.
+
+### Integrations
+- **Google Calendar**: Bidirectional sync with calendar events and tasks.
+- **GitHub**: Track issues, pull requests, and development activity.
+- **MCP (Model Context Protocol)**: Extensible integration framework for AI assistants.
+
+## Technology Stack
+
+### Desktop Application
+- **Framework**: Electron (cross-platform)
+- **Frontend**: React, TypeScript, Tailwind CSS
+- **State Management**: Redux Toolkit
+- **Database**: SQLite (better-sqlite3)
+- **Platforms**: macOS (available), Windows (coming soon), Linux (planned)
+
+### Web Application
+- **Framework**: Next.js 14 (App Router)
+- **Frontend**: React, TypeScript, Tailwind CSS
+- **Authentication**: NextAuth.js with OAuth (Google, GitHub)
+- **Database**: PostgreSQL (production), SQLite (development)
+- **Deployment**: Self-hosted or cloud platforms (Vercel, Netlify)
+
+### Architecture
+- **Monorepo**: Turborepo with shared packages (@serenity/core, @serenity/ui, @serenity/database)
+- **AI Services**: Modular architecture supporting multiple AI providers
+- **IPC Communication**: Secure Electron IPC with middleware-based validation
+
+### AI Capabilities
+- **Providers**: Anthropic Claude, OpenAI GPT-4
+- **Features**: Context-aware prompts, incremental analysis, theme tracking, quality scoring
+- **Analysis Modes**: Incremental (new data only), Window (date ranges), Full (complete re-analysis)
+
+## Use Cases
+
+1. **Personal Productivity**: Individuals managing daily tasks, journaling, and personal goals
+2. **Self-hosted Privacy**: Users who require complete data ownership and control
+3. **AI-assisted Planning**: Leveraging AI insights to improve productivity habits
+4. **Cross-platform Workflow**: Seamless sync between desktop and web applications
+5. **Developer Productivity**: GitHub integration for tracking development work alongside personal tasks
+
+## URLs
+
+- **Website**: https://serenitynotes.cloud
+- **GitHub Repository**: https://github.com/serenity-notes/serenity
+- **Documentation**: https://serenitynotes.cloud/about
+- **Download**: https://serenitynotes.cloud/about (macOS desktop app)
+
+## Contact & Support
+
+- **Issues & Bug Reports**: https://github.com/serenity-notes/serenity/issues
+- **Feature Requests**: https://github.com/serenity-notes/serenity/discussions
+
+## License
+
+Open source project - see repository for licensing details.
+
+## Keywords
+
+productivity app, task management, journal app, AI insights, privacy-focused, end-to-end encryption, self-hosted, offline-first, note-taking, goal tracking, Electron app, Next.js, React, TypeScript, SQLite, PostgreSQL, Anthropic Claude, OpenAI GPT-4, MCP protocol

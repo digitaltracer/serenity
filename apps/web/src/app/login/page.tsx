@@ -1,8 +1,19 @@
 import { auth } from '@/lib/auth/config'
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { OAuthButtons } from '@/components/auth/OAuthButtons'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'Login',
+  description:
+    'Sign in to Serenity Notes to access your tasks, journal entries, and AI-powered productivity insights.',
+  robots: {
+    index: false,
+    follow: true,
+  },
+}
 
 export default async function LoginPage() {
   // If user is already signed in, redirect to encryption setup or home

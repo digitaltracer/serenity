@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * React Hook for Keyboard Shortcuts
  * Provides keyboard shortcut functionality with context awareness

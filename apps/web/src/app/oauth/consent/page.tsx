@@ -143,7 +143,7 @@ function ConsentForm() {
   if (error && (!clientId || !redirectUri)) {
     return (
       <div className="container max-w-md mx-auto py-12 px-4">
-        <Alert variant="destructive">
+        <Alert variant="error">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
@@ -168,7 +168,7 @@ function ConsentForm() {
 
         <CardContent className="space-y-6">
           {error && (
-            <Alert variant="destructive">
+            <Alert variant="error">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>

@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * React Hooks for Drag and Drop Functionality
  * Provides easy-to-use hooks for implementing drag and drop in components

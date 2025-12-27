@@ -1,10 +1,11 @@
 "use strict";
+'use client';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.usePriorityDropZone = exports.useProjectDropZone = exports.useTaskDragDrop = exports.useDropZone = exports.useDraggable = void 0;
 /**
  * React Hooks for Drag and Drop Functionality
  * Provides easy-to-use hooks for implementing drag and drop in components
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.usePriorityDropZone = exports.useProjectDropZone = exports.useTaskDragDrop = exports.useDropZone = exports.useDraggable = void 0;
 const react_1 = require("react");
 const react_redux_1 = require("react-redux");
 const dragDrop_1 = require("../utils/dragDrop");

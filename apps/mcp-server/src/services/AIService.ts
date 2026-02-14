@@ -1,5 +1,4 @@
-import { PostgresAdapter } from '@serenity/database';
-import { config } from '../config/env.js';
+import { db } from '../utils/pool.js';
 import logger from '../utils/logger.js';
 import { DatabaseError } from '../utils/errors.js';
 
@@ -59,15 +58,11 @@ export interface GetInsightsFilters {
 
 /**
  * AI Service
- * Handles AI insights and summaries using existing database infrastructure
+ * Handles AI insights and summaries using shared database pool
  */
 export class AIService {
-  private adapter: PostgresAdapter;
-
   constructor() {
-    this.adapter = new PostgresAdapter({
-      connectionString: config.databaseUrl,
-    });
+    // No initialization needed - uses shared pool
   }
 
   /**
@@ -122,7 +117,7 @@ export class AIService {
         params.push(filters.offset);
       }
 
-      const result = await this.adapter.query(query, params);
+      const result = await db.query(query, params);
 
       logger.info('AI insights retrieved successfully', {
         userId,
@@ -165,7 +160,7 @@ export class AIService {
           WHERE user_id = $1
         `;
 
-        const tasksResult = await this.adapter.query(tasksQuery, [userId]);
+        const tasksResult = await db.query(tasksQuery, [userId]);
         const tasks = tasksResult.rows;
 
         // Analyze task patterns and generate insights
@@ -268,7 +263,7 @@ export class AIService {
           LIMIT 30
         `;
 
-        const journalResult = await this.adapter.query(journalQuery, [userId]);
+        const journalResult = await db.query(journalQuery, [userId]);
         const entries = journalResult.rows;
 
         if (entries.length > 0) {
@@ -388,7 +383,7 @@ export class AIService {
         ORDER BY created_at DESC
       `;
 
-      const tasksResult = await this.adapter.query(tasksQuery, [
+      const tasksResult = await db.query(tasksQuery, [
         userId,
         params.period.start,
         params.period.end,
@@ -411,7 +406,7 @@ export class AIService {
         ORDER BY date DESC
       `;
 
-      const journalResult = await this.adapter.query(journalQuery, [
+      const journalResult = await db.query(journalQuery, [
         userId,
         params.period.start,
         params.period.end,
@@ -508,7 +503,7 @@ export class AIService {
    * Create and store an insight in the database
    */
   private async createInsight(_userId: string, data: Omit<AIInsight, 'id' | 'createdAt'>): Promise<AIInsight> {
-    const result = await this.adapter.query(
+    const result = await db.query(
       `INSERT INTO ai_insights (
         provider, type, title, description, confidence,
         category, actionable, metadata
@@ -543,7 +538,7 @@ export class AIService {
    * Create and store a recap in the database
    */
   private async createRecap(_userId: string, data: Omit<AIRecap, 'id' | 'createdAt'>): Promise<AIRecap> {
-    const result = await this.adapter.query(
+    const result = await db.query(
       `INSERT INTO ai_recaps (
         provider, type, title, summary, highlights,
         challenges, recommendations, period, metadata

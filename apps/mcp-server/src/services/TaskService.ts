@@ -1,5 +1,4 @@
-import { PostgresAdapter } from '@serenity/database';
-import { config } from '../config/env.js';
+import { db } from '../utils/pool.js';
 import logger from '../utils/logger.js';
 import { NotFoundError, ValidationError, DatabaseError } from '../utils/errors.js';
 import type {
@@ -17,15 +16,11 @@ export interface TaskWithSubtasks extends Task {
 
 /**
  * Task Service
- * Uses PostgresAdapter from @serenity/database for database operations
+ * Uses shared database pool for database operations
  */
 export class TaskService {
-  private adapter: PostgresAdapter;
-
   constructor() {
-    this.adapter = new PostgresAdapter({
-      connectionString: config.databaseUrl,
-    });
+    // No initialization needed - uses shared pool
   }
 
   /**
@@ -126,7 +121,7 @@ export class TaskService {
         params.push(filters.offset);
       }
 
-      const result = await this.adapter.query(query, params);
+      const result = await db.query(query, params);
 
       logger.info('Tasks retrieved successfully', {
         userId,
@@ -187,7 +182,7 @@ export class TaskService {
         GROUP BY t.id
       `;
 
-      const result = await this.adapter.query(query, [taskId, userId]);
+      const result = await db.query(query, [taskId, userId]);
 
       if (result.rows.length === 0) {
         return null;
@@ -212,7 +207,7 @@ export class TaskService {
 
     try {
       // Get next order value
-      const orderResult = await this.adapter.query(
+      const orderResult = await db.query(
         `SELECT COALESCE(MAX(order_index), 0) as max_order
          FROM tasks
          WHERE user_id = $1`,
@@ -221,7 +216,7 @@ export class TaskService {
       const nextOrder = (orderResult.rows[0]?.max_order || 0) + 1;
 
       // Insert task
-      const taskResult = await this.adapter.query(
+      const taskResult = await db.query(
         `INSERT INTO tasks (
           user_id, title, description, priority,
           due_date, tags, order_index
@@ -273,7 +268,7 @@ export class TaskService {
 
     try {
       // Verify ownership
-      const ownershipCheck = await this.adapter.query(
+      const ownershipCheck = await db.query(
         `SELECT id FROM tasks WHERE id = $1 AND user_id = $2`,
         [taskId, userId]
       );
@@ -354,7 +349,7 @@ export class TaskService {
           completed_at as "completedAt"
       `;
 
-      const result = await this.adapter.query(query, values);
+      const result = await db.query(query, values);
 
       logger.info('Task updated successfully', { taskId });
       return result.rows[0] as Task;
@@ -379,7 +374,7 @@ export class TaskService {
     logger.info('Completing task', { userId, taskId });
 
     try {
-      const result = await this.adapter.query(
+      const result = await db.query(
         `UPDATE tasks
          SET completed = true,
              completed_at = NOW(),
@@ -429,7 +424,7 @@ export class TaskService {
 
     try {
       // Use hard delete since the schema doesn't have deleted_at
-      const result = await this.adapter.query(
+      const result = await db.query(
         `DELETE FROM tasks
          WHERE id = $1 AND user_id = $2
          RETURNING id`,
@@ -462,7 +457,7 @@ export class TaskService {
 
     try {
       // Verify task ownership
-      const taskCheck = await this.adapter.query(
+      const taskCheck = await db.query(
         `SELECT id FROM tasks WHERE id = $1 AND user_id = $2`,
         [taskId, userId]
       );
@@ -472,7 +467,7 @@ export class TaskService {
       }
 
       // Get next order value for subtask
-      const orderResult = await this.adapter.query(
+      const orderResult = await db.query(
         `SELECT COALESCE(MAX(order_index), 0) as max_order
          FROM subtasks
          WHERE task_id = $1`,
@@ -481,7 +476,7 @@ export class TaskService {
       const nextOrder = (orderResult.rows[0]?.max_order || 0) + 1;
 
       // Insert subtask
-      const subtaskResult = await this.adapter.query(
+      const subtaskResult = await db.query(
         `INSERT INTO subtasks (task_id, title, order_index)
          VALUES ($1, $2, $3)
          RETURNING
@@ -498,7 +493,7 @@ export class TaskService {
       const subtask = subtaskResult.rows[0] as Subtask;
 
       // Update parent task's updatedAt
-      await this.adapter.query(
+      await db.query(
         `UPDATE tasks SET updated_at = NOW() WHERE id = $1`,
         [taskId]
       );

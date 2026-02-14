@@ -326,20 +326,6 @@ export async function initializeStoreData() {
     logger.error('❌ Failed to initialize store data:', { component: 'enhancedStore', operation: 'failedInitializeStore' }, error as Error);
     return false;
   }
-
-  // Load AI insights/recaps from localStorage (persisted in middleware)
-  try {
-    const insightsStr = (localStorage.getItem('serenity_ai_insights') ?? '');
-    const recapsStr = (localStorage.getItem('serenity_ai_recaps') ?? '');
-    if (insightsStr) {
-      store.dispatch(restoreInsights(JSON.parse(insightsStr)));
-    }
-    if (recapsStr) {
-      store.dispatch(restoreRecaps(JSON.parse(recapsStr)));
-    }
-  } catch (e) {
-    logger.warn('⚠️ Failed to restore AI insights/recaps:', { component: 'enhancedStore', operation: 'failedRestoreInsights/recaps:' });
-  }
 }
 
 /**

@@ -59,7 +59,6 @@ const dragDropSlice_1 = __importDefault(require("./slices/dragDropSlice"));
 const goalsSlice_1 = __importDefault(require("./slices/goalsSlice"));
 const integrationsSlice_1 = __importDefault(require("./slices/integrationsSlice"));
 const aiAssistantSlice_1 = __importDefault(require("./slices/aiAssistantSlice"));
-const aiAssistantSlice_2 = require("./slices/aiAssistantSlice");
 const insightsSlice_1 = __importDefault(require("./slices/insightsSlice"));
 const summariesSlice_1 = __importDefault(require("./slices/summariesSlice"));
 const simplifiedPersistenceMiddleware_1 = require("./middleware/simplifiedPersistenceMiddleware");
@@ -380,20 +379,6 @@ async function initializeStoreData() {
     catch (error) {
         logger_1.logger.error('❌ Failed to initialize store data:', { component: 'enhancedStore', operation: 'failedInitializeStore' }, error);
         return false;
-    }
-    // Load AI insights/recaps from localStorage (persisted in middleware)
-    try {
-        const insightsStr = (localStorage.getItem('serenity_ai_insights') ?? '');
-        const recapsStr = (localStorage.getItem('serenity_ai_recaps') ?? '');
-        if (insightsStr) {
-            exports.store.dispatch((0, aiAssistantSlice_2.restoreInsights)(JSON.parse(insightsStr)));
-        }
-        if (recapsStr) {
-            exports.store.dispatch((0, aiAssistantSlice_2.restoreRecaps)(JSON.parse(recapsStr)));
-        }
-    }
-    catch (e) {
-        logger_1.logger.warn('⚠️ Failed to restore AI insights/recaps:', { component: 'enhancedStore', operation: 'failedRestoreInsights/recaps:' });
     }
 }
 /**

@@ -1,5 +1,4 @@
-import { PostgresAdapter } from '@serenity/database';
-import { config } from '../config/env.js';
+import { db } from '../utils/pool.js';
 import logger from '../utils/logger.js';
 import { NotFoundError, ValidationError, DatabaseError } from '../utils/errors.js';
 import type {
@@ -12,15 +11,11 @@ import type {
 
 /**
  * Journal Service
- * Uses PostgresAdapter from @serenity/database for database operations
+ * Uses shared database pool for database operations
  */
 export class JournalService {
-  private adapter: PostgresAdapter;
-
   constructor() {
-    this.adapter = new PostgresAdapter({
-      connectionString: config.databaseUrl,
-    });
+    // No initialization needed - uses shared pool
   }
 
   /**
@@ -82,7 +77,7 @@ export class JournalService {
         params.push(filters.offset);
       }
 
-      const result = await this.adapter.query(query, params);
+      const result = await db.query(query, params);
 
       logger.info('Journal entries retrieved successfully', {
         userId,
@@ -123,7 +118,7 @@ export class JournalService {
         WHERE id = $1 AND user_id = $2
       `;
 
-      const result = await this.adapter.query(query, [entryId, userId]);
+      const result = await db.query(query, [entryId, userId]);
 
       if (result.rows.length === 0) {
         return null;
@@ -166,7 +161,7 @@ export class JournalService {
         LIMIT 1
       `;
 
-      const result = await this.adapter.query(query, [userId, date]);
+      const result = await db.query(query, [userId, date]);
 
       if (result.rows.length === 0) {
         return null;
@@ -191,7 +186,7 @@ export class JournalService {
 
     try {
       // Insert journal entry
-      const entryResult = await this.adapter.query(
+      const entryResult = await db.query(
         `INSERT INTO journal_entries (
           user_id, title, content, mood, tags, date
         ) VALUES ($1, $2, $3, $4, $5, $6)
@@ -238,7 +233,7 @@ export class JournalService {
 
     try {
       // Verify ownership
-      const ownershipCheck = await this.adapter.query(
+      const ownershipCheck = await db.query(
         `SELECT id FROM journal_entries WHERE id = $1 AND user_id = $2`,
         [entryId, userId]
       );
@@ -296,7 +291,7 @@ export class JournalService {
           updated_at as "updatedAt"
       `;
 
-      const result = await this.adapter.query(query, values);
+      const result = await db.query(query, values);
 
       logger.info('Journal entry updated successfully', { entryId });
       return result.rows[0] as JournalEntry;
@@ -321,7 +316,7 @@ export class JournalService {
     logger.info('Deleting journal entry', { userId, entryId });
 
     try {
-      const result = await this.adapter.query(
+      const result = await db.query(
         `DELETE FROM journal_entries
          WHERE id = $1 AND user_id = $2
          RETURNING id`,
@@ -386,7 +381,7 @@ export class JournalService {
         LIMIT $3
       `;
 
-      const result = await this.adapter.query(
+      const result = await db.query(
         searchQuery,
         [userId, query, limit]
       );

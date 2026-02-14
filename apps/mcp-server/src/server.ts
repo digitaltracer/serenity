@@ -526,8 +526,11 @@ app.use(notFoundHandler);
 // Global error handling middleware (must be last)
 app.use(errorHandler);
 
+// Server instance for graceful shutdown
+let server: ReturnType<typeof app.listen> | null = null;
+
 export function startServer(): void {
-  app.listen(config.port, () => {
+  server = app.listen(config.port, () => {
     logger.info(`Serenity MCP Server running on http://localhost:${config.port}`, {
       environment: config.nodeEnv,
       allowedOrigins: config.allowedOrigins,
@@ -535,4 +538,27 @@ export function startServer(): void {
   });
 }
 
+/**
+ * Stop the server gracefully
+ * Returns a promise that resolves when the server has stopped
+ */
+export async function stopServer(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (!server) {
+      resolve();
+      return;
+    }
+
+    server.close((err) => {
+      if (err) {
+        reject(err);
+      } else {
+        server = null;
+        resolve();
+      }
+    });
+  });
+}
+
 export default app;
+

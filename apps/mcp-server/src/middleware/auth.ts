@@ -1,13 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { PostgresAdapter } from '@serenity/database';
-import config from '../config/env.js';
+import { db } from '../utils/pool.js';
 import { AuthenticationError, SessionError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
-
-// Create adapter instance for auth queries
-const authAdapter = new PostgresAdapter({
-  connectionString: config.databaseUrl,
-});
 
 /**
  * User interface from NextAuth
@@ -58,7 +52,7 @@ export async function authenticateRequest(
 
   try {
     // Validate against mcp_sessions table in PostgreSQL
-    const result = await authAdapter.query(`
+    const result = await db.query(`
       SELECT
         u.id,
         u.email,
@@ -101,7 +95,7 @@ export async function authenticateRequest(
     }
 
     // Update last_used_at for MCP session (fire and forget - don't block response)
-    authAdapter.query(`
+    db.query(`
       UPDATE mcp_sessions
       SET last_used_at = NOW()
       WHERE id = $1
@@ -113,7 +107,7 @@ export async function authenticateRequest(
     });
 
     // Update user updatedAt timestamp (fire and forget)
-    authAdapter.query(`
+    db.query(`
       UPDATE users
       SET "updatedAt" = NOW()
       WHERE id = $1
@@ -125,7 +119,7 @@ export async function authenticateRequest(
     });
 
     // Log to audit table (fire and forget)
-    authAdapter.query(`
+    db.query(`
       INSERT INTO audit_logs ("userId", action, metadata, "createdAt")
       VALUES ($1, $2, $3, NOW())
     `, [

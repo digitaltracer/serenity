@@ -1,5 +1,4 @@
-import { PostgresAdapter } from '@serenity/database';
-import { config } from '../config/env.js';
+import { db } from '../utils/pool.js';
 import logger from '../utils/logger.js';
 import { NotFoundError, ValidationError, DatabaseError } from '../utils/errors.js';
 import type { Goal } from '../types/index.js';
@@ -36,15 +35,11 @@ export interface GoalFilters {
 
 /**
  * Goal Service
- * Uses PostgresAdapter from @serenity/database for database operations
+ * Uses shared database pool for database operations
  */
 export class GoalService {
-  private adapter: PostgresAdapter;
-
   constructor() {
-    this.adapter = new PostgresAdapter({
-      connectionString: config.databaseUrl,
-    });
+    // No initialization needed - uses shared pool
   }
 
   /**
@@ -98,7 +93,7 @@ export class GoalService {
         params.push(filters.offset);
       }
 
-      const result = await this.adapter.query(query, params);
+      const result = await db.query(query, params);
 
       logger.info('Goals retrieved successfully', {
         userId,
@@ -141,7 +136,7 @@ export class GoalService {
         WHERE id = $1 AND user_id = $2
       `;
 
-      const result = await this.adapter.query(query, [goalId, userId]);
+      const result = await db.query(query, [goalId, userId]);
 
       if (result.rows.length === 0) {
         return null;
@@ -176,7 +171,7 @@ export class GoalService {
         periodEnd: this.calculatePeriodEnd(now, data.config.timeframe),
       };
 
-      const goalResult = await this.adapter.query(
+      const goalResult = await db.query(
         `INSERT INTO goals (
           user_id, title, description, type, config, progress, status, priority, reminders
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -228,7 +223,7 @@ export class GoalService {
 
     try {
       // Verify ownership
-      const ownershipCheck = await this.adapter.query(
+      const ownershipCheck = await db.query(
         `SELECT id FROM goals WHERE id = $1 AND user_id = $2`,
         [goalId, userId]
       );
@@ -293,7 +288,7 @@ export class GoalService {
           updated_at as "updatedAt"
       `;
 
-      const result = await this.adapter.query(query, values);
+      const result = await db.query(query, values);
 
       logger.info('Goal updated successfully', { goalId });
       return result.rows[0] as Goal;
@@ -333,7 +328,7 @@ export class GoalService {
         isCompleted: current >= goal.progress.target,
       };
 
-      const result = await this.adapter.query(
+      const result = await db.query(
         `UPDATE goals
          SET progress = $1,
              status = $2,
@@ -383,7 +378,7 @@ export class GoalService {
     logger.info('Deleting goal', { userId, goalId });
 
     try {
-      const result = await this.adapter.query(
+      const result = await db.query(
         `DELETE FROM goals
          WHERE id = $1 AND user_id = $2
          RETURNING id`,

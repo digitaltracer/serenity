@@ -1,10 +1,46 @@
-import { startServer } from './server.js';
+import { startServer, stopServer } from './server.js';
 import logger from './utils/logger.js';
 import config from './config/env.js';
 import { DeviceFlowAuthService } from './services/DeviceFlowAuthService.js';
+import { db } from './utils/pool.js';
 
 // Global MCP session token (set after device flow authentication)
 export let mcpSessionToken: string | null = null;
+
+// Track if shutdown is in progress
+let isShuttingDown = false;
+
+/**
+ * Graceful shutdown handler
+ * Closes database connections and stops server
+ */
+async function gracefulShutdown(signal: string): Promise<void> {
+  if (isShuttingDown) {
+    logger.warn(`${signal} received again, forcing exit`);
+    process.exit(1);
+  }
+
+  isShuttingDown = true;
+  logger.info(`${signal} received, shutting down gracefully...`);
+
+  try {
+    // Stop accepting new requests
+    await stopServer();
+    logger.info('Server stopped accepting new requests');
+
+    // Close database pool
+    await db.close();
+    logger.info('Database connections closed');
+
+    logger.info('Graceful shutdown complete');
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during graceful shutdown', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    process.exit(1);
+  }
+}
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error: Error) => {
@@ -19,16 +55,10 @@ process.on('unhandledRejection', (reason: unknown) => {
 });
 
 // Handle SIGTERM gracefully
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Handle SIGINT gracefully (Ctrl+C)
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 /**
  * Main application entry point

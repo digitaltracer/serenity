@@ -1,0 +1,12 @@
+{
+  "name": "@serenity/macos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Serenity native macOS application",
+  "scripts": {
+    "build": "node ./scripts/run-swift-command.cjs build",
+    "test": "node ./scripts/run-swift-command.cjs test",
+    "dev": "node ./scripts/run-swift-command.cjs run SerenityMac",
+    "clean": "node ./scripts/run-swift-command.cjs package clean"
+  }
+}

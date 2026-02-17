@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 @main
 struct SerenityMacApp: App {
@@ -11,7 +12,7 @@ struct SerenityMacApp: App {
           get: { appState.selectedSection },
           set: { appState.setSection($0) }
         ))
-        .navigationSplitViewColumnWidth(min: 236, ideal: 252, max: 282)
+        .navigationSplitViewColumnWidth(min: 214, ideal: 228, max: 246)
       } detail: {
         ZStack {
           SerenityDetailBackground()
@@ -30,11 +31,12 @@ struct SerenityMacApp: App {
           }
         }
       }
-      .frame(minWidth: 1160, minHeight: 700)
+      .environmentObject(appState)
+      .frame(minWidth: 1080, minHeight: 680)
       .navigationSplitViewStyle(.balanced)
       .groupBoxStyle(SerenityPanelGroupBoxStyle())
       .tint(SerenityPalette.accent)
-      .preferredColorScheme(.dark)
+      .preferredColorScheme(appState.themePreference.colorScheme)
       .overlay(alignment: .top) {
         if let toast = appState.activeToast {
           ToastBanner(message: toast.message)
@@ -45,6 +47,9 @@ struct SerenityMacApp: App {
         Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
       }
       .onAppear {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
         AppLogger.info("Native macOS shell loaded")
         Task {
           await appState.bootstrapAuthSession()
@@ -59,6 +64,7 @@ struct SerenityMacApp: App {
         }
       }
     }
+    .windowStyle(.hiddenTitleBar)
     .commands {
       CommandGroup(after: .newItem) {
         Button("Quick Add Task") {
@@ -72,19 +78,61 @@ struct SerenityMacApp: App {
   }
 }
 
-private enum SerenityPalette {
-  static let accent = Color(red: 0.27, green: 0.52, blue: 0.95)
-  static let windowBackground = Color(red: 0.02, green: 0.07, blue: 0.18)
-  static let sidebarBackground = Color(red: 0.03, green: 0.07, blue: 0.16)
-  static let sidebarHeaderBackground = Color(red: 0.03, green: 0.08, blue: 0.18)
-  static let panelBackground = Color(red: 0.04, green: 0.09, blue: 0.20)
-  static let panelBackgroundRaised = Color(red: 0.07, green: 0.13, blue: 0.25)
-  static let innerCardBackground = Color(red: 0.08, green: 0.14, blue: 0.25)
-  static let border = Color(red: 0.24, green: 0.34, blue: 0.50).opacity(0.55)
-  static let thinBorder = Color(red: 0.24, green: 0.34, blue: 0.50).opacity(0.32)
-  static let activeItemBackground = Color(red: 0.17, green: 0.25, blue: 0.38)
-  static let headerIconBackground = Color(red: 0.10, green: 0.17, blue: 0.30)
-  static let textSecondary = Color(red: 0.57, green: 0.65, blue: 0.78)
+private extension AppThemePreference {
+  var colorScheme: ColorScheme? {
+    switch self {
+    case .system:
+      return nil
+    case .light:
+      return .light
+    case .dark:
+      return .dark
+    }
+  }
+
+  var topBarSymbol: String {
+    switch self {
+    case .system:
+      return "circle.lefthalf.filled"
+    case .light:
+      return "sun.max"
+    case .dark:
+      return "moon"
+    }
+  }
+}
+
+private struct HoverCursorModifier: ViewModifier {
+  let cursor: NSCursor
+
+  func body(content: Content) -> some View {
+    if #available(macOS 13.0, *) {
+      content
+        .onContinuousHover { phase in
+          switch phase {
+          case .active:
+            cursor.set()
+          case .ended:
+            NSCursor.arrow.set()
+          }
+        }
+    } else {
+      content
+        .onHover { hovering in
+          if hovering {
+            cursor.set()
+          } else {
+            NSCursor.arrow.set()
+          }
+        }
+    }
+  }
+}
+
+private extension View {
+  func hoverCursor(_ cursor: NSCursor) -> some View {
+    modifier(HoverCursorModifier(cursor: cursor))
+  }
 }
 
 private struct SerenityDetailBackground: View {
@@ -120,7 +168,7 @@ private struct SerenityPanelGroupBoxStyle: GroupBoxStyle {
   func makeBody(configuration: Configuration) -> some View {
     VStack(alignment: .leading, spacing: 0) {
       configuration.label
-        .font(.system(size: 15, weight: .semibold))
+        .font(SerenityType.bodyLarge.weight(.semibold))
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -140,17 +188,31 @@ private struct SerenityPanelGroupBoxStyle: GroupBoxStyle {
 }
 
 private struct SerenityTopBar: View {
+  @EnvironmentObject private var appState: AppState
+
   var body: some View {
     HStack(spacing: 10) {
       Spacer()
 
-      topIcon("magnifyingglass")
-      topIcon("questionmark.circle")
-      topIcon("display")
+      TopBarButton(symbol: "magnifyingglass", accessibilityLabel: "Search") {
+        appState.showToast("Global search is coming soon.")
+      }
+      TopBarButton(symbol: "questionmark.circle", accessibilityLabel: "Help") {
+        appState.showToast("Help center is coming soon.")
+      }
+      TopBarButton(symbol: appState.themePreference.topBarSymbol, accessibilityLabel: "Theme") {
+        cycleThemePreference()
+      }
     }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 9)
-    .background(SerenityPalette.sidebarHeaderBackground.opacity(0.7))
+    .padding(.horizontal, 14)
+    .frame(height: 34)
+    .background(
+      LinearGradient(
+        colors: [SerenityPalette.sidebarHeaderBackground.opacity(0.95), SerenityPalette.sidebarBackground.opacity(0.9)],
+        startPoint: .top,
+        endPoint: .bottom
+      )
+    )
     .overlay(alignment: .bottom) {
       Rectangle()
         .fill(SerenityPalette.thinBorder)
@@ -158,23 +220,58 @@ private struct SerenityTopBar: View {
     }
   }
 
-  private func topIcon(_ symbol: String) -> some View {
-    Image(systemName: symbol)
-      .font(.system(size: 13, weight: .semibold))
-      .foregroundStyle(SerenityPalette.textSecondary)
-      .frame(width: 30, height: 30)
-      .background(.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+  private func cycleThemePreference() {
+    let all = AppThemePreference.allCases
+    guard let currentIndex = all.firstIndex(of: appState.themePreference) else {
+      appState.setThemePreference(.system)
+      return
+    }
+
+    let next = all[(currentIndex + 1) % all.count]
+    appState.setThemePreference(next)
+  }
+}
+
+private struct TopBarButton: View {
+  @State private var hovered = false
+  let symbol: String
+  let accessibilityLabel: String
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      Image(systemName: symbol)
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(SerenityPalette.textSecondary)
+        .frame(width: 22, height: 22)
+        .background(
+          RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(hovered ? SerenityPalette.panelBackgroundRaised : .clear)
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .stroke(hovered ? SerenityPalette.thinBorder : .clear, lineWidth: 1)
+        )
+        .accessibilityLabel(accessibilityLabel)
+        .onHover { hovering in
+          hovered = hovering
+        }
+      }
+      .buttonStyle(.plain)
+      .hoverCursor(.pointingHand)
   }
 }
 
 private struct SerenitySidebar: View {
   @Binding var selectedSection: AppSection?
+  @State private var hoveredSection: AppSection?
 
   private let primarySections: [AppSection] = [.home, .actionHub, .today, .journal, .goals, .projects, .insights]
   private let systemSections: [AppSection] = [.integrations, .database, .settings]
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
+      sidebarChromeRow
       sidebarHeader
 
       VStack(alignment: .leading, spacing: 0) {
@@ -211,10 +308,21 @@ private struct SerenitySidebar: View {
       }
     }
     .background(SerenityPalette.sidebarBackground)
-    .overlay(alignment: .trailing) {
+  }
+
+  private var sidebarChromeRow: some View {
+    HStack {
+      // Reserve leading space so window controls don't clash with custom chrome.
+      Spacer(minLength: 74)
+      Spacer()
+    }
+    .padding(.horizontal, 14)
+    .frame(height: 34)
+    .background(SerenityPalette.sidebarHeaderBackground)
+    .overlay(alignment: .bottom) {
       Rectangle()
-        .fill(SerenityPalette.border)
-        .frame(width: 1)
+        .fill(SerenityPalette.thinBorder)
+        .frame(height: 1)
     }
   }
 
@@ -223,20 +331,20 @@ private struct SerenitySidebar: View {
       ZStack {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
           .fill(SerenityPalette.headerIconBackground)
-          .frame(width: 36, height: 36)
-        Image(systemName: "feather.fill")
-          .font(.system(size: 15, weight: .bold))
+          .frame(width: 34, height: 34)
+        Image(systemName: "square.and.pencil")
+          .font(.system(size: 14, weight: .semibold))
           .foregroundStyle(SerenityPalette.accent)
       }
 
       VStack(alignment: .leading, spacing: 1) {
         Text("Serenity Notes")
-          .font(.system(size: 17, weight: .semibold))
+          .font(SerenityType.bodyLarge.weight(.semibold))
       }
       Spacer()
     }
     .padding(.horizontal, 18)
-    .padding(.vertical, 14)
+    .padding(.vertical, 12)
     .background(SerenityPalette.sidebarHeaderBackground)
     .overlay(alignment: .bottom) {
       Rectangle()
@@ -246,7 +354,10 @@ private struct SerenitySidebar: View {
   }
 
   private func navRow(_ section: AppSection) -> some View {
-    Button {
+    let selected = isSelected(section)
+    let hovered = hoveredSection == section
+
+    return Button {
       selectedSection = section
     } label: {
       HStack(spacing: 10) {
@@ -255,19 +366,28 @@ private struct SerenitySidebar: View {
           .font(.system(size: 14, weight: .semibold))
 
         Text(section.title)
-          .font(.system(size: 16, weight: .medium))
+          .font(SerenityType.bodyLarge.weight(.medium))
 
         Spacer()
       }
       .padding(.horizontal, 12)
-      .padding(.vertical, 10)
-      .foregroundStyle(isSelected(section) ? Color.white : SerenityPalette.textSecondary)
+      .padding(.vertical, 8)
+      .foregroundStyle(selected ? Color.white : SerenityPalette.textSecondary)
       .background(
         RoundedRectangle(cornerRadius: 12, style: .continuous)
-          .fill(isSelected(section) ? SerenityPalette.activeItemBackground : .clear)
+          .fill(selected ? SerenityPalette.activeItemBackground : (hovered ? SerenityPalette.panelBackgroundRaised : .clear))
       )
+      .overlay(
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+          .stroke(hovered && !selected ? SerenityPalette.thinBorder : .clear, lineWidth: 1)
+      )
+      .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    .hoverCursor(.pointingHand)
+    .onHover { hovering in
+      hoveredSection = hovering ? section : nil
+    }
   }
 
   private func isSelected(_ section: AppSection) -> Bool {
@@ -302,43 +422,260 @@ private extension AppSection {
   }
 }
 
+private enum SerenityContentDensity {
+  case regular
+  case compact
+  case tight
+
+  static func from(width: CGFloat) -> SerenityContentDensity {
+    if width < 980 {
+      return .tight
+    }
+
+    if width < 1280 {
+      return .compact
+    }
+
+    return .regular
+  }
+
+  var sectionSpacing: CGFloat {
+    switch self {
+    case .regular: return 18
+    case .compact: return 14
+    case .tight: return 12
+    }
+  }
+
+  var contentPadding: CGFloat {
+    switch self {
+    case .regular: return 22
+    case .compact: return 18
+    case .tight: return 14
+    }
+  }
+
+  var contentBottomPadding: CGFloat {
+    switch self {
+    case .regular: return 12
+    case .compact: return 10
+    case .tight: return 8
+    }
+  }
+
+  var sectionIconContainer: CGFloat {
+    switch self {
+    case .regular: return 50
+    case .compact: return 44
+    case .tight: return 40
+    }
+  }
+
+  var sectionIconSize: CGFloat {
+    switch self {
+    case .regular: return 19
+    case .compact: return 17
+    case .tight: return 15
+    }
+  }
+
+  var sectionTitleFont: Font {
+    switch self {
+    case .regular: return .system(size: 28, weight: .semibold)
+    case .compact: return .system(size: 24, weight: .semibold)
+    case .tight: return .system(size: 21, weight: .medium)
+    }
+  }
+
+  var sectionSubtitleFont: Font {
+    switch self {
+    case .regular: return .system(size: 17, weight: .regular)
+    case .compact: return .system(size: 15, weight: .regular)
+    case .tight: return .system(size: 14, weight: .regular)
+    }
+  }
+
+  var heroAvatarSize: CGFloat {
+    switch self {
+    case .regular: return 76
+    case .compact: return 64
+    case .tight: return 56
+    }
+  }
+
+  var heroLetterSize: CGFloat {
+    switch self {
+    case .regular: return 32
+    case .compact: return 28
+    case .tight: return 24
+    }
+  }
+
+  var heroTitleSize: CGFloat {
+    switch self {
+    case .regular: return 48
+    case .compact: return 40
+    case .tight: return 34
+    }
+  }
+
+  var heroSubtitleMaxWidth: CGFloat {
+    switch self {
+    case .regular: return 700
+    case .compact: return 560
+    case .tight: return 460
+    }
+  }
+
+  var quickCapturePromptHorizontalPadding: CGFloat {
+    switch self {
+    case .regular: return 24
+    case .compact: return 18
+    case .tight: return 14
+    }
+  }
+
+  var quickCapturePromptVerticalPadding: CGFloat {
+    switch self {
+    case .regular: return 22
+    case .compact: return 18
+    case .tight: return 14
+    }
+  }
+
+  var quickCaptureEditorFontSize: CGFloat {
+    switch self {
+    case .regular: return 16
+    case .compact: return 15
+    case .tight: return 14
+    }
+  }
+
+  var quickCaptureEditorPadding: CGFloat {
+    switch self {
+    case .regular: return 16
+    case .compact: return 14
+    case .tight: return 12
+    }
+  }
+
+  var quickCaptureEditorHeight: CGFloat {
+    switch self {
+    case .regular: return 156
+    case .compact: return 132
+    case .tight: return 116
+    }
+  }
+
+  var quickCaptureFooterPaddingVertical: CGFloat {
+    switch self {
+    case .regular: return 12
+    case .compact: return 10
+    case .tight: return 8
+    }
+  }
+
+  var featureGridSpacing: CGFloat {
+    switch self {
+    case .regular: return 16
+    case .compact: return 14
+    case .tight: return 12
+    }
+  }
+
+  var featureCardPadding: CGFloat {
+    switch self {
+    case .regular: return 20
+    case .compact: return 16
+    case .tight: return 14
+    }
+  }
+
+  var featureCardMinHeight: CGFloat {
+    switch self {
+    case .regular: return 168
+    case .compact: return 150
+    case .tight: return 136
+    }
+  }
+
+  var featureIconContainer: CGFloat {
+    switch self {
+    case .regular: return 54
+    case .compact: return 46
+    case .tight: return 42
+    }
+  }
+
+  var featureIconSize: CGFloat {
+    switch self {
+    case .regular: return 24
+    case .compact: return 20
+    case .tight: return 18
+    }
+  }
+
+  var heroTitleWeight: Font.Weight {
+    switch self {
+    case .regular, .compact: return .semibold
+    case .tight: return .medium
+    }
+  }
+
+  var featureColumns: [GridItem] {
+    switch self {
+    case .tight:
+      return [GridItem(.flexible(), spacing: featureGridSpacing)]
+    case .regular, .compact:
+      return [
+        GridItem(.flexible(), spacing: featureGridSpacing),
+        GridItem(.flexible(), spacing: featureGridSpacing),
+      ]
+    }
+  }
+}
+
 private struct SectionView: View {
   @EnvironmentObject private var appState: AppState
   let section: AppSection
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 18) {
-        if section != .home {
-          sectionHeader
-        }
+    GeometryReader { proxy in
+      let density = SerenityContentDensity.from(width: proxy.size.width)
 
-        switch section {
-        case .home:
-          HomeSectionView()
-        case .actionHub:
-          ActionHubSectionView()
-        case .today:
-          TodaySectionView()
-        case .journal:
-          JournalSectionView()
-        case .goals:
-          GoalsSectionView()
-        case .projects:
-          ProjectsSectionView()
-        case .integrations:
-          IntegrationsSectionView()
-        case .insights:
-          InsightsSectionView()
-        case .database:
-          DatabaseSectionView()
-        case .settings:
-          SettingsSectionView()
+      ScrollView {
+        VStack(alignment: .leading, spacing: density.sectionSpacing) {
+          if section != .home {
+            sectionHeader(density: density)
+          }
+
+          switch section {
+          case .home:
+            HomeSectionView(density: density, availableWidth: proxy.size.width)
+          case .actionHub:
+            ActionHubSectionView()
+          case .today:
+            TodaySectionView()
+          case .journal:
+            JournalSectionView()
+          case .goals:
+            GoalsSectionView()
+          case .projects:
+            ProjectsSectionView()
+          case .integrations:
+            IntegrationsSectionView()
+          case .insights:
+            InsightsSectionView()
+          case .database:
+            DatabaseSectionView()
+          case .settings:
+            SettingsSectionView()
+          }
         }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(density.contentPadding)
+        .padding(.bottom, density.contentBottomPadding)
       }
-      .frame(maxWidth: 1180, alignment: .topLeading)
-      .padding(28)
-      .padding(.bottom, 16)
     }
     .animation(.easeInOut(duration: 0.2), value: section)
     .onAppear {
@@ -357,22 +694,22 @@ private struct SectionView: View {
     }
   }
 
-  private var sectionHeader: some View {
+  private func sectionHeader(density: SerenityContentDensity) -> some View {
     HStack(spacing: 12) {
       ZStack {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
           .fill(SerenityPalette.headerIconBackground)
-          .frame(width: 50, height: 50)
+          .frame(width: density.sectionIconContainer, height: density.sectionIconContainer)
         Image(systemName: section.systemImage)
-          .font(.system(size: 21, weight: .semibold))
+          .font(.system(size: density.sectionIconSize, weight: .semibold))
           .foregroundStyle(SerenityPalette.accent)
       }
 
       VStack(alignment: .leading, spacing: 2) {
         Text(section.title)
-          .font(.system(size: 34, weight: .bold))
+          .font(density.sectionTitleFont)
         Text(section.subtitle)
-          .font(.system(size: 22, weight: .regular))
+          .font(density.sectionSubtitleFont)
           .foregroundStyle(SerenityPalette.textSecondary)
       }
 
@@ -382,16 +719,164 @@ private struct SectionView: View {
   }
 }
 
+private final class QuickCaptureTextView: NSTextView {
+  var focusChanged: ((Bool) -> Void)?
+
+  override func becomeFirstResponder() -> Bool {
+    let accepted = super.becomeFirstResponder()
+    if accepted {
+      focusChanged?(true)
+    }
+    return accepted
+  }
+
+  override func resignFirstResponder() -> Bool {
+    let accepted = super.resignFirstResponder()
+    if accepted {
+      focusChanged?(false)
+    }
+    return accepted
+  }
+}
+
+private final class QuickCaptureContainerScrollView: NSScrollView {
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+    true
+  }
+
+  override func resetCursorRects() {
+    super.resetCursorRects()
+    addCursorRect(bounds, cursor: .iBeam)
+  }
+
+  override func mouseDown(with event: NSEvent) {
+    NSApp.activate(ignoringOtherApps: true)
+    window?.makeKeyAndOrderFront(nil)
+
+    if let textView = documentView as? NSTextView {
+      window?.makeFirstResponder(textView)
+    }
+    super.mouseDown(with: event)
+  }
+}
+
+private struct QuickCaptureEditor: NSViewRepresentable {
+  @Binding var text: String
+  @Binding var isFocused: Bool
+  let fontSize: CGFloat
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator(text: $text, isFocused: $isFocused)
+  }
+
+  func makeNSView(context: Context) -> NSScrollView {
+    let scrollView = QuickCaptureContainerScrollView()
+    scrollView.drawsBackground = false
+    scrollView.borderType = .noBorder
+    scrollView.hasVerticalScroller = false
+    scrollView.autohidesScrollers = true
+    scrollView.scrollerStyle = .overlay
+    scrollView.backgroundColor = .clear
+
+    let textView = QuickCaptureTextView()
+    textView.delegate = context.coordinator
+    textView.focusChanged = { focused in
+      if context.coordinator.isFocused != focused {
+        context.coordinator.isFocused = focused
+      }
+    }
+    textView.string = text
+    textView.drawsBackground = false
+    textView.isRichText = false
+    textView.importsGraphics = false
+    textView.usesFindBar = false
+    textView.isEditable = true
+    textView.isSelectable = true
+    textView.isVerticallyResizable = true
+    textView.isHorizontallyResizable = false
+    textView.minSize = NSSize(width: 0, height: 0)
+    textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+    textView.autoresizingMask = [.width]
+    textView.isContinuousSpellCheckingEnabled = true
+    textView.textContainerInset = NSSize(width: 0, height: 0)
+    textView.textContainer?.lineFragmentPadding = 0
+    textView.textContainer?.widthTracksTextView = true
+    textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+    textView.frame = NSRect(x: 0, y: 0, width: 1, height: 1)
+    textView.font = .systemFont(ofSize: fontSize, weight: .regular)
+    textView.textColor = NSColor.white.withAlphaComponent(0.95)
+    textView.insertionPointColor = NSColor.white.withAlphaComponent(0.95)
+
+    scrollView.documentView = textView
+    context.coordinator.textView = textView
+
+    return scrollView
+  }
+
+  func updateNSView(_ nsView: NSScrollView, context: Context) {
+    guard let textView = nsView.documentView as? QuickCaptureTextView else { return }
+
+    let contentSize = nsView.contentView.bounds.size
+    let targetHeight = max(contentSize.height, textView.frame.height)
+    if textView.frame.width != contentSize.width || textView.frame.height < contentSize.height {
+      textView.frame = NSRect(x: 0, y: 0, width: contentSize.width, height: targetHeight)
+    }
+    textView.textContainer?.containerSize = NSSize(width: contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+
+    if textView.string != text {
+      textView.string = text
+    }
+
+    textView.font = .systemFont(ofSize: fontSize, weight: .regular)
+    textView.textColor = NSColor.white.withAlphaComponent(0.95)
+    textView.insertionPointColor = NSColor.white.withAlphaComponent(0.95)
+
+    if isFocused {
+      if nsView.window?.firstResponder !== textView {
+        nsView.window?.makeFirstResponder(textView)
+      }
+    } else if nsView.window?.firstResponder === textView {
+      nsView.window?.makeFirstResponder(nil)
+    }
+  }
+
+  final class Coordinator: NSObject, NSTextViewDelegate {
+    @Binding var text: String
+    @Binding var isFocused: Bool
+    weak var textView: QuickCaptureTextView?
+
+    init(text: Binding<String>, isFocused: Binding<Bool>) {
+      _text = text
+      _isFocused = isFocused
+    }
+
+    func textDidChange(_ notification: Notification) {
+      guard let textView else { return }
+      text = textView.string
+    }
+
+    func textDidBeginEditing(_ notification: Notification) {
+      isFocused = true
+    }
+
+    func textDidEndEditing(_ notification: Notification) {
+      isFocused = false
+    }
+  }
+}
+
 private struct HomeSectionView: View {
+  let density: SerenityContentDensity
+  let availableWidth: CGFloat
+
   @EnvironmentObject private var appState: AppState
 
   @State private var quickCapture = ""
   @State private var submitting = false
-
-  private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+  @State private var quickCaptureFocused = false
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 18) {
+    VStack(alignment: .leading, spacing: density.sectionSpacing) {
       hero
       quickCaptureCard
       featureGrid
@@ -399,24 +884,24 @@ private struct HomeSectionView: View {
   }
 
   private var hero: some View {
-    VStack(spacing: 12) {
+    VStack(spacing: 10) {
       ZStack {
         Circle()
           .fill(Color.white.opacity(0.92))
-          .frame(width: 84, height: 84)
+          .frame(width: density.heroAvatarSize, height: density.heroAvatarSize)
           .shadow(color: SerenityPalette.accent.opacity(0.35), radius: 22)
         Text("S")
-          .font(.system(size: 36, weight: .semibold))
+          .font(.system(size: density.heroLetterSize, weight: .medium))
           .foregroundStyle(Color.black.opacity(0.85))
       }
 
       Text("Serenity Notes")
-        .font(.system(size: 52, weight: .bold))
-      Text("Boost your productivity and mindfulness with an integrated task and journaling workspace.")
-        .font(.system(size: 21, weight: .regular))
+        .font(.system(size: density.heroTitleSize, weight: density.heroTitleWeight))
+      Text("Boost your productivity and mindfulness with a powerful integrated task management and journaling experience.")
+        .font(density.sectionSubtitleFont)
         .foregroundStyle(SerenityPalette.textSecondary)
         .multilineTextAlignment(.center)
-        .frame(maxWidth: 780)
+        .frame(maxWidth: min(density.heroSubtitleMaxWidth, max(360, availableWidth - (density.contentPadding * 2))))
     }
     .frame(maxWidth: .infinity)
     .padding(.top, 8)
@@ -438,50 +923,70 @@ private struct HomeSectionView: View {
             )
           )
 
-        TextEditor(text: $quickCapture)
-          .font(.system(size: 22, weight: .regular))
-          .scrollContentBackground(.hidden)
-          .foregroundStyle(.white.opacity(0.95))
-          .padding(20)
-          .frame(height: 172)
+        if quickCapture.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !quickCaptureFocused {
+          Text("Speak naturally. Example: \"Remind me to call mom tomorrow afternoon.\"")
+            .font(SerenityType.bodyLarge)
+            .foregroundStyle(SerenityPalette.textSecondary.opacity(0.72))
+            .padding(.horizontal, density.quickCapturePromptHorizontalPadding)
+            .padding(.vertical, density.quickCapturePromptVerticalPadding)
+            .allowsHitTesting(false)
+        }
+
+        QuickCaptureEditor(
+          text: $quickCapture,
+          isFocused: $quickCaptureFocused,
+          fontSize: density.quickCaptureEditorFontSize
+        )
+          .padding(density.quickCaptureEditorPadding)
+          .frame(height: density.quickCaptureEditorHeight)
       }
 
-      HStack(spacing: 12) {
-        Text("Write naturally. Prefix with `journal:` to create an entry; otherwise we create a task.")
-          .font(.system(size: 18, weight: .regular))
-          .foregroundStyle(SerenityPalette.textSecondary)
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 12) {
+          Text("Write naturally. Prefix with `journal:` to create an entry; otherwise we create a task.")
+            .font(SerenityType.bodyLarge)
+            .foregroundStyle(SerenityPalette.textSecondary)
 
-        Spacer()
+          Spacer()
 
-        Text("Provider: native")
-          .font(.system(size: 15, weight: .medium))
-          .padding(.horizontal, 14)
-          .padding(.vertical, 8)
-          .background(SerenityPalette.innerCardBackground, in: Capsule())
-          .overlay(Capsule().stroke(SerenityPalette.thinBorder, lineWidth: 1))
+          providerBadge
+          submitButton
+        }
 
-        Button(submitting ? "Submitting..." : "Submit") {
-          Task {
-            await submitQuickCapture()
+        VStack(alignment: .leading, spacing: 10) {
+          Text("Write naturally. Prefix with `journal:` to create an entry; otherwise we create a task.")
+            .font(SerenityType.body)
+            .foregroundStyle(SerenityPalette.textSecondary)
+
+          HStack {
+            Spacer()
+            providerBadge
+            submitButton
           }
         }
-        .disabled(submitting || quickCapture.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        .buttonStyle(.borderedProminent)
       }
       .padding(.horizontal, 18)
-      .padding(.vertical, 14)
+      .padding(.vertical, density.quickCaptureFooterPaddingVertical)
       .background(SerenityPalette.panelBackgroundRaised.opacity(0.86))
     }
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     .overlay(
       RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .stroke(SerenityPalette.border, lineWidth: 1)
+        .stroke(quickCaptureFocused ? SerenityPalette.accent.opacity(0.7) : SerenityPalette.border.opacity(0.95), lineWidth: 1)
+        .allowsHitTesting(false)
     )
-    .shadow(color: SerenityPalette.accent.opacity(0.2), radius: 20)
+    .shadow(color: quickCaptureFocused ? SerenityPalette.accent.opacity(0.42) : SerenityPalette.accent.opacity(0.28), radius: quickCaptureFocused ? 30 : 24)
+    .overlay {
+      RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        .blur(radius: 4)
+        .allowsHitTesting(false)
+    }
+    .animation(.easeInOut(duration: 0.18), value: quickCaptureFocused)
   }
 
   private var featureGrid: some View {
-    LazyVGrid(columns: columns, spacing: 16) {
+    LazyVGrid(columns: density.featureColumns, spacing: density.featureGridSpacing) {
       featureCard(title: "ActionHub", subtitle: "Efficiently manage tasks, projects, and priorities.", icon: "checklist", section: .actionHub)
       featureCard(title: "Journal", subtitle: "Capture thoughts, ideas, and reflections securely.", icon: "book", section: .journal)
       featureCard(title: "Projects", subtitle: "Organize related work with clear progress tracking.", icon: "folder", section: .projects)
@@ -489,6 +994,26 @@ private struct HomeSectionView: View {
       featureCard(title: "Integrations", subtitle: "Connect external services and monitor sync.", icon: "link", section: .integrations)
       featureCard(title: "Database", subtitle: "Manage backups, integrity checks, and exports.", icon: "internaldrive", section: .database)
     }
+  }
+
+  private var providerBadge: some View {
+    Text("Provider: native")
+      .font(SerenityType.bodyMedium)
+      .padding(.horizontal, 14)
+      .padding(.vertical, 8)
+      .background(SerenityPalette.innerCardBackground, in: Capsule())
+      .overlay(Capsule().stroke(SerenityPalette.thinBorder, lineWidth: 1))
+  }
+
+  private var submitButton: some View {
+    Button(submitting ? "Submitting..." : "Submit") {
+      Task {
+        await submitQuickCapture()
+      }
+    }
+    .disabled(submitting || quickCapture.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    .buttonStyle(SerenityPrimaryButtonStyle())
+    .hoverCursor(.pointingHand)
   }
 
   private func featureCard(title: String, subtitle: String, icon: String, section: AppSection) -> some View {
@@ -499,21 +1024,21 @@ private struct HomeSectionView: View {
         ZStack {
           RoundedRectangle(cornerRadius: 12, style: .continuous)
             .fill(SerenityPalette.headerIconBackground)
-            .frame(width: 54, height: 54)
+            .frame(width: density.featureIconContainer, height: density.featureIconContainer)
           Image(systemName: icon)
-            .font(.system(size: 24, weight: .semibold))
+            .font(.system(size: density.featureIconSize, weight: .semibold))
             .foregroundStyle(SerenityPalette.accent)
         }
         Text(title)
-          .font(.system(size: 32, weight: .bold))
+          .font(SerenityType.cardTitle)
           .multilineTextAlignment(.leading)
         Text(subtitle)
-          .font(.system(size: 21, weight: .regular))
+          .font(SerenityType.pageSubtitle)
           .foregroundStyle(SerenityPalette.textSecondary)
           .multilineTextAlignment(.leading)
       }
-      .padding(24)
-      .frame(maxWidth: .infinity, minHeight: 188, alignment: .topLeading)
+      .padding(density.featureCardPadding)
+      .frame(maxWidth: .infinity, minHeight: density.featureCardMinHeight, alignment: .topLeading)
       .background(SerenityPalette.panelBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
       .overlay(
         RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -521,6 +1046,7 @@ private struct HomeSectionView: View {
       )
     }
     .buttonStyle(.plain)
+    .hoverCursor(.pointingHand)
   }
 
   private func submitQuickCapture() async {
@@ -587,9 +1113,9 @@ struct IntegrationsSectionView: View {
 
               VStack(alignment: .leading, spacing: 2) {
                 Text("All integrations ready for synchronization")
-                  .font(.system(size: 21, weight: .semibold))
+                  .font(SerenityType.sectionTitle)
                 Text(appState.integrationSyncInProgress ? "Syncing now..." : "Manual sync available")
-                  .font(.system(size: 16, weight: .regular))
+                  .font(SerenityType.body)
                   .foregroundStyle(SerenityPalette.textSecondary)
               }
             }
@@ -601,7 +1127,8 @@ struct IntegrationsSectionView: View {
                 await appState.syncIntegrationsNow()
               }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(SerenityPrimaryButtonStyle())
+          .hoverCursor(.pointingHand)
             .disabled(appState.integrationSyncInProgress)
           }
 
@@ -672,6 +1199,7 @@ struct IntegrationsSectionView: View {
               )
             }
           }
+          .hoverCursor(.pointingHand)
 
           if let authorizationURL = appState.googleOAuthAuthorizationURL {
             Text("Authorization URL")
@@ -693,6 +1221,7 @@ struct IntegrationsSectionView: View {
               googleAuthorizationCode = ""
             }
           }
+          .hoverCursor(.pointingHand)
 
           Divider()
 
@@ -718,6 +1247,7 @@ struct IntegrationsSectionView: View {
               }
             }
             .buttonStyle(.borderedProminent)
+          .hoverCursor(.pointingHand)
 
             Button("Disconnect", role: .destructive) {
               Task {
@@ -725,6 +1255,7 @@ struct IntegrationsSectionView: View {
               }
             }
             .disabled(!appState.googleIntegrationState.connected)
+            .hoverCursor(.pointingHand)
           }
         }
         .padding(.top, 8)
@@ -763,6 +1294,8 @@ struct IntegrationsSectionView: View {
               githubDisplayName = ""
             }
           }
+          .buttonStyle(SerenityPrimaryButtonStyle())
+          .hoverCursor(.pointingHand)
 
           if !appState.githubIntegrationState.tokens.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
@@ -794,6 +1327,7 @@ struct IntegrationsSectionView: View {
                     }
                   }
                   .buttonStyle(.borderless)
+          .hoverCursor(.pointingHand)
                 }
                 .padding(8)
                 .background(SerenityPalette.innerCardBackground, in: RoundedRectangle(cornerRadius: 8))
@@ -812,6 +1346,8 @@ struct IntegrationsSectionView: View {
                 await appState.refreshIntegrationDiagnostics()
               }
             }
+            .buttonStyle(SerenitySecondaryButtonStyle())
+          .hoverCursor(.pointingHand)
           }
 
           if appState.integrationDiagnosticsLines.isEmpty {
@@ -851,7 +1387,8 @@ struct IntegrationsSectionView: View {
                 await appState.runCloudSync()
               }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(SerenityPrimaryButtonStyle())
+          .hoverCursor(.pointingHand)
 
             switch appState.cloudSyncState {
             case .idle:
@@ -889,6 +1426,7 @@ struct IntegrationsSectionView: View {
                     }
                   }
                   .buttonStyle(.bordered)
+          .hoverCursor(.pointingHand)
 
                   Button("Use Remote") {
                     Task {
@@ -896,6 +1434,7 @@ struct IntegrationsSectionView: View {
                     }
                   }
                   .buttonStyle(.bordered)
+          .hoverCursor(.pointingHand)
                 }
               }
               .padding(8)
@@ -933,7 +1472,7 @@ struct IntegrationsSectionView: View {
       VStack(alignment: .leading, spacing: 3) {
         HStack(spacing: 8) {
           Text(title)
-            .font(.system(size: 21, weight: .semibold))
+            .font(SerenityType.sectionTitle)
           Text(active ? "Connected" : "Disconnected")
             .font(.caption)
             .foregroundStyle(active ? .green : SerenityPalette.textSecondary)
@@ -943,7 +1482,7 @@ struct IntegrationsSectionView: View {
         }
 
         Text(detail)
-          .font(.system(size: 16, weight: .regular))
+          .font(SerenityType.body)
           .foregroundStyle(SerenityPalette.textSecondary)
       }
 
@@ -1020,15 +1559,8 @@ private struct ActionHubSectionView: View {
         Button(tab.title) {
           activeTab = tab
         }
-        .buttonStyle(.plain)
-        .font(.system(size: 15, weight: .medium))
-        .padding(.horizontal, 20)
-        .padding(.vertical, 9)
-        .foregroundStyle(activeTab == tab ? Color.white : SerenityPalette.textSecondary)
-        .background(
-          RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(activeTab == tab ? SerenityPalette.activeItemBackground : .clear)
-        )
+        .buttonStyle(SerenityPillButtonStyle(selected: activeTab == tab))
+          .hoverCursor(.pointingHand)
       }
     }
     .padding(6)
@@ -1037,14 +1569,20 @@ private struct ActionHubSectionView: View {
       RoundedRectangle(cornerRadius: 14, style: .continuous)
         .stroke(SerenityPalette.thinBorder, lineWidth: 1)
     )
-    .frame(width: 360, alignment: .leading)
+    .frame(maxWidth: 420, alignment: .leading)
   }
 
   private var tasksView: some View {
     VStack(alignment: .leading, spacing: 16) {
-      HStack(alignment: .top, spacing: 14) {
-        progressPanel
-        quickAddPanel
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .top, spacing: 14) {
+          progressPanel
+          quickAddPanel
+        }
+        VStack(spacing: 14) {
+          progressPanel
+          quickAddPanel
+        }
       }
 
       HStack(spacing: 12) {
@@ -1069,19 +1607,8 @@ private struct ActionHubSectionView: View {
           Button(filter.rawValue.capitalized) {
             taskFilter = filter
           }
-          .buttonStyle(.plain)
-          .font(.system(size: 15, weight: .medium))
-          .padding(.horizontal, 20)
-          .padding(.vertical, 11)
-          .foregroundStyle(taskFilter == filter ? Color.white : SerenityPalette.textSecondary)
-          .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-              .fill(taskFilter == filter ? SerenityPalette.activeItemBackground : SerenityPalette.panelBackgroundRaised)
-          )
-          .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-              .stroke(SerenityPalette.thinBorder, lineWidth: 1)
-          )
+          .buttonStyle(SerenityPillButtonStyle(selected: taskFilter == filter))
+          .hoverCursor(.pointingHand)
         }
       }
 
@@ -1089,13 +1616,15 @@ private struct ActionHubSectionView: View {
         Button("Complete Selected") {
           Task { await appState.markSelectedTasksCompleted() }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(SerenitySecondaryButtonStyle())
+          .hoverCursor(.pointingHand)
         .disabled(appState.selectedTaskIDs.isEmpty)
 
         Button("Delete Selected", role: .destructive) {
           Task { await appState.deleteSelectedTasks() }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(SerenitySecondaryButtonStyle())
+          .hoverCursor(.pointingHand)
         .disabled(appState.selectedTaskIDs.isEmpty)
       }
 
@@ -1115,7 +1644,7 @@ private struct ActionHubSectionView: View {
     VStack(alignment: .leading, spacing: 14) {
       HStack {
         Text("Overall Progress")
-          .font(.title3)
+          .font(SerenityType.sectionTitle)
         Spacer()
       }
 
@@ -1136,7 +1665,7 @@ private struct ActionHubSectionView: View {
         .foregroundStyle(SerenityPalette.textSecondary)
     }
     .padding(18)
-    .frame(width: 436, alignment: .leading)
+    .frame(maxWidth: .infinity, alignment: .leading)
     .background(SerenityPalette.panelBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     .overlay(
       RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -1149,13 +1678,7 @@ private struct ActionHubSectionView: View {
       if showQuickAddForm {
         TextField("Task title", text: $newTaskTitle)
           .textFieldStyle(.plain)
-          .padding(.horizontal, 12)
-          .padding(.vertical, 10)
-          .background(SerenityPalette.panelBackgroundRaised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-          .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-              .stroke(SerenityPalette.thinBorder, lineWidth: 1)
-          )
+          .serenityInputField()
 
         HStack {
           Picker("Priority", selection: $newTaskPriority) {
@@ -1190,13 +1713,15 @@ private struct ActionHubSectionView: View {
             includeDueDate = false
             showQuickAddForm = false
           }
-          .buttonStyle(.borderedProminent)
+          .buttonStyle(SerenityPrimaryButtonStyle())
+          .hoverCursor(.pointingHand)
           .disabled(newTaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
           Button("Cancel") {
             showQuickAddForm = false
           }
-          .buttonStyle(.bordered)
+          .buttonStyle(SerenitySecondaryButtonStyle())
+          .hoverCursor(.pointingHand)
         }
       } else {
         Button {
@@ -1217,6 +1742,7 @@ private struct ActionHubSectionView: View {
           )
         }
         .buttonStyle(.plain)
+          .hoverCursor(.pointingHand)
       }
     }
     .padding(16)
@@ -1239,6 +1765,7 @@ private struct ActionHubSectionView: View {
             .foregroundStyle(appState.selectedTaskIDs.contains(task.id) ? SerenityPalette.accent : SerenityPalette.textSecondary)
         }
         .buttonStyle(.plain)
+          .hoverCursor(.pointingHand)
 
         Button {
           Task { await appState.toggleTaskCompletion(id: task.id) }
@@ -1247,6 +1774,7 @@ private struct ActionHubSectionView: View {
             .foregroundStyle(task.completed ? .green : SerenityPalette.textSecondary)
         }
         .buttonStyle(.plain)
+          .hoverCursor(.pointingHand)
 
         Text(task.title)
           .font(.system(size: 20, weight: .medium))
@@ -1256,7 +1784,7 @@ private struct ActionHubSectionView: View {
         Spacer()
 
         Text(task.priority.rawValue.capitalized)
-          .font(.caption)
+          .font(SerenityType.caption)
           .padding(.horizontal, 10)
           .padding(.vertical, 4)
           .background(priorityColor(task.priority).opacity(0.18), in: Capsule())
@@ -1296,6 +1824,7 @@ private struct ActionHubSectionView: View {
               }
             }
             .buttonStyle(.plain)
+          .hoverCursor(.pointingHand)
           }
         }
       }
@@ -1303,27 +1832,23 @@ private struct ActionHubSectionView: View {
       HStack {
         TextField("Add subtask", text: subtaskBinding(for: task.id))
           .textFieldStyle(.plain)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 8)
-          .background(SerenityPalette.panelBackgroundRaised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-          .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-              .stroke(SerenityPalette.thinBorder, lineWidth: 1)
-          )
+          .serenityInputField()
 
         Button("Add") {
           let subtaskText = subtaskBinding(for: task.id).wrappedValue
           Task { await appState.addSubtask(taskID: task.id, title: subtaskText) }
           subtaskBinding(for: task.id).wrappedValue = ""
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(SerenitySecondaryButtonStyle())
+          .hoverCursor(.pointingHand)
 
         Spacer()
 
         Button("Delete", role: .destructive) {
           Task { await appState.deleteTask(id: task.id) }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(SerenitySecondaryButtonStyle())
+          .hoverCursor(.pointingHand)
       }
     }
     .padding(14)
@@ -1462,7 +1987,7 @@ private struct ActionHubSectionView: View {
 
   private func chip(_ value: String, tint: Color = SerenityPalette.textSecondary) -> some View {
     Text(value)
-      .font(.system(size: 12, weight: .medium))
+      .font(SerenityType.caption)
       .foregroundStyle(tint)
       .padding(.horizontal, 10)
       .padding(.vertical, 4)
@@ -1533,6 +2058,7 @@ private struct TodaySectionView: View {
           await appState.refreshCoreWorkflowData()
         }
       }
+      .hoverCursor(.pointingHand)
     }
   }
 
@@ -1566,6 +2092,7 @@ private struct TodaySectionView: View {
               }
             }
             .buttonStyle(.bordered)
+          .hoverCursor(.pointingHand)
           }
           .padding(8)
           .background(SerenityPalette.innerCardBackground, in: RoundedRectangle(cornerRadius: 8))
@@ -1624,12 +2151,14 @@ private struct JournalSectionView: View {
               newEntryTags = ""
             }
             .buttonStyle(.borderedProminent)
+          .hoverCursor(.pointingHand)
 
             Button("Refresh") {
               Task {
                 await appState.refreshCoreWorkflowData()
               }
             }
+            .hoverCursor(.pointingHand)
           }
         }
         .padding(.top, 8)
@@ -1653,6 +2182,7 @@ private struct JournalSectionView: View {
                   await appState.refreshCoreWorkflowData()
                 }
               }
+              .hoverCursor(.pointingHand)
             }
           }
         }
@@ -1699,11 +2229,13 @@ private struct JournalSectionView: View {
                     }
                   }
                   .buttonStyle(.bordered)
+          .hoverCursor(.pointingHand)
 
                   Button("Edit") {
                     editingEntry = entry
                   }
                   .buttonStyle(.bordered)
+          .hoverCursor(.pointingHand)
 
                   Button("Delete", role: .destructive) {
                     Task {
@@ -1711,6 +2243,7 @@ private struct JournalSectionView: View {
                     }
                   }
                   .buttonStyle(.borderless)
+          .hoverCursor(.pointingHand)
                 }
               }
               .padding(10)
@@ -1800,12 +2333,14 @@ private struct GoalsSectionView: View {
               newGoalTarget = "5"
             }
             .buttonStyle(.borderedProminent)
+          .hoverCursor(.pointingHand)
 
             Button("Refresh") {
               Task {
                 await appState.refreshCoreWorkflowData()
               }
             }
+            .hoverCursor(.pointingHand)
           }
         }
         .padding(.top, 8)
@@ -1847,6 +2382,7 @@ private struct GoalsSectionView: View {
                     }
                   }
                   .buttonStyle(.bordered)
+          .hoverCursor(.pointingHand)
 
                   Spacer()
 
@@ -1856,6 +2392,7 @@ private struct GoalsSectionView: View {
                     }
                   }
                   .buttonStyle(.borderless)
+          .hoverCursor(.pointingHand)
                 }
               }
               .padding(10)
@@ -1908,6 +2445,7 @@ private struct ProjectsSectionView: View {
               newProjectColor = "#4A90E2"
             }
             .buttonStyle(.borderedProminent)
+          .hoverCursor(.pointingHand)
 
             Toggle("Include archived", isOn: $appState.includeArchivedProjects)
               .onChange(of: appState.includeArchivedProjects) { _, _ in
@@ -1958,11 +2496,13 @@ private struct ProjectsSectionView: View {
                     }
                   }
                   .buttonStyle(.bordered)
+          .hoverCursor(.pointingHand)
 
                   Button("Edit") {
                     editingProject = project
                   }
                   .buttonStyle(.bordered)
+          .hoverCursor(.pointingHand)
 
                   Spacer()
 
@@ -1972,6 +2512,7 @@ private struct ProjectsSectionView: View {
                     }
                   }
                   .buttonStyle(.borderless)
+          .hoverCursor(.pointingHand)
                 }
               }
               .padding(10)
@@ -2137,6 +2678,7 @@ struct InsightsSectionView: View {
             }
           }
           .buttonStyle(.borderedProminent)
+          .hoverCursor(.pointingHand)
 
           if appState.aiCredentials.isEmpty {
             Text("No credentials configured.")
@@ -2169,6 +2711,7 @@ struct InsightsSectionView: View {
                     }
                   }
                   .buttonStyle(.borderless)
+          .hoverCursor(.pointingHand)
                 }
 
                 Picker("Model", selection: Binding(
@@ -2209,18 +2752,21 @@ struct InsightsSectionView: View {
               }
             }
             .buttonStyle(.borderedProminent)
+          .hoverCursor(.pointingHand)
 
             Button("Weekly Recap") {
               Task {
                 await appState.generateAIRecap(type: .weekly)
               }
             }
+            .hoverCursor(.pointingHand)
 
             Button("Monthly Recap") {
               Task {
                 await appState.generateAIRecap(type: .monthly)
               }
             }
+            .hoverCursor(.pointingHand)
           }
 
           HStack {
@@ -2229,24 +2775,28 @@ struct InsightsSectionView: View {
                 await appState.generateAISummary(type: .tasks)
               }
             }
+            .hoverCursor(.pointingHand)
 
             Button("Journal Summary") {
               Task {
                 await appState.generateAISummary(type: .journal)
               }
             }
+            .hoverCursor(.pointingHand)
 
             Button("Combined Summary") {
               Task {
                 await appState.generateAISummary(type: .combined)
               }
             }
+            .hoverCursor(.pointingHand)
 
             Button("Refresh") {
               Task {
                 await appState.refreshAIWorkflows()
               }
             }
+            .hoverCursor(.pointingHand)
           }
         }
         .padding(.top, 8)
@@ -2285,6 +2835,7 @@ struct InsightsSectionView: View {
                       )
                     }
                   }
+                  .hoverCursor(.pointingHand)
 
                   Button("Dismiss") {
                     Task {
@@ -2297,6 +2848,7 @@ struct InsightsSectionView: View {
                       )
                     }
                   }
+                  .hoverCursor(.pointingHand)
 
                   Spacer()
 
@@ -2313,6 +2865,7 @@ struct InsightsSectionView: View {
                       }
                     }
                     .buttonStyle(.bordered)
+          .hoverCursor(.pointingHand)
                   }
                 }
               }
@@ -2348,11 +2901,13 @@ struct InsightsSectionView: View {
                       await appState.markRecapViewed(id: recap.id)
                     }
                   }
+                  .hoverCursor(.pointingHand)
                   Button(recap.favorited ? "Unfavorite" : "Favorite") {
                     Task {
                       await appState.toggleRecapFavorite(id: recap.id)
                     }
                   }
+                  .hoverCursor(.pointingHand)
                 }
               }
               .padding(8)
@@ -2387,11 +2942,13 @@ struct InsightsSectionView: View {
                       await appState.exportAISummary(id: summary.id)
                     }
                   }
+                  .hoverCursor(.pointingHand)
                   Button("Delete", role: .destructive) {
                     Task {
                       await appState.deleteAISummary(id: summary.id)
                     }
                   }
+                  .hoverCursor(.pointingHand)
                 }
               }
               .padding(8)
@@ -2444,13 +3001,15 @@ private struct DatabaseSectionView: View {
             await appState.refreshDatabaseManagement()
           }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(SerenitySecondaryButtonStyle())
+          .hoverCursor(.pointingHand)
         .controlSize(.large)
 
         Button("Configure Database") {
           appState.setSection(.settings)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(SerenityPrimaryButtonStyle())
+          .hoverCursor(.pointingHand)
         .controlSize(.large)
       }
 
@@ -2458,7 +3017,7 @@ private struct DatabaseSectionView: View {
         Image(systemName: "checkmark.circle.fill")
           .foregroundStyle(.green)
         Text("Connected to \(appState.backendSelectionState.activeProfile.title.uppercased())")
-          .font(.system(size: 20, weight: .semibold))
+          .font(SerenityType.sectionTitle)
         Spacer()
       }
       .padding(.horizontal, 14)
@@ -2481,7 +3040,7 @@ private struct DatabaseSectionView: View {
 
             VStack(alignment: .leading, spacing: 8) {
               Text("Record Breakdown")
-                .font(.system(size: 21, weight: .semibold))
+                .font(SerenityType.sectionTitle)
 
               breakdownRow("Tasks", value: "\(appState.tasks.count)")
               breakdownRow("Projects", value: "\(appState.projects.count)")
@@ -2494,7 +3053,7 @@ private struct DatabaseSectionView: View {
 
             VStack(alignment: .leading, spacing: 8) {
               Text("Performance Metrics")
-                .font(.system(size: 21, weight: .semibold))
+                .font(SerenityType.sectionTitle)
 
               breakdownRow("Integrity Check", value: appState.databaseIntegrityCheckResult)
               breakdownRow("Last Backup", value: appState.lastDatabaseBackupPath == nil ? "Not created" : "Available")
@@ -2511,22 +3070,26 @@ private struct DatabaseSectionView: View {
               Button("Create Backup") {
                 Task { await appState.createDatabaseBackup() }
               }
-              .buttonStyle(.borderedProminent)
+              .buttonStyle(SerenityPrimaryButtonStyle())
+          .hoverCursor(.pointingHand)
 
               Button("Integrity Check") {
                 Task { await appState.runDatabaseIntegrityCheck() }
               }
-              .buttonStyle(.bordered)
+              .buttonStyle(SerenitySecondaryButtonStyle())
+          .hoverCursor(.pointingHand)
 
               Button("Export Snapshot") {
                 Task { await appState.exportCoreDataSnapshot() }
               }
-              .buttonStyle(.bordered)
+              .buttonStyle(SerenitySecondaryButtonStyle())
+          .hoverCursor(.pointingHand)
 
               Button("Run Bootstrap") {
                 Task { await appState.bootstrapLocalDatabase() }
               }
-              .buttonStyle(.bordered)
+              .buttonStyle(SerenitySecondaryButtonStyle())
+          .hoverCursor(.pointingHand)
             }
             .padding(.top, 4)
           }
@@ -2582,7 +3145,7 @@ private struct DatabaseSectionView: View {
       Text(value)
         .lineLimit(1)
     }
-    .font(.system(size: 16, weight: .regular))
+    .font(SerenityType.body)
   }
 
   private func statMetricCard(title: String, value: String) -> some View {
@@ -2591,7 +3154,7 @@ private struct DatabaseSectionView: View {
         .font(.caption2)
         .foregroundStyle(SerenityPalette.textSecondary)
       Text(value)
-        .font(.system(size: 34, weight: .bold))
+        .font(SerenityType.pageTitle)
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 10)
@@ -2609,6 +3172,29 @@ private struct SettingsSectionView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
+      GroupBox("Appearance") {
+        VStack(alignment: .leading, spacing: 10) {
+          Picker(
+            "Theme",
+            selection: Binding(
+              get: { appState.themePreference },
+              set: { appState.setThemePreference($0) }
+            )
+          ) {
+            ForEach(AppThemePreference.allCases) { preference in
+              Text(preference.title).tag(preference)
+            }
+          }
+          .pickerStyle(.segmented)
+          .frame(maxWidth: 340)
+
+          Text("Choose whether Serenity follows the system appearance or forces light/dark mode.")
+            .font(.caption)
+            .foregroundStyle(SerenityPalette.textSecondary)
+        }
+        .padding(.top, 8)
+      }
+
       GroupBox("Backend Configuration") {
         VStack(alignment: .leading, spacing: 10) {
           Picker("Primary backend", selection: $appState.settings.backendProfile) {
@@ -2628,6 +3214,7 @@ private struct SettingsSectionView: View {
               await appState.refreshActiveBackendValidation()
             }
           }
+          .hoverCursor(.pointingHand)
 
           backendSwitchStatus
         }
@@ -2653,6 +3240,7 @@ private struct SettingsSectionView: View {
               await appState.refreshBackendDiagnostics()
             }
           }
+          .hoverCursor(.pointingHand)
         }
         .padding(.top, 8)
       }
@@ -2666,6 +3254,7 @@ private struct SettingsSectionView: View {
               await appState.logout()
             }
           }
+          .hoverCursor(.pointingHand)
         }
         .padding(.top, 8)
       }
@@ -2684,12 +3273,14 @@ private struct SettingsSectionView: View {
                 await appState.lockAppNow()
               }
             }
+            .hoverCursor(.pointingHand)
 
             Button("Unlock") {
               Task {
                 await appState.unlockAppWithConfiguredPassword()
               }
             }
+            .hoverCursor(.pointingHand)
           }
 
           biometricStatus
@@ -2706,6 +3297,7 @@ private struct SettingsSectionView: View {
               await appState.bootstrapLocalDatabase()
             }
           }
+          .hoverCursor(.pointingHand)
         }
         .padding(.top, 8)
       }
@@ -2773,6 +3365,7 @@ private struct SettingsSectionView: View {
           await appState.unlockAppWithBiometrics()
         }
       }
+      .hoverCursor(.pointingHand)
     case .unavailable(let reason):
       Text("Touch ID unavailable: \(reason)")
         .font(.caption)
@@ -2874,6 +3467,7 @@ private struct JournalEntryEditorView: View {
         Button("Cancel") {
           dismiss()
         }
+        .hoverCursor(.pointingHand)
         Button("Save") {
           let splitTags = tags
             .split(separator: ",")
@@ -2884,6 +3478,7 @@ private struct JournalEntryEditorView: View {
           dismiss()
         }
         .buttonStyle(.borderedProminent)
+          .hoverCursor(.pointingHand)
       }
     }
     .padding(20)
@@ -2922,11 +3517,13 @@ private struct ProjectEditorView: View {
         Button("Cancel") {
           dismiss()
         }
+        .hoverCursor(.pointingHand)
         Button("Save") {
           onSave(name, description, color)
           dismiss()
         }
         .buttonStyle(.borderedProminent)
+          .hoverCursor(.pointingHand)
       }
     }
     .padding(20)

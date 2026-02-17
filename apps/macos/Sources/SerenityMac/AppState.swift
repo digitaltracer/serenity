@@ -24,6 +24,25 @@ struct AppSettings {
   var localLockEnabled = false
 }
 
+enum AppThemePreference: String, CaseIterable, Identifiable {
+  case system
+  case light
+  case dark
+
+  var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .system:
+      return "System"
+    case .light:
+      return "Light"
+    case .dark:
+      return "Dark"
+    }
+  }
+}
+
 enum DatabaseBootstrapState: Equatable {
   case idle
   case bootstrapping
@@ -79,8 +98,11 @@ enum CoreWorkflowError: Error, LocalizedError {
 
 @MainActor
 final class AppState: ObservableObject {
+  private static let themePreferenceDefaultsKey = "serenity.ui.themePreference"
+
   @Published var selectedSection: AppSection? = .home
   @Published var settings = AppSettings()
+  @Published var themePreference: AppThemePreference = .system
   @Published var backendSelectionState = BackendProfileSelectionState(
     activeProfile: .sqliteLocal,
     descriptors: BackendProfileRegistry.live.orderedDescriptors,
@@ -180,6 +202,11 @@ final class AppState: ObservableObject {
     self.githubIntegrationService = githubIntegrationService
     self.aiWorkflowService = aiWorkflowService ?? AIWorkflowService(sqliteBackendAdapter: sqliteBackendAdapter)
     self.cloudSyncEngine = serenityCloudAdapter.map { CloudSyncEngine(sqliteBackendAdapter: sqliteBackendAdapter, remoteBackend: $0) }
+
+    if let storedTheme = UserDefaults.standard.string(forKey: Self.themePreferenceDefaultsKey),
+       let preference = AppThemePreference(rawValue: storedTheme) {
+      themePreference = preference
+    }
   }
 
   var filteredTasks: [TaskEntity] {
@@ -255,6 +282,12 @@ final class AppState: ObservableObject {
     if let section {
       AppLogger.info("Section selected: \(section.rawValue)")
     }
+  }
+
+  func setThemePreference(_ preference: AppThemePreference) {
+    themePreference = preference
+    UserDefaults.standard.set(preference.rawValue, forKey: Self.themePreferenceDefaultsKey)
+    AppLogger.info("Theme preference updated: \(preference.rawValue)")
   }
 
   func showError(title: String, message: String) {

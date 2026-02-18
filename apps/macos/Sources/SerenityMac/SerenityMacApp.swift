@@ -141,7 +141,7 @@ private struct SerenityDetailBackground: View {
       LinearGradient(
         colors: [
           SerenityPalette.windowBackground,
-          Color(red: 0.01, green: 0.05, blue: 0.15),
+          SerenityPalette.windowBackgroundDepth,
         ],
         startPoint: .top,
         endPoint: .bottom
@@ -155,7 +155,7 @@ private struct SerenityDetailBackground: View {
         .offset(x: 220, y: -250)
 
       Circle()
-        .fill(Color(red: 0.45, green: 0.33, blue: 0.92).opacity(0.09))
+        .fill(SerenityPalette.ambientGlow)
         .frame(width: 560, height: 560)
         .blur(radius: 100)
         .offset(x: 0, y: 260)
@@ -385,7 +385,7 @@ private struct SerenitySidebar: View {
       }
       .padding(.horizontal, 12)
       .padding(.vertical, 8)
-      .foregroundStyle(selected ? Color.white : SerenityPalette.textSecondary)
+      .foregroundStyle(selected ? SerenityPalette.textOnInteractiveSurface : SerenityPalette.textSecondary)
       .background(
         RoundedRectangle(cornerRadius: 12, style: .continuous)
           .fill(selected ? SerenityPalette.activeItemBackground : (hovered ? SerenityPalette.panelBackgroundRaised : .clear))
@@ -817,8 +817,9 @@ private struct QuickCaptureEditor: NSViewRepresentable {
     textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
     textView.frame = NSRect(x: 0, y: 0, width: 1, height: 1)
     textView.font = .systemFont(ofSize: fontSize, weight: .regular)
-    textView.textColor = NSColor.white.withAlphaComponent(0.95)
-    textView.insertionPointColor = NSColor.white.withAlphaComponent(0.95)
+    textView.textColor = SerenityPalette.editorTextNSColor
+    textView.insertionPointColor = SerenityPalette.editorTextNSColor
+    textView.typingAttributes[.foregroundColor] = SerenityPalette.editorTextNSColor
 
     scrollView.documentView = textView
     context.coordinator.textView = textView
@@ -841,8 +842,9 @@ private struct QuickCaptureEditor: NSViewRepresentable {
     }
 
     textView.font = .systemFont(ofSize: fontSize, weight: .regular)
-    textView.textColor = NSColor.white.withAlphaComponent(0.95)
-    textView.insertionPointColor = NSColor.white.withAlphaComponent(0.95)
+    textView.textColor = SerenityPalette.editorTextNSColor
+    textView.insertionPointColor = SerenityPalette.editorTextNSColor
+    textView.typingAttributes[.foregroundColor] = SerenityPalette.editorTextNSColor
 
     if isFocused {
       if nsView.window?.firstResponder !== textView {
@@ -900,12 +902,12 @@ private struct HomeSectionView: View {
     VStack(spacing: 10) {
       ZStack {
         Circle()
-          .fill(Color.white.opacity(0.92))
+          .fill(SerenityPalette.headerIconBackground)
           .frame(width: density.heroAvatarSize, height: density.heroAvatarSize)
           .shadow(color: SerenityPalette.accent.opacity(0.35), radius: 22)
         Text("S")
           .font(.system(size: density.heroLetterSize, weight: .medium))
-          .foregroundStyle(Color.black.opacity(0.85))
+          .foregroundStyle(SerenityPalette.accent)
       }
 
       Text("Serenity Notes")
@@ -929,7 +931,7 @@ private struct HomeSectionView: View {
             LinearGradient(
               colors: [
                 SerenityPalette.panelBackgroundRaised.opacity(0.9),
-                Color(red: 0.24, green: 0.17, blue: 0.44).opacity(0.55),
+                SerenityPalette.quickCaptureTint,
               ],
               startPoint: .leading,
               endPoint: .trailing
@@ -980,7 +982,16 @@ private struct HomeSectionView: View {
       }
       .padding(.horizontal, 18)
       .padding(.vertical, density.quickCaptureFooterPaddingVertical)
-      .background(SerenityPalette.panelBackgroundRaised.opacity(0.86))
+      .background(
+        LinearGradient(
+          colors: [
+            SerenityPalette.panelBackgroundRaised.opacity(0.92),
+            SerenityPalette.quickCaptureTint.opacity(0.72),
+          ],
+          startPoint: .leading,
+          endPoint: .trailing
+        )
+      )
     }
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     .overlay(
@@ -991,7 +1002,7 @@ private struct HomeSectionView: View {
     .shadow(color: quickCaptureFocused ? SerenityPalette.accent.opacity(0.42) : SerenityPalette.accent.opacity(0.28), radius: quickCaptureFocused ? 30 : 24)
     .overlay {
       RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        .stroke(SerenityPalette.highlightStroke, lineWidth: 1)
         .blur(radius: 4)
         .allowsHitTesting(false)
     }
@@ -1052,10 +1063,20 @@ private struct HomeSectionView: View {
       }
       .padding(density.featureCardPadding)
       .frame(maxWidth: .infinity, minHeight: density.featureCardMinHeight, alignment: .topLeading)
-      .background(SerenityPalette.panelBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+      .background(
+        LinearGradient(
+          colors: [
+            SerenityPalette.panelBackgroundRaised,
+            SerenityPalette.innerCardBackground,
+          ],
+          startPoint: .topLeading,
+          endPoint: .bottomTrailing
+        ),
+        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+      )
       .overlay(
         RoundedRectangle(cornerRadius: 16, style: .continuous)
-          .stroke(SerenityPalette.border, lineWidth: 1)
+          .stroke(SerenityPalette.thinBorder, lineWidth: 1)
       )
     }
     .buttonStyle(.plain)

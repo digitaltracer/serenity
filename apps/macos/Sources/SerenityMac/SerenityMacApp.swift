@@ -187,11 +187,23 @@ private struct SerenityPanelGroupBoxStyle: GroupBoxStyle {
   }
 }
 
+private enum SerenityChromeMetrics {
+  static let rowHeight: CGFloat = 12
+  static let horizontalPadding: CGFloat = 5
+  static let controlSpacing: CGFloat = 4
+  static let controlsVerticalOffset: CGFloat = -14
+  static let buttonSize: CGFloat = 28
+  static let buttonIconSize: CGFloat = 14
+  static let sidebarControlReserve: CGFloat = 34
+  static let sidebarHeaderIconSize: CGFloat = 30
+  static let sidebarHeaderVerticalPadding: CGFloat = 4
+}
+
 private struct SerenityTopBar: View {
   @EnvironmentObject private var appState: AppState
 
   var body: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: SerenityChromeMetrics.controlSpacing) {
       Spacer()
 
       TopBarButton(symbol: "magnifyingglass", accessibilityLabel: "Search") {
@@ -204,8 +216,9 @@ private struct SerenityTopBar: View {
         cycleThemePreference()
       }
     }
-    .padding(.horizontal, 14)
-    .frame(height: 34)
+    .offset(y: SerenityChromeMetrics.controlsVerticalOffset)
+    .padding(.horizontal, SerenityChromeMetrics.horizontalPadding)
+    .frame(height: SerenityChromeMetrics.rowHeight)
     .background(
       LinearGradient(
         colors: [SerenityPalette.sidebarHeaderBackground.opacity(0.95), SerenityPalette.sidebarBackground.opacity(0.9)],
@@ -241,9 +254,9 @@ private struct TopBarButton: View {
   var body: some View {
     Button(action: action) {
       Image(systemName: symbol)
-        .font(.system(size: 11, weight: .semibold))
+        .font(.system(size: SerenityChromeMetrics.buttonIconSize, weight: .semibold))
         .foregroundStyle(SerenityPalette.textSecondary)
-        .frame(width: 22, height: 22)
+        .frame(width: SerenityChromeMetrics.buttonSize, height: SerenityChromeMetrics.buttonSize)
         .background(
           RoundedRectangle(cornerRadius: 8, style: .continuous)
             .fill(hovered ? SerenityPalette.panelBackgroundRaised : .clear)
@@ -313,11 +326,11 @@ private struct SerenitySidebar: View {
   private var sidebarChromeRow: some View {
     HStack {
       // Reserve leading space so window controls don't clash with custom chrome.
-      Spacer(minLength: 74)
+      Spacer(minLength: SerenityChromeMetrics.sidebarControlReserve)
       Spacer()
     }
-    .padding(.horizontal, 14)
-    .frame(height: 34)
+    .padding(.horizontal, SerenityChromeMetrics.horizontalPadding)
+    .frame(height: SerenityChromeMetrics.rowHeight)
     .background(SerenityPalette.sidebarHeaderBackground)
     .overlay(alignment: .bottom) {
       Rectangle()
@@ -331,7 +344,7 @@ private struct SerenitySidebar: View {
       ZStack {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
           .fill(SerenityPalette.headerIconBackground)
-          .frame(width: 34, height: 34)
+          .frame(width: SerenityChromeMetrics.sidebarHeaderIconSize, height: SerenityChromeMetrics.sidebarHeaderIconSize)
         Image(systemName: "square.and.pencil")
           .font(.system(size: 14, weight: .semibold))
           .foregroundStyle(SerenityPalette.accent)
@@ -344,7 +357,7 @@ private struct SerenitySidebar: View {
       Spacer()
     }
     .padding(.horizontal, 18)
-    .padding(.vertical, 12)
+    .padding(.vertical, SerenityChromeMetrics.sidebarHeaderVerticalPadding)
     .background(SerenityPalette.sidebarHeaderBackground)
     .overlay(alignment: .bottom) {
       Rectangle()

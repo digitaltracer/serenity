@@ -129,6 +129,8 @@ final class AppState: ObservableObject {
   @Published var journalRangeStartDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
   @Published var journalRangeEndDate: Date = Date()
   @Published var includeArchivedProjects = true
+  @Published var isGlobalSearchPresented = false
+  @Published var isHelpCenterPresented = false
   @Published var globalSearchQuery = ""
   @Published var globalSearchResults: [GlobalSearchResult] = []
   @Published var databaseManagementLines: [String] = []
@@ -282,6 +284,33 @@ final class AppState: ObservableObject {
     if let section {
       AppLogger.info("Section selected: \(section.rawValue)")
     }
+  }
+
+  func openGlobalSearch(prefill query: String? = nil) {
+    isHelpCenterPresented = false
+    isGlobalSearchPresented = true
+
+    if let query {
+      setGlobalSearchQuery(query)
+    }
+  }
+
+  func closeGlobalSearch() {
+    isGlobalSearchPresented = false
+  }
+
+  func openHelpCenter() {
+    isGlobalSearchPresented = false
+    isHelpCenterPresented = true
+  }
+
+  func closeHelpCenter() {
+    isHelpCenterPresented = false
+  }
+
+  func selectGlobalSearchResult(_ result: GlobalSearchResult) {
+    setSection(result.type.targetSection)
+    closeGlobalSearch()
   }
 
   func setThemePreference(_ preference: AppThemePreference) {
@@ -1139,7 +1168,7 @@ final class AppState: ObservableObject {
   }
 
   func quickAddTaskFromCommand() async {
-    await createTask(
+    _ = await createTask(
       title: "Quick task \(Self.commandDateFormatter.string(from: Date()))",
       priority: .medium,
       dueDate: Date(),
@@ -1148,30 +1177,43 @@ final class AppState: ObservableObject {
     )
   }
 
+  @discardableResult
   func createTask(
     title: String,
     priority: TaskPriority,
     dueDate: Date?,
     tags: [String],
-    subtaskTitles: [String]
-  ) async {
+    subtaskTitles: [String],
+    description: String = "",
+    projectID: String? = nil
+  ) async -> Bool {
     let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedTitle.isEmpty else {
       showToast("Task title cannot be empty")
-      return
+      return false
     }
 
+    let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+    let normalizedProjectID: String? = {
+      guard let rawProjectID = projectID?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !rawProjectID.isEmpty else {
+        return nil
+      }
+      return rawProjectID
+    }()
     let now = Date()
     let task = TaskEntity(
       id: UUID().uuidString,
       title: trimmedTitle,
-      description: nil,
+      description: trimmedDescription.isEmpty ? nil : trimmedDescription,
       completed: false,
       completedAt: nil,
       priority: priority,
       dueDate: dueDate,
-      projectId: nil,
-      tags: tags.filter { !$0.isEmpty },
+      projectId: normalizedProjectID,
+      tags: tags
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty },
       createdAt: now,
       updatedAt: now,
       subtasks: subtaskTitles.enumerated().map { offset, title in
@@ -1185,8 +1227,55 @@ final class AppState: ObservableObject {
       try await createTask(task)
       showToast("Task created")
       await refreshCoreWorkflowData()
+      return true
     } catch {
       showError(title: "Failed to create task", message: error.localizedDescription)
+      return false
+    }
+  }
+
+  func updateTask(
+    id: String,
+    title: String,
+    description: String,
+    priority: TaskPriority,
+    dueDate: Date?,
+    projectID: String?,
+    tags: [String]
+  ) async {
+    guard let existing = tasks.first(where: { $0.id == id }) else { return }
+    let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedTitle.isEmpty else {
+      showToast("Task title cannot be empty")
+      return
+    }
+
+    let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+    let normalizedProjectID: String? = {
+      guard let rawProjectID = projectID?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !rawProjectID.isEmpty else {
+        return nil
+      }
+      return rawProjectID
+    }()
+
+    var updated = existing
+    updated.title = trimmedTitle
+    updated.description = trimmedDescription.isEmpty ? nil : trimmedDescription
+    updated.priority = priority
+    updated.dueDate = dueDate
+    updated.projectId = normalizedProjectID
+    updated.tags = tags
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+    updated.updatedAt = Date()
+
+    do {
+      try await saveTask(updated)
+      showToast("Task updated")
+      await refreshCoreWorkflowData()
+    } catch {
+      showError(title: "Failed to update task", message: error.localizedDescription)
     }
   }
 

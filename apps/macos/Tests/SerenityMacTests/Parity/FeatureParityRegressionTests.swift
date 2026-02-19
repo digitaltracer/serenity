@@ -129,10 +129,29 @@ final class FeatureParityRegressionTests: XCTestCase {
     await state.createJournalEntry(title: "Parity Entry", content: "Journal flow", mood: .happy, tags: ["parity"])
     await state.createGoal(title: "Parity Goal", target: 3, type: .weeklyTasks, priority: .medium)
 
+    if let task = state.tasks.first(where: { $0.title == "Parity Task" }),
+       let project = state.projects.first {
+      await state.updateTask(
+        id: task.id,
+        title: "Parity Task Updated",
+        description: "Updated from parity regression",
+        priority: .high,
+        dueDate: Date(),
+        projectID: project.id,
+        tags: ["parity", "updated"]
+      )
+    } else {
+      XCTFail("Expected parity task and project to exist for task update flow")
+    }
+
     await state.refreshCoreWorkflowData()
 
     XCTAssertFalse(state.projects.isEmpty)
     XCTAssertFalse(state.tasks.isEmpty)
+    XCTAssertEqual(state.tasks.first(where: { $0.title == "Parity Task Updated" })?.priority, .high)
+    XCTAssertEqual(state.tasks.first(where: { $0.title == "Parity Task Updated" })?.description, "Updated from parity regression")
+    XCTAssertEqual(state.tasks.first(where: { $0.title == "Parity Task Updated" })?.tags, ["parity", "updated"])
+    XCTAssertNotNil(state.tasks.first(where: { $0.title == "Parity Task Updated" })?.projectId)
     XCTAssertFalse(state.todayTasks.isEmpty)
     XCTAssertFalse(state.journalEntries.isEmpty)
     XCTAssertFalse(state.goals.isEmpty)
@@ -148,4 +167,3 @@ final class FeatureParityRegressionTests: XCTestCase {
     return SQLiteBackendAdapter(databaseURL: baseURL.appendingPathComponent("serenity.sqlite"))
   }
 }
-

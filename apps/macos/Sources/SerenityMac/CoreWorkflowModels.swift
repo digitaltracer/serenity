@@ -100,6 +100,34 @@ struct GlobalSearchDocument {
   let updatedAt: Date
 }
 
+extension GlobalSearchResultType {
+  var targetSection: AppSection {
+    switch self {
+    case .task:
+      return .actionHub
+    case .project:
+      return .projects
+    case .journal:
+      return .journal
+    case .goal:
+      return .goals
+    }
+  }
+
+  var systemImage: String {
+    switch self {
+    case .task:
+      return "checklist"
+    case .project:
+      return "folder"
+    case .journal:
+      return "book.closed"
+    case .goal:
+      return "target"
+    }
+  }
+}
+
 struct TaskExportSubtask: Encodable {
   let id: String
   let title: String

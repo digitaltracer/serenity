@@ -46,6 +46,18 @@ struct SerenityMacApp: App {
       .alert(item: $appState.activeAlert) { alert in
         Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
       }
+      .sheet(isPresented: $appState.isGlobalSearchPresented, onDismiss: {
+        appState.closeGlobalSearch()
+      }) {
+        GlobalSearchSheet()
+          .environmentObject(appState)
+      }
+      .sheet(isPresented: $appState.isHelpCenterPresented, onDismiss: {
+        appState.closeHelpCenter()
+      }) {
+        HelpCenterSheet()
+          .environmentObject(appState)
+      }
       .onAppear {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
@@ -67,6 +79,18 @@ struct SerenityMacApp: App {
     .windowStyle(.hiddenTitleBar)
     .commands {
       CommandGroup(after: .newItem) {
+        Button("Global Search") {
+          appState.openGlobalSearch()
+        }
+        .keyboardShortcut("k", modifiers: [.command])
+
+        Button("Help Center") {
+          appState.openHelpCenter()
+        }
+        .keyboardShortcut("/", modifiers: [.command])
+
+        Divider()
+
         Button("Quick Add Task") {
           Task {
             await appState.quickAddTaskFromCommand()
@@ -207,10 +231,10 @@ private struct SerenityTopBar: View {
       Spacer()
 
       TopBarButton(symbol: "magnifyingglass", accessibilityLabel: "Search") {
-        appState.showToast("Global search is coming soon.")
+        appState.openGlobalSearch()
       }
       TopBarButton(symbol: "questionmark.circle", accessibilityLabel: "Help") {
-        appState.showToast("Help center is coming soon.")
+        appState.openHelpCenter()
       }
       TopBarButton(symbol: appState.themePreference.topBarSymbol, accessibilityLabel: "Theme") {
         cycleThemePreference()
@@ -558,9 +582,9 @@ private enum SerenityContentDensity {
 
   var quickCaptureEditorFontSize: CGFloat {
     switch self {
-    case .regular: return 16
-    case .compact: return 15
-    case .tight: return 14
+    case .regular: return 18
+    case .compact: return 17
+    case .tight: return 16
     }
   }
 
@@ -1567,10 +1591,14 @@ private struct ActionHubSectionView: View {
   @State private var showQuickAddForm = false
 
   @State private var newTaskTitle = ""
+  @State private var newTaskDescription = ""
+  @State private var newTaskTags = ""
+  @State private var newTaskProjectID = ""
   @State private var newTaskPriority: TaskPriority = .medium
   @State private var includeDueDate = false
   @State private var dueDate = Date()
   @State private var subtaskDraftByTaskID: [String: String] = [:]
+  @State private var editingTask: TaskEntity?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -1672,6 +1700,28 @@ private struct ActionHubSectionView: View {
         }
       }
     }
+    .sheet(item: $editingTask) { task in
+      TaskEditorView(task: task, availableProjects: assignableProjects) {
+        title,
+        description,
+        priority,
+        dueDate,
+        projectID,
+        tags in
+        Task {
+          await appState.updateTask(
+            id: task.id,
+            title: title,
+            description: description,
+            priority: priority,
+            dueDate: dueDate,
+            projectID: projectID,
+            tags: tags
+          )
+        }
+      }
+      .frame(minWidth: 500, minHeight: 430)
+    }
   }
 
   private var progressPanel: some View {
@@ -1714,6 +1764,23 @@ private struct ActionHubSectionView: View {
           .textFieldStyle(.plain)
           .serenityInputField()
 
+        TextField("Description (optional)", text: $newTaskDescription, axis: .vertical)
+          .textFieldStyle(.plain)
+          .lineLimit(2...4)
+          .serenityInputField()
+
+        TextField("Tags (comma-separated)", text: $newTaskTags)
+          .textFieldStyle(.plain)
+          .serenityInputField()
+
+        Picker("Project", selection: $newTaskProjectID) {
+          Text("No project").tag("")
+          ForEach(assignableProjects) { project in
+            Text(project.name).tag(project.id)
+          }
+        }
+        .frame(maxWidth: 240)
+
         HStack {
           Picker("Priority", selection: $newTaskPriority) {
             ForEach(TaskPriority.allCases, id: \.rawValue) { priority in
@@ -1734,18 +1801,34 @@ private struct ActionHubSectionView: View {
 
         HStack {
           Button("Create Task") {
+            let title = newTaskTitle
+            let description = newTaskDescription
+            let tags = csvValues(from: newTaskTags)
+            let projectID = newTaskProjectID.isEmpty ? nil : newTaskProjectID
+            let priority = newTaskPriority
+            let taskDueDate = includeDueDate ? dueDate : nil
+
             Task {
-              await appState.createTask(
-                title: newTaskTitle,
-                priority: newTaskPriority,
-                dueDate: includeDueDate ? dueDate : nil,
-                tags: [],
-                subtaskTitles: []
+              let created = await appState.createTask(
+                title: title,
+                priority: priority,
+                dueDate: taskDueDate,
+                tags: tags,
+                subtaskTitles: [],
+                description: description,
+                projectID: projectID
               )
+
+              guard created else { return }
+              newTaskTitle = ""
+              newTaskDescription = ""
+              newTaskTags = ""
+              newTaskProjectID = ""
+              searchQuery = ""
+              taskFilter = .all
+              includeDueDate = false
+              showQuickAddForm = false
             }
-            newTaskTitle = ""
-            includeDueDate = false
-            showQuickAddForm = false
           }
           .buttonStyle(SerenityPrimaryButtonStyle())
           .hoverCursor(.pointingHand)
@@ -1774,6 +1857,7 @@ private struct ActionHubSectionView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
               .stroke(SerenityPalette.thinBorder, style: StrokeStyle(lineWidth: 1, dash: [6, 6]))
           )
+          .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
           .hoverCursor(.pointingHand)
@@ -1829,6 +1913,16 @@ private struct ActionHubSectionView: View {
         if let dueDate = task.dueDate {
           chip("Due \(dueDate.formatted(date: .numeric, time: .omitted))", tint: isOverdue(task) ? .red : SerenityPalette.accent)
         }
+        if let projectName = projectName(for: task.projectId) {
+          chip(projectName, tint: SerenityPalette.accent)
+        }
+      }
+
+      if let description = task.description, !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        Text(description)
+          .font(SerenityType.body)
+          .foregroundStyle(SerenityPalette.textSecondary)
+          .lineLimit(3)
       }
 
       if !task.tags.isEmpty {
@@ -1877,6 +1971,12 @@ private struct ActionHubSectionView: View {
           .hoverCursor(.pointingHand)
 
         Spacer()
+
+        Button("Edit") {
+          editingTask = task
+        }
+        .buttonStyle(SerenitySecondaryButtonStyle())
+          .hoverCursor(.pointingHand)
 
         Button("Delete", role: .destructive) {
           Task { await appState.deleteTask(id: task.id) }
@@ -2052,17 +2152,20 @@ private struct ActionHubSectionView: View {
     )
   }
 
-  private func section(for resultType: GlobalSearchResultType) -> AppSection {
-    switch resultType {
-    case .task:
-      return .actionHub
-    case .project:
-      return .projects
-    case .journal:
-      return .journal
-    case .goal:
-      return .goals
-    }
+  private var assignableProjects: [ProjectEntity] {
+    appState.projects.filter { !$0.archived }
+  }
+
+  private func projectName(for projectID: String?) -> String? {
+    guard let projectID else { return nil }
+    return appState.projects.first(where: { $0.id == projectID })?.name
+  }
+
+  private func csvValues(from value: String) -> [String] {
+    value
+      .split(separator: ",")
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
   }
 }
 
@@ -2453,7 +2556,7 @@ private struct ProjectsSectionView: View {
 
   @State private var newProjectName = ""
   @State private var newProjectDescription = ""
-  @State private var newProjectColor = "#4A90E2"
+  @State private var newProjectColor: Color = ProjectColorCodec.fallbackColor
   @State private var editingProject: ProjectEntity?
 
   var body: some View {
@@ -2462,21 +2565,30 @@ private struct ProjectsSectionView: View {
         VStack(alignment: .leading, spacing: 10) {
           TextField("Project name", text: $newProjectName)
           TextField("Description", text: $newProjectDescription)
-          TextField("Color hex", text: $newProjectColor)
+          HStack(spacing: 10) {
+            ColorPicker("Project color", selection: $newProjectColor, supportsOpacity: false)
+            Text(ProjectColorCodec.hex(from: newProjectColor))
+              .font(.caption.monospaced())
+              .foregroundStyle(.secondary)
+          }
 
           HStack {
             Button("Create Project") {
+              let name = newProjectName
+              let description = newProjectDescription
+              let colorHex = ProjectColorCodec.hex(from: newProjectColor)
+
               Task {
                 await appState.createProject(
-                  name: newProjectName,
-                  description: newProjectDescription,
-                  color: newProjectColor
+                  name: name,
+                  description: description,
+                  color: colorHex
                 )
               }
 
               newProjectName = ""
               newProjectDescription = ""
-              newProjectColor = "#4A90E2"
+              newProjectColor = ProjectColorCodec.fallbackColor
             }
             .buttonStyle(.borderedProminent)
           .hoverCursor(.pointingHand)
@@ -2507,9 +2619,14 @@ private struct ProjectsSectionView: View {
                     Text(project.description ?? "No description")
                       .font(.caption)
                       .foregroundStyle(.secondary)
-                    Text("Color: \(project.color)")
-                      .font(.caption2)
-                      .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                      Circle()
+                        .fill(ProjectColorCodec.color(from: project.color) ?? Color.secondary)
+                        .frame(width: 10, height: 10)
+                      Text("Color: \(project.color)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
                   }
 
                   Spacer()
@@ -3456,6 +3573,503 @@ private struct MetricTile: View {
   }
 }
 
+private struct GlobalSearchSheet: View {
+  @EnvironmentObject private var appState: AppState
+  @FocusState private var queryFocused: Bool
+
+  private var queryBinding: Binding<String> {
+    Binding(
+      get: { appState.globalSearchQuery },
+      set: { appState.setGlobalSearchQuery($0) }
+    )
+  }
+
+  private var hasSearchQuery: Bool {
+    !appState.globalSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  private var groupedResults: [(GlobalSearchResultType, [GlobalSearchResult])] {
+    GlobalSearchResultType.allCases.compactMap { type in
+      let matches = appState.globalSearchResults.filter { $0.type == type }
+      guard !matches.isEmpty else { return nil }
+      return (type, matches)
+    }
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      HStack {
+        Label("Global Search", systemImage: "magnifyingglass")
+          .font(SerenityType.sectionTitle)
+        Spacer()
+        Text("Cmd+K")
+          .font(SerenityType.caption)
+          .foregroundStyle(SerenityPalette.textSecondary)
+          .padding(.horizontal, 8)
+          .padding(.vertical, 4)
+          .background(SerenityPalette.innerCardBackground, in: Capsule())
+      }
+
+      HStack(spacing: 8) {
+        Image(systemName: "magnifyingglass")
+          .foregroundStyle(SerenityPalette.textSecondary)
+        TextField("Search tasks, projects, journal, or goals", text: queryBinding)
+          .textFieldStyle(.plain)
+          .font(.system(size: 16, weight: .regular))
+          .focused($queryFocused)
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 12)
+      .background(SerenityPalette.panelBackgroundRaised, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+      .overlay(
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+          .stroke(SerenityPalette.thinBorder, lineWidth: 1)
+      )
+
+      if !hasSearchQuery {
+        ContentUnavailableView(
+          "Start typing to search",
+          systemImage: "text.magnifyingglass",
+          description: Text("Use keywords, tags, project names, or journal terms.")
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      } else if appState.globalSearchResults.isEmpty {
+        ContentUnavailableView(
+          "No matches found",
+          systemImage: "magnifyingglass",
+          description: Text("Try fewer keywords or a broader term.")
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      } else {
+        ScrollView {
+          VStack(alignment: .leading, spacing: 14) {
+            ForEach(groupedResults, id: \.0.id) { type, results in
+              VStack(alignment: .leading, spacing: 8) {
+                Text(type.title.uppercased())
+                  .font(.caption.weight(.semibold))
+                  .foregroundStyle(SerenityPalette.textSecondary)
+                ForEach(results.prefix(10)) { result in
+                  Button {
+                    appState.selectGlobalSearchResult(result)
+                  } label: {
+                    GlobalSearchResultRow(result: result)
+                  }
+                  .buttonStyle(.plain)
+                  .hoverCursor(.pointingHand)
+                }
+              }
+            }
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+        }
+      }
+    }
+    .padding(20)
+    .frame(minWidth: 760, minHeight: 560)
+    .background(SerenityPalette.windowBackground)
+    .onAppear {
+      queryFocused = true
+    }
+    .onSubmit(of: .text) {
+      guard let firstResult = appState.globalSearchResults.first else { return }
+      appState.selectGlobalSearchResult(firstResult)
+    }
+  }
+}
+
+private struct GlobalSearchResultRow: View {
+  let result: GlobalSearchResult
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: result.type.systemImage)
+        .foregroundStyle(SerenityPalette.accent)
+        .frame(width: 18)
+
+      VStack(alignment: .leading, spacing: 3) {
+        Text(result.title)
+          .font(SerenityType.bodyLarge.weight(.medium))
+          .foregroundStyle(SerenityPalette.textPrimary)
+          .lineLimit(1)
+        Text(result.subtitle.isEmpty ? "No additional details" : result.subtitle)
+          .font(SerenityType.caption)
+          .foregroundStyle(SerenityPalette.textSecondary)
+          .lineLimit(1)
+      }
+
+      Spacer()
+
+      VStack(alignment: .trailing, spacing: 3) {
+        Text(result.type.title)
+          .font(SerenityType.caption.weight(.semibold))
+          .foregroundStyle(SerenityPalette.textSecondary)
+        Text(result.updatedAt.formatted(date: .abbreviated, time: .shortened))
+          .font(SerenityType.caption)
+          .foregroundStyle(SerenityPalette.textSecondary)
+      }
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    .background(SerenityPalette.panelBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .overlay(
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .stroke(SerenityPalette.thinBorder, lineWidth: 1)
+    )
+  }
+}
+
+private struct HelpCenterArticle: Identifiable {
+  let title: String
+  let summary: String
+  let keywords: [String]
+  let shortcut: String?
+  let section: AppSection?
+
+  var id: String { title }
+}
+
+private struct HelpCenterSheet: View {
+  @EnvironmentObject private var appState: AppState
+  @State private var query = ""
+
+  private let articles: [HelpCenterArticle] = [
+    HelpCenterArticle(
+      title: "Search across everything",
+      summary: "Find tasks, projects, journal entries, and goals from one place.",
+      keywords: ["search", "global", "find", "lookup"],
+      shortcut: "Cmd+K",
+      section: nil
+    ),
+    HelpCenterArticle(
+      title: "Manage tasks in ActionHub",
+      summary: "Create, edit, complete, or bulk-update tasks and subtasks.",
+      keywords: ["actionhub", "tasks", "subtasks", "bulk"],
+      shortcut: nil,
+      section: .actionHub
+    ),
+    HelpCenterArticle(
+      title: "Plan your day",
+      summary: "Review due and overdue work in Today view.",
+      keywords: ["today", "due", "overdue"],
+      shortcut: nil,
+      section: .today
+    ),
+    HelpCenterArticle(
+      title: "Capture journal entries",
+      summary: "Track reflections, moods, and tags in the Journal.",
+      keywords: ["journal", "mood", "entry", "notes"],
+      shortcut: nil,
+      section: .journal
+    ),
+    HelpCenterArticle(
+      title: "Track goal progress",
+      summary: "Use Goals to monitor weekly and project targets.",
+      keywords: ["goals", "progress", "target"],
+      shortcut: nil,
+      section: .goals
+    ),
+    HelpCenterArticle(
+      title: "Configure integrations",
+      summary: "Connect Google and GitHub providers and inspect sync health.",
+      keywords: ["integrations", "google", "github", "sync"],
+      shortcut: nil,
+      section: .integrations
+    ),
+    HelpCenterArticle(
+      title: "Review AI insights and summaries",
+      summary: "Explore generated insights, recaps, and summary exports.",
+      keywords: ["insights", "ai", "summary", "usage"],
+      shortcut: nil,
+      section: .insights
+    ),
+    HelpCenterArticle(
+      title: "Security and backend settings",
+      summary: "Manage auth, local lock, database diagnostics, and backend selection.",
+      keywords: ["settings", "security", "database", "backend"],
+      shortcut: nil,
+      section: .settings
+    ),
+  ]
+
+  private var filteredArticles: [HelpCenterArticle] {
+    let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard !trimmed.isEmpty else { return articles }
+
+    return articles.filter { article in
+      let haystack = [
+        article.title,
+        article.summary,
+        article.shortcut ?? "",
+        article.section?.title ?? "",
+        article.keywords.joined(separator: " "),
+      ]
+        .joined(separator: " ")
+        .lowercased()
+      return haystack.contains(trimmed)
+    }
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      HStack {
+        Label("Help Center", systemImage: "questionmark.circle")
+          .font(SerenityType.sectionTitle)
+        Spacer()
+        Text("Cmd+/")
+          .font(SerenityType.caption)
+          .foregroundStyle(SerenityPalette.textSecondary)
+          .padding(.horizontal, 8)
+          .padding(.vertical, 4)
+          .background(SerenityPalette.innerCardBackground, in: Capsule())
+      }
+
+      HStack(spacing: 8) {
+        Image(systemName: "magnifyingglass")
+          .foregroundStyle(SerenityPalette.textSecondary)
+        TextField("Search help topics", text: $query)
+          .textFieldStyle(.plain)
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 12)
+      .background(SerenityPalette.panelBackgroundRaised, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+      .overlay(
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+          .stroke(SerenityPalette.thinBorder, lineWidth: 1)
+      )
+
+      ScrollView {
+        VStack(alignment: .leading, spacing: 14) {
+          GroupBox("Quick Actions") {
+            HStack(spacing: 8) {
+              Button("Open Search") {
+                appState.closeHelpCenter()
+                appState.openGlobalSearch()
+              }
+              .buttonStyle(SerenitySecondaryButtonStyle())
+              .hoverCursor(.pointingHand)
+
+              Button("Go to ActionHub") {
+                appState.setSection(.actionHub)
+                appState.closeHelpCenter()
+              }
+              .buttonStyle(SerenitySecondaryButtonStyle())
+              .hoverCursor(.pointingHand)
+
+              Button("Quick Add Task") {
+                Task {
+                  await appState.quickAddTaskFromCommand()
+                  appState.closeHelpCenter()
+                }
+              }
+              .buttonStyle(SerenitySecondaryButtonStyle())
+              .hoverCursor(.pointingHand)
+
+              Button("Refresh Data") {
+                Task {
+                  await appState.refreshCoreWorkflowData()
+                }
+              }
+              .buttonStyle(SerenitySecondaryButtonStyle())
+              .hoverCursor(.pointingHand)
+            }
+            .padding(.top, 8)
+          }
+
+          GroupBox("Keyboard Shortcuts") {
+            VStack(alignment: .leading, spacing: 8) {
+              HelpShortcutRow(action: "Global Search", shortcut: "Cmd+K")
+              HelpShortcutRow(action: "Help Center", shortcut: "Cmd+/")
+              HelpShortcutRow(action: "Quick Add Task", shortcut: "Cmd+Shift+N")
+            }
+            .padding(.top, 8)
+          }
+
+          GroupBox("Guides") {
+            VStack(alignment: .leading, spacing: 10) {
+              if filteredArticles.isEmpty {
+                Text("No help topics matched your search.")
+                  .foregroundStyle(SerenityPalette.textSecondary)
+              } else {
+                ForEach(filteredArticles) { article in
+                  HelpArticleRow(article: article) {
+                    guard let section = article.section else { return }
+                    appState.setSection(section)
+                    appState.closeHelpCenter()
+                  }
+                }
+              }
+            }
+            .padding(.top, 8)
+          }
+        }
+      }
+    }
+    .padding(20)
+    .frame(minWidth: 760, minHeight: 560)
+    .background(SerenityPalette.windowBackground)
+  }
+}
+
+private struct HelpShortcutRow: View {
+  let action: String
+  let shortcut: String
+
+  var body: some View {
+    HStack {
+      Text(action)
+      Spacer()
+      Text(shortcut)
+        .font(SerenityType.caption.weight(.semibold))
+        .foregroundStyle(SerenityPalette.textSecondary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(SerenityPalette.innerCardBackground, in: Capsule())
+    }
+  }
+}
+
+private struct HelpArticleRow: View {
+  let article: HelpCenterArticle
+  let openAction: () -> Void
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: article.section?.systemImage ?? "info.circle")
+        .frame(width: 18)
+        .foregroundStyle(SerenityPalette.accent)
+
+      VStack(alignment: .leading, spacing: 3) {
+        Text(article.title)
+          .font(SerenityType.bodyLarge.weight(.medium))
+        Text(article.summary)
+          .font(SerenityType.body)
+          .foregroundStyle(SerenityPalette.textSecondary)
+      }
+
+      Spacer()
+
+      if let shortcut = article.shortcut {
+        Text(shortcut)
+          .font(SerenityType.caption)
+          .foregroundStyle(SerenityPalette.textSecondary)
+      }
+
+      if article.section != nil {
+        Button("Open", action: openAction)
+          .buttonStyle(SerenitySecondaryButtonStyle())
+          .hoverCursor(.pointingHand)
+      }
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    .background(SerenityPalette.panelBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .overlay(
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .stroke(SerenityPalette.thinBorder, lineWidth: 1)
+    )
+  }
+}
+
+private struct TaskEditorView: View {
+  let task: TaskEntity
+  let availableProjects: [ProjectEntity]
+  let onSave: (String, String, TaskPriority, Date?, String?, [String]) -> Void
+
+  @Environment(\.dismiss) private var dismiss
+
+  @State private var title: String
+  @State private var description: String
+  @State private var priority: TaskPriority
+  @State private var hasDueDate: Bool
+  @State private var dueDate: Date
+  @State private var selectedProjectID: String
+  @State private var tags: String
+
+  init(
+    task: TaskEntity,
+    availableProjects: [ProjectEntity],
+    onSave: @escaping (String, String, TaskPriority, Date?, String?, [String]) -> Void
+  ) {
+    self.task = task
+    self.availableProjects = availableProjects
+    self.onSave = onSave
+    _title = State(initialValue: task.title)
+    _description = State(initialValue: task.description ?? "")
+    _priority = State(initialValue: task.priority)
+    _hasDueDate = State(initialValue: task.dueDate != nil)
+    _dueDate = State(initialValue: task.dueDate ?? Date())
+    _selectedProjectID = State(initialValue: task.projectId ?? "")
+    _tags = State(initialValue: task.tags.joined(separator: ", "))
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Edit Task")
+        .font(.headline)
+
+      TextField("Title", text: $title)
+
+      TextField("Description (optional)", text: $description, axis: .vertical)
+        .lineLimit(2...6)
+
+      HStack(spacing: 12) {
+        Picker("Priority", selection: $priority) {
+          ForEach(TaskPriority.allCases, id: \.rawValue) { value in
+            Text(value.rawValue.capitalized).tag(value)
+          }
+        }
+        .frame(maxWidth: 180)
+
+        Toggle("Due date", isOn: $hasDueDate)
+          .toggleStyle(.switch)
+
+        if hasDueDate {
+          DatePicker("", selection: $dueDate, displayedComponents: [.date, .hourAndMinute])
+            .labelsHidden()
+        }
+      }
+
+      Picker("Project", selection: $selectedProjectID) {
+        Text("No project").tag("")
+        ForEach(availableProjects) { project in
+          Text(project.name).tag(project.id)
+        }
+      }
+      .frame(maxWidth: 260)
+
+      TextField("Tags (comma-separated)", text: $tags)
+
+      HStack {
+        Spacer()
+        Button("Cancel") {
+          dismiss()
+        }
+        .hoverCursor(.pointingHand)
+
+        Button("Save") {
+          let parsedTags = tags
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+          onSave(
+            title,
+            description,
+            priority,
+            hasDueDate ? dueDate : nil,
+            selectedProjectID.isEmpty ? nil : selectedProjectID,
+            parsedTags
+          )
+          dismiss()
+        }
+        .buttonStyle(.borderedProminent)
+        .hoverCursor(.pointingHand)
+      }
+    }
+    .padding(20)
+  }
+}
+
 private struct JournalEntryEditorView: View {
   let entry: JournalEntryEntity
   let onSave: (String, String, JournalMood?, [String]) -> Void
@@ -3527,14 +4141,14 @@ private struct ProjectEditorView: View {
 
   @State private var name: String
   @State private var description: String
-  @State private var color: String
+  @State private var color: Color
 
   init(project: ProjectEntity, onSave: @escaping (String, String, String) -> Void) {
     self.project = project
     self.onSave = onSave
     _name = State(initialValue: project.name)
     _description = State(initialValue: project.description ?? "")
-    _color = State(initialValue: project.color)
+    _color = State(initialValue: ProjectColorCodec.color(from: project.color) ?? ProjectColorCodec.fallbackColor)
   }
 
   var body: some View {
@@ -3544,7 +4158,12 @@ private struct ProjectEditorView: View {
 
       TextField("Name", text: $name)
       TextField("Description", text: $description)
-      TextField("Color", text: $color)
+      HStack(spacing: 10) {
+        ColorPicker("Project color", selection: $color, supportsOpacity: false)
+        Text(ProjectColorCodec.hex(from: color))
+          .font(.caption.monospaced())
+          .foregroundStyle(.secondary)
+      }
 
       HStack {
         Spacer()
@@ -3553,7 +4172,7 @@ private struct ProjectEditorView: View {
         }
         .hoverCursor(.pointingHand)
         Button("Save") {
-          onSave(name, description, color)
+          onSave(name, description, ProjectColorCodec.hex(from: color))
           dismiss()
         }
         .buttonStyle(.borderedProminent)
@@ -3561,6 +4180,41 @@ private struct ProjectEditorView: View {
       }
     }
     .padding(20)
+  }
+}
+
+private enum ProjectColorCodec {
+  static let fallbackHex = "#4A90E2"
+  static let fallbackColor = Color(red: 0.29, green: 0.56, blue: 0.89)
+
+  static func color(from hex: String) -> Color? {
+    let sanitized = hex
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .replacingOccurrences(of: "#", with: "")
+      .uppercased()
+
+    guard sanitized.count == 6 else { return nil }
+
+    var value: UInt64 = 0
+    guard Scanner(string: sanitized).scanHexInt64(&value) else { return nil }
+
+    let red = Double((value & 0xFF0000) >> 16) / 255.0
+    let green = Double((value & 0x00FF00) >> 8) / 255.0
+    let blue = Double(value & 0x0000FF) / 255.0
+
+    return Color(red: red, green: green, blue: blue)
+  }
+
+  static func hex(from color: Color) -> String {
+    guard let converted = NSColor(color).usingColorSpace(.sRGB) else {
+      return fallbackHex
+    }
+
+    let red = Int(round(converted.redComponent * 255))
+    let green = Int(round(converted.greenComponent * 255))
+    let blue = Int(round(converted.blueComponent * 255))
+
+    return String(format: "#%02X%02X%02X", red, green, blue)
   }
 }
 

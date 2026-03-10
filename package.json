@@ -4,7 +4,7 @@
   "private": true,
   "description": "Cross-platform productivity application with ActionHub and Journal",
   "scripts": {
-    "build": "npm -w @serenity/core run build && npm -w @serenity/database run build && npm -w @serenity/ui run build && npm -w @serenity/desktop run build && npm -w @serenity/macos run build && npm -w @serenity/web run build && npm -w @serenity/mcp-server run build",
+    "build": "npm -w @serenity/core run build && npm -w @serenity/database run build && npm -w @serenity/ui run build && npm -w @serenity/desktop run build && npm -w @serenity/web run build && npm -w @serenity/mcp-server run build",
     "dev": "turbo run dev --no-daemon",
     "lint": "turbo run lint --no-daemon",
     "test": "turbo run test --no-daemon",
@@ -13,7 +13,6 @@
     "type-check": "tsc --noEmit",
     "docs:generate": "typedoc",
     "prepare:logos": "bash scripts/prepare-logos.sh",
-    "beta:triage:macos": "node scripts/macos-beta-triage-report.mjs",
     "postinstall": "npm run build"
   },
   "devDependencies": {
@@ -33,7 +32,6 @@
   "workspaces": [
     "apps/desktop",
     "apps/web",
-    "apps/macos",
     "apps/mcp-server",
     "packages/*"
   ]
